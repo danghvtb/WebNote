@@ -3,15 +3,28 @@
 // Creates a comprehensive demo notebook with tutorial pages & live examples for all features.
 // ============================================================
 
-import { ensureToday, createNotebook, createPage, updatePageContent } from './repository';
+import { ensureToday, createNotebook, createPage, updatePageContent, getNotebooksByDay, getPagesByNotebook } from './repository';
 import type { Notebook, Page } from '../../types';
 
 export async function seedDemoVault(): Promise<{ notebook: Notebook; pages: Page[] }> {
   // Ensure today exists
   const today = await ensureToday();
 
-  // Create Demo Notebook
-  const notebook = await createNotebook('📚 Hướng Dẫn Sử Dụng MyNotes 4.0', today.id, 'book');
+  // Check if Demo Notebook already exists for today to prevent duplicates
+  const existingNotebooks = await getNotebooksByDay(today.id);
+  const existingDemo = existingNotebooks.find(
+    (nb) => nb.title === '📚 Hướng Dẫn Sử Dụng MyNotes 4.0'
+  );
+
+  if (existingDemo) {
+    const existingPages = await getPagesByNotebook(existingDemo.id);
+    if (existingPages.length > 0) {
+      return { notebook: existingDemo, pages: existingPages };
+    }
+  }
+
+  // Create Demo Notebook if not found
+  const notebook = existingDemo || (await createNotebook('📚 Hướng Dẫn Sử Dụng MyNotes 4.0', today.id, 'book'));
 
   const demoPagesData = [
     {

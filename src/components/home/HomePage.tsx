@@ -21,12 +21,15 @@ export function HomePage() {
 
   const handleGenerateDemoNotes = async () => {
     try {
-      const { notebook } = await seedDemoVault();
+      const { notebook, pages } = await seedDemoVault();
       await loadDays();
       await loadRecentNotebooks();
       await selectNotebook(notebook.id);
+      if (pages && pages.length > 0) {
+        useNotesStore.getState().selectPage(pages[0].id);
+      }
       queueSync('create', 'notebook', notebook.id);
-      addNotification('success', 'Đã tạo bộ ghi chú mẫu cho tất cả tính năng!');
+      addNotification('success', 'Đã nạp và mở bộ ghi chú hướng dẫn mẫu!');
     } catch (err) {
       console.error(err);
       addNotification('error', 'Có lỗi khi tạo bộ ghi chú mẫu.');
