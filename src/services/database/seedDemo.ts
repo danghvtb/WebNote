@@ -1,6 +1,6 @@
 // ============================================================
 // MyNotes — Demo Vault Seed Data Generator
-// Creates a comprehensive demo notebook with tutorial pages for all features.
+// Creates a comprehensive demo notebook with tutorial pages & live examples for all features.
 // ============================================================
 
 import { ensureToday, createNotebook, createPage, updatePageContent } from './repository';
@@ -26,7 +26,32 @@ export async function seedDemoVault(): Promise<{ notebook: Notebook; pages: Page
   <li><p><strong>Obsidian Midnight UI:</strong> Giao diện tối màu tương phản cao, phông chữ lớn hiện đại, trải nghiệm viết cực kỳ êm mắt.</p></li>
 </ul>
 
-<p>👉 Hãy mở các trang ghi chú trong danh sách bên trái để khám phá và thử nghiệm chi tiết từng tính năng thông minh!</p>`,
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+<p>Dưới đây là ví dụ minh họa cấu trúc của một ghi chú tiêu chuẩn trong MyNotes kết hợp văn bản, đánh dấu highlight và bảng tổng quan:</p>
+
+<blockquote><p>📌 <em>"Tri thức là tài sản duy nhất tăng giá trị khi được chia sẻ và tổ chức hệ thống."</em></p></blockquote>
+
+<table>
+  <thead>
+    <tr>
+      <th>Thành phần</th>
+      <th>Vị trí lưu trữ</th>
+      <th>Cơ chế bảo mật</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Bộ nhớ cục bộ</strong></td>
+      <td>IndexedDB (Trình duyệt)</td>
+      <td>Lưu mã hóa cục bộ, truy cập không cần mạng</td>
+    </tr>
+    <tr>
+      <td><strong>Sao lưu đám mây</strong></td>
+      <td>Google Drive (/MyNotes)</td>
+      <td>Chỉ tài khoản Google cá nhân mới có quyền xem</td>
+    </tr>
+  </tbody>
+</table>`,
     },
     {
       title: '⚡ 2. Slash Commands Menu (Gõ /)',
@@ -40,16 +65,46 @@ export async function seedDemoVault(): Promise<{ notebook: Notebook; pages: Page
   <li><p>Sử dụng phím mũi tên lên/xuống để chọn loại định dạng mong muốn và ấn <code>Enter</code>.</p></li>
 </ol>
 
-<h2>📋 Các khối hỗ trợ trong Menu:</h2>
-<ul>
-  <li><p><strong>Headings (H1, H2, H3):</strong> Tiêu đề bài viết lớn, vừa, nhỏ.</p></li>
-  <li><p><strong>Task List:</strong> Tạo danh sách việc cần làm có ô tích checkbox.</p></li>
-  <li><p><strong>Code Block:</strong> Khối mã nguồn hỗ trợ tô màu cú pháp syntax highlighting.</p></li>
-  <li><p><strong>Quote:</strong> Khối trích dẫn nổi bật.</p></li>
-  <li><p><strong>Table:</strong> Chèn bảng biểu 3x3 linh hoạt.</p></li>
-  <li><p><strong>Divider:</strong> Đường phân cách nét liền đẹp mắt.</p></li>
-  <li><p><strong>AI Copilot:</strong> Kích hoạt Trợ lý AI ngay tại vị trí soạn thảo.</p></li>
-</ul>`,
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+
+<h3>1. Khối trích dẫn (Quote Block):</h3>
+<blockquote><p>💡 <strong>Slash Command Tip:</strong> Nhấn phím <code>Esc</code> bất kỳ lúc nào để đóng trình đơn lệnh nhanh mà không cần dùng chuột.</p></blockquote>
+
+<h3>2. Khối mã nguồn (Code Block with Syntax Highlighting):</h3>
+<pre><code>// Ví dụ đoạn mã TypeScript tính toán thời gian đọc
+function getReadingTime(wordsCount: number): number {
+  const WORDS_PER_MINUTE = 200;
+  return Math.ceil(wordsCount / WORDS_PER_MINUTE);
+}
+console.log("Reading time:", getReadingTime(450), "minutes");</code></pre>
+
+<h3>3. Khối Bảng dữ liệu mẫu (Interactive Table):</h3>
+<table>
+  <thead>
+    <tr>
+      <th>Lệnh Slash</th>
+      <th>Phím tắt tương ứng</th>
+      <th>Chức năng</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><code>/h1</code></td>
+      <td>Ctrl + Alt + 1</td>
+      <td>Tiêu đề H1 lớn</td>
+    </tr>
+    <tr>
+      <td><code>/todo</code></td>
+      <td>Ctrl + Shift + C</td>
+      <td>Tạo ô tích công việc</td>
+    </tr>
+    <tr>
+      <td><code>/code</code></td>
+      <td>Ctrl + Alt + C</td>
+      <td>Tạo khối mã nguồn</td>
+    </tr>
+  </tbody>
+</table>`,
     },
     {
       title: '🔗 3. Liên Kết 2 Chiều (Wiki Links [[ ]])',
@@ -57,16 +112,21 @@ export async function seedDemoVault(): Promise<{ notebook: Notebook; pages: Page
 <p>Giống như <em>Obsidian</em> và <em>Roam Research</em>, MyNotes hỗ trợ liên kết các trang ghi chú lại với nhau tạo thành mạng lưới tri thức liên hoàn.</p>
 
 <h2>📝 Cách tạo liên kết trang:</h2>
-<p>Để liên kết tới một trang khác, bạn chỉ cần gõ tên trang đó trong cặp dấu ngoặc vuông đôi <code>[[Tên trang]]</code>.</p>
+<p>Để liên kết tới một trang khác, bạn chỉ chỉ cần gõ tên trang đó trong cặp dấu ngoặc vuông đôi <code>[[Tên trang]]</code>.</p>
 
-<p>Ví dụ hãy nhấp thử vào các đường dẫn bên dưới:</p>
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+<p>Hãy thử nhấp vào các liên kết Wiki Links trực tiếp dưới đây để chuyển trang tức thì:</p>
+
 <ul>
-  <li><p>Trang hướng dẫn Slash Menu: [[⚡ 2. Slash Commands Menu (Gõ /)]]</p></li>
-  <li><p>Trang hướng dẫn Knowledge Graph: [[🌐 4. Sơ Đồ Tri Thức (Knowledge Graph View)]]</p></li>
+  <li><p>👉 Mở trang hướng dẫn gõ Slash Menu: [[⚡ 2. Slash Commands Menu (Gõ /)]]</p></li>
+  <li><p>👉 Mở trang hướng dẫn Sơ đồ tri thức: [[🌐 4. Sơ Đồ Tri Thức (Knowledge Graph View)]]</p></li>
+  <li><p>👉 Mở trang Quản lý công việc: [[✅ 6. Trung Tâm Quản Lý Công Việc (Todo Dashboard)]]</p></li>
 </ul>
 
-<h2>🔍 Linked References (Tham chiếu ngược):</h2>
-<p>Ở phía dưới chân của mỗi bài viết, MyNotes tự động phân tích và hiển thị phần <strong>Linked References</strong> — liệt kê tất cả các bài viết khác có liên kết hoặc nhắc tới bài viết hiện tại!</p>`,
+<hr />
+
+<h2>🔍 Thử nghiệm Linked References:</h2>
+<p>Cuộn xuống <strong>cuối trang này</strong> để nhìn thấy bảng <strong>Linked References</strong> — danh sách các bài viết mẫu khác tự động tham chiếu ngược lại bài viết này!</p>`,
     },
     {
       title: '🌐 4. Sơ Đồ Tri Thức (Knowledge Graph View)',
@@ -79,77 +139,132 @@ export async function seedDemoVault(): Promise<{ notebook: Notebook; pages: Page
   <li><p>Một cửa sổ Modal Canvas 2D sẽ hiện lên với các nút (nodes) tượng trưng cho Vault, Notebook và Page.</p></li>
   <li><p>Bạn có thể dùng chuột kéo thả các nút, thu phóng sơ đồ.</p></li>
   <li><p>Nhấp trực tiếp vào bất kỳ nút trang màu hồng nào để chuyển nhanh sang bài viết đó!</p></li>
-</ol>`,
+</ol>
+
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+<p>Dưới đây là một sơ đồ liên kết ý tưởng văn bản (Map of Content - MOC) thể hiện cách các nút ghi chú kết nối với nhau trong Knowledge Graph:</p>
+
+<pre><code>[ MyNotes Vault ]
+   ├── [ 📚 Sổ Tay Hướng Dẫn ]
+   │     ├── 📄 [[📄 1. Tổng Quan về MyNotes 4.0]]
+   │     ├── ⚡ [[⚡ 2. Slash Commands Menu (Gõ /)]]
+   │     ├── 🔗 [[🔗 3. Liên Kết 2 Chiều (Wiki Links [[ ]])]]
+   │     └── 🌐 [[🌐 4. Sơ Đồ Tri Thức (Knowledge Graph View)]]
+   └── [ 💡 Sổ Tay Dự Án Kế Hoạch ]
+         ├── 🤖 [[🤖 5. Trợ Lý AI Copilot (Summarize, Polish & Translate)]]
+         └── ✅ [[✅ 6. Trung Tâm Quản Lý Công Việc (Todo Dashboard)]]</code></pre>`,
     },
     {
       title: '🤖 5. Trợ Lý AI Copilot (Summarize, Polish & Translate)',
       content: `<h1>🤖 AI Writing Copilot Assistant</h1>
 <p>Trợ lý AI tích hợp sẵn giúp bạn xử lý văn bản, tóm tắt ý chính, trích xuất to-do list và dịch thuật chuyên nghiệp chỉ với 1 cú nhấp chuột.</p>
 
-<h2>✨ Các tính năng của AI Copilot:</h2>
-<ul>
-  <li><p><strong>Summarize (Tóm tắt):</strong> Tóm gọn bài viết dài thành các ý chính cô đọng.</p></li>
-  <li><p><strong>Polish / Rephrase (Chuẩn hóa):</strong> Trau chuốt văn phong bài viết thêm chuyên nghiệp và mượt mà.</p></li>
-  <li><p><strong>Extract Tasks (Rút việc cần làm):</strong> Tự động phát hiện các yêu cầu trong bài và chuyển thành danh sách Checklist <code>- [ ]</code>.</p></li>
-  <li><p><strong>Translate (Dịch thuật):</strong> Dịch tức thì bài viết sang Tiếng Việt hoặc Tiếng Anh.</p></li>
-</ul>
-
 <h2>🚀 Hướng dẫn kích hoạt:</h2>
-<p>Bấm vào nút <strong>AI Copilot</strong> (biểu tượng ✨ tím) trên thanh công cụ soạn thảo hoặc ở chân trang để mở giao diện Trợ lý AI.</p>`,
+<p>Bấm vào nút <strong>AI Copilot</strong> (biểu tượng ✨ tím) trên thanh công cụ soạn thảo hoặc ở chân trang để mở giao diện Trợ lý AI.</p>
+
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+
+<h3>Đoạn văn bản thô (Original Input Text):</h3>
+<blockquote><p>"Hôm nay đội dự án đã họp bàn về việc nâng cấp giao diện MyNotes lên phiên bản 4.0. Cần phải hoàn thành các nhiệm vụ sau: bổ sung menu gõ slash command, xây dựng todo dashboard tập trung, thêm tính năng backup dữ liệu json và kiểm thử toàn bộ trên trình duyệt trước 22:00."</p></blockquote>
+
+<h3>Kết quả sau khi dùng AI Copilot (AI Processed Output):</h3>
+<ul>
+  <li><p><strong>Tóm tắt (Summarize):</strong> Họp nâng cấp MyNotes 4.0 tập trung vào 3 tính năng: Slash Menu, Todo Dashboard, Backup JSON và kiểm thử trước 22:00.</p></li>
+  <li><p><strong>Rút công việc (Extract Tasks):</strong></p>
+    <ul data-type="taskList">
+      <li data-type="taskItem" data-checked="true"><p>Bổ sung menu gõ Slash command</p></li>
+      <li data-type="taskItem" data-checked="true"><p>Xây dựng Todo Dashboard tập trung</p></li>
+      <li data-type="taskItem" data-checked="false"><p>Thêm tính năng backup dữ liệu JSON</p></li>
+      <li data-type="taskItem" data-checked="false"><p>Kiểm thử toàn bộ trên trình duyệt trước 22:00</p></li>
+    </ul>
+  </li>
+  <li><p><strong>Dịch sang Tiếng Anh (English Translation):</strong> <em>"Today the project team met to discuss upgrading the MyNotes UI to version 4.0, focusing on Slash Commands, Todo Dashboard, and JSON Backup."</em></p></li>
+</ul>`,
     },
     {
       title: '✅ 6. Trung Tâm Quản Lý Công Việc (Todo Dashboard)',
       content: `<h1>✅ Task Center & Todo Dashboard</h1>
 <p>Toàn bộ các danh sách công việc (Checklists) nằm rải rác ở nhiều bài viết khác nhau sẽ được gom về một giao diện quản lý tập trung duy nhất!</p>
 
-<h2>📌 Danh sách công việc mẫu để thử nghiệm:</h2>
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+<p>Hãy thử đánh dấu tích hoặc bỏ tích các ô công việc mẫu dưới đây, sau đó bấm nút <strong>Tasks</strong> trên thanh Header để quan sát sự thay đổi ngay trên Dashboard:</p>
+
+<h3>📌 Danh sách công việc tuần này (Weekly Checklist):</h3>
 <ul data-type="taskList">
-  <li data-type="taskItem" data-checked="false"><p>Thử nghiệm tính năng Task Center bằng cách bấm nút Tasks trên Header</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Đánh dấu hoàn thành bài tập về nhà trong ghi chú</p></li>
-  <li data-type="taskItem" data-checked="true"><p>Khám phá tính năng MyNotes 4.0 thành công</p></li>
+  <li data-type="taskItem" data-checked="true"><p>Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới</p></li>
+  <li data-type="taskItem" data-checked="true"><p>Thử nghiệm mở Knowledge Graph View trên thanh Header</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Trải nghiệm Trợ lý AI Copilot để tóm tắt văn bản</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Xuất bản sao lưu dữ liệu (.json) dự phòng về máy tính</p></li>
+  <li data-type="taskItem" data-checked="false"><p>Thực hiện kiểm tra đồng bộ ứng dụng với Google Drive</p></li>
 </ul>
 
-<h2>💡 Hướng dẫn sử dụng:</h2>
-<ol>
-  <li><p>Nhấp vào nút <strong>Tasks</strong> (biểu tượng CheckSquare) trên thanh Header.</p></li>
-  <li><p>Bạn sẽ thấy tổng số việc, tỷ lệ hoàn thành (%) và bộ lọc (Tất cả / Đang làm / Đã hoàn thành).</p></li>
-  <li><p>Có thể tích chọn hoàn thành trực tiếp trên Dashboard hoặc bấm vào tên bài viết để chuyển đến vị trí trang gốc!</p></li>
-</ol>`,
+<p>👉 Nhấp nút <strong>Tasks</strong> trên Header để theo dõi thanh tiến độ % hoàn thành của toàn bộ danh sách trên!</p>`,
     },
     {
       title: '📦 7. Sao Lưu & Xuất/Nhập Dữ Liệu (Backup & Export)',
       content: `<h1>📦 Vault Backup & Data Portability</h1>
 <p>Dữ liệu ghi chú là tài sản quan trọng nhất của bạn. MyNotes đảm bảo bạn luôn làm chủ 100% dữ liệu với khả năng sao lưu và xuất file linh hoạt.</p>
 
-<h2>📥 Các tùy chọn xuất dữ liệu:</h2>
-<ul>
-  <li><p><strong>Full Vault Backup (.json):</strong> Xuất toàn bộ cơ sở dữ liệu (Tất cả ngày, sổ tay, bài viết và thuộc tính) thành 1 file JSON duy nhất để lưu trữ dự phòng.</p></li>
-  <li><p><strong>Export Markdown (.md):</strong> Xuất bài viết hiện tại thành file văn bản chuẩn Markdown (.md) để sử dụng trên Obsidian, VS Code hay bất kỳ trình đọc nào khác.</p></li>
-  <li><p><strong>Restore / Import (.json):</strong> Nạp lại dữ liệu đã sao lưu vào trình duyệt chỉ trong 1 giây.</p></li>
-</ul>
+<h2>🚀 Hướng dẫn kích hoạt:</h2>
+<p>Bấm vào nút <strong>Export</strong> (biểu tượng Download màu xanh lá) trên thanh Header để mở bảng điều khiển Sao lưu.</p>
 
-<h2>🚀 Thử nghiệm ngay:</h2>
-<p>Bấm vào nút <strong>Export</strong> (biểu tượng Download màu xanh lá) trên thanh Header để mở bảng điều khiển Sao lưu.</p>`,
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+
+<h3>1. Mẫu file Markdown (.md) sau khi xuất từ MyNotes:</h3>
+<pre><code># 📄 1. Tổng Quan về MyNotes 4.0
+
+Date Created: 2026-09-04T20:30:00.000Z
+Notebook: 📚 Hướng Dẫn Sử Dụng MyNotes 4.0
+---
+
+Welcome to MyNotes 4.0 🚀
+MyNotes là ứng dụng quản lý tri thức cá nhân (Personal Knowledge Base) hiện đại...</code></pre>
+
+<h3>2. Mẫu định dạng sao lưu dữ liệu Full Vault (.json):</h3>
+<pre><code>{
+  "version": "4.0",
+  "exportDate": "2026-09-04T21:50:00.000Z",
+  "days": [{ "id": "day_20260904", "date": "2026-09-04" }],
+  "notebooks": [{ "id": "nb_demo", "title": "📚 Hướng Dẫn Sử Dụng MyNotes 4.0" }],
+  "pages": [{ "id": "page_demo_1", "title": "📄 1. Tổng Quan về MyNotes 4.0" }]
+}</code></pre>`,
     },
     {
       title: '☁️ 8. Đồng Bộ Google Drive & Hoạt Động Offline',
       content: `<h1>☁️ Google Drive Sync & Offline-First Storage</h1>
 <p>MyNotes kết hợp hoàn hảo giữa tốc độ vượt trội của bộ nhớ cục bộ trình duyệt và độ an toàn của đám mây Google Drive.</p>
 
-<h2>🔒 Cơ chế bảo mật và đồng bộ:</h2>
-<ul>
-  <li><p><strong>Offline-First:</strong> Mọi thao tác gõ chữ, tạo bài viết đều lưu tức thì vào IndexedDB cục bộ. Bạn có thể sử dụng mượt mà ngay cả khi không có mạng Internet.</p></li>
-  <li><p><strong>Tự động đồng bộ:</strong> Khi có mạng, ứng dụng sẽ tự động sao lưu dữ liệu lên thư mục <code>MyNotes/</code> trên Google Drive của bạn.</p></li>
-  <li><p><strong>Trạng thái lưu trên Header:</strong></p>
-    <ul>
-      <li><p><code>Saved</code>: Dữ liệu đã an toàn trên đám mây.</p></li>
-      <li><p><code>Saving...</code>: Đang tự động lưu bài viết.</p></li>
-      <li><p><code>Offline</code>: Đang chạy ở chế độ ngoại tuyến.</p></li>
-    </ul>
-  </li>
-</ul>
+<h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
+<p>Dưới đây là mô phỏng chu kỳ xử lý lưu trữ tự động của MyNotes khi có kết nối mạng và khi ngoại tuyến:</p>
 
-<p>👉 Nhấp vào biểu tượng đám mây trên Header bất kỳ lúc nào để thực hiện ép đồng bộ (<strong>Sync Now</strong>)!</p>`,
+<table>
+  <thead>
+    <tr>
+      <th>Trạng thái mạng</th>
+      <th>Hành động người dùng</th>
+      <th>Phản hồi hệ thống MyNotes</th>
+    </tr>
+  </thead>
+  <tbody>
+    <tr>
+      <td><strong>Online (Có mạng)</strong></td>
+      <td>Gõ bài viết mới</td>
+      <td>Lưu tức thì vào IndexedDB ➔ Đợi 1.5s ➔ Đẩy đồng bộ lên Google Drive (Hiển thị <code>Saved</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>Offline (Mất mạng)</strong></td>
+      <td>Tạo thêm 5 bài viết</td>
+      <td>Lưu an toàn vào IndexedDB ➔ Đưa vào Hàng chờ đồng bộ (Hiển thị <code>Offline</code>)</td>
+    </tr>
+    <tr>
+      <td><strong>Có mạng trở lại</strong></td>
+      <td>Mở lại trình duyệt</td>
+      <td>Tự động quét Hàng chờ ➔ Đồng bộ toàn bộ bài viết mới lên Google Drive</td>
+    </tr>
+  </tbody>
+</table>
+
+<p>👉 Bạn có thể bấm vào biểu tượng đám mây trên Header bất kỳ lúc nào để thực hiện ép đồng bộ (<strong>Sync Now</strong>)!</p>`,
     },
   ];
 
