@@ -57,6 +57,24 @@ export function NotebookSidebar() {
     setContextMenu({ x: e.clientX, y: e.clientY, type, id });
   };
 
+  const handleButtonClick = (e: React.MouseEvent, type: 'notebook' | 'page', id: string) => {
+    e.preventDefault();
+    e.stopPropagation();
+
+    if (contextMenu?.id === id) {
+      setContextMenu(null);
+      return;
+    }
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    setContextMenu({
+      x: Math.max(10, rect.left - 120),
+      y: rect.bottom + 4,
+      type,
+      id,
+    });
+  };
+
   const handleNewPage = async (notebookId: string) => {
     try {
       await createPage(notebookId, 'Untitled');
@@ -207,9 +225,10 @@ export function NotebookSidebar() {
                   )}
 
                   <button
-                    onClick={(e) => { e.stopPropagation(); handleContextMenu(e, 'notebook', nb.id); }}
-                    className="opacity-0 group-hover:opacity-100 p-1 rounded transition-opacity cursor-pointer"
+                    onClick={(e) => handleButtonClick(e, 'notebook', nb.id)}
+                    className="opacity-70 group-hover:opacity-100 hover:bg-slate-800 p-1 rounded transition-all cursor-pointer"
                     style={{ color: 'var(--color-text-tertiary)' }}
+                    title="Notebook options"
                     aria-label="Notebook options"
                   >
                     <MoreVertical className="w-3.5 h-3.5" />
@@ -251,9 +270,10 @@ export function NotebookSidebar() {
                           )}
 
                           <button
-                            onClick={(e) => { e.stopPropagation(); handleContextMenu(e, 'page', page.id); }}
-                            className="opacity-0 group-hover:opacity-100 p-0.5 rounded transition-opacity cursor-pointer"
+                            onClick={(e) => handleButtonClick(e, 'page', page.id)}
+                            className="opacity-70 group-hover:opacity-100 hover:bg-slate-800 p-0.5 rounded transition-all cursor-pointer"
                             style={{ color: 'var(--color-text-tertiary)' }}
+                            title="Page options"
                             aria-label="Page options"
                           >
                             <MoreVertical className="w-3 h-3" />
