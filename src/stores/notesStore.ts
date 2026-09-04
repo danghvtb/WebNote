@@ -145,22 +145,45 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   selectNotebook: async (notebookId) => {
+    const notebook = await repo.getNotebook(notebookId);
+    if (notebook) {
+      if (get().selectedDayId !== notebook.dateId) {
+        set({ selectedDayId: notebook.dateId });
+        await get().loadNotebooksByDay(notebook.dateId);
+      }
+    }
     set({
       selectedNotebookId: notebookId,
-      selectedPageId: null,
-      pages: [],
     });
     await get().loadPagesByNotebook(notebookId);
 
-    // Auto-select first page
-    const { pages } = get();
-    if (pages.length > 0) {
+    // Auto-select first page if no page selected or selected page not in this notebook
+    const { pages, selectedPageId } = get();
+    if (pages.length > 0 && (!selectedPageId || !pages.some((p) => p.id === selectedPageId))) {
       set({ selectedPageId: pages[0].id });
     }
   },
 
-  selectPage: (pageId) => {
+  selectPage: async (pageId) => {
     set({ selectedPageId: pageId });
+    try {
+      const page = await repo.getPage(pageId);
+      if (page) {
+        const notebook = await repo.getNotebook(page.notebookId);
+        if (notebook) {
+          if (get().selectedDayId !== notebook.dateId) {
+            set({ selectedDayId: notebook.dateId });
+            await get().loadNotebooksByDay(notebook.dateId);
+          }
+          if (get().selectedNotebookId !== notebook.id) {
+            set({ selectedNotebookId: notebook.id });
+            await get().loadPagesByNotebook(notebook.id);
+          }
+        }
+      }
+    } catch (err) {
+      console.error('[NotesStore] Failed to resolve parent notebook for page:', err);
+    }
   },
 
   selectToday: async () => {

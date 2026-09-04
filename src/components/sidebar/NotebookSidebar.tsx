@@ -168,7 +168,7 @@ export function NotebookSidebar() {
         ) : (
           notebooks.map((nb) => {
             const isSelected = nb.id === selectedNotebookId;
-            const isExpanded = expandedNotebook === nb.id;
+            const isExpanded = expandedNotebook === nb.id || isSelected;
             const nbPages = isExpanded ? pages : [];
 
             return (
