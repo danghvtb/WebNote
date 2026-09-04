@@ -25,6 +25,9 @@ interface AppState {
   searchQuery: string;
   settingsOpen: boolean;
   createNotebookOpen: boolean;
+  graphViewOpen: boolean;
+  taskManagerOpen: boolean;
+  exportModalOpen: boolean;
   confirmModal: { open: boolean; title: string; message: string; onConfirm: (() => void) | null };
 
   // App state
@@ -48,6 +51,9 @@ interface AppState {
   setSearchQuery: (query: string) => void;
   setSettingsOpen: (open: boolean) => void;
   setCreateNotebookOpen: (open: boolean) => void;
+  setGraphViewOpen: (open: boolean) => void;
+  setTaskManagerOpen: (open: boolean) => void;
+  setExportModalOpen: (open: boolean) => void;
   setConfirmModal: (modal: { open: boolean; title: string; message: string; onConfirm: (() => void) | null }) => void;
   setInitialized: (initialized: boolean) => void;
   setRootFolderId: (folderId: string | null) => void;
@@ -73,6 +79,9 @@ export const useAppStore = create<AppState>((set) => ({
   searchQuery: '',
   settingsOpen: false,
   createNotebookOpen: false,
+  graphViewOpen: false,
+  taskManagerOpen: false,
+  exportModalOpen: false,
   confirmModal: { open: false, title: '', message: '', onConfirm: null },
 
   initialized: false,
@@ -121,6 +130,9 @@ export const useAppStore = create<AppState>((set) => ({
   setSearchQuery: (query) => set({ searchQuery: query }),
   setSettingsOpen: (open) => set({ settingsOpen: open }),
   setCreateNotebookOpen: (open) => set({ createNotebookOpen: open }),
+  setGraphViewOpen: (open) => set({ graphViewOpen: open }),
+  setTaskManagerOpen: (open) => set({ taskManagerOpen: open }),
+  setExportModalOpen: (open) => set({ exportModalOpen: open }),
   setConfirmModal: (modal) => set({ confirmModal: modal }),
   setInitialized: (initialized) => set({ initialized }),
   setRootFolderId: (folderId) => set({ rootFolderId: folderId }),

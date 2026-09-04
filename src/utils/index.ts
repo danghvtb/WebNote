@@ -158,6 +158,32 @@ export function stripHtml(html: string): string {
 }
 
 /**
+ * Count words in HTML content.
+ */
+export function countWords(html: string): number {
+  const text = stripHtml(html);
+  if (!text) return 0;
+  return text.split(/\s+/).filter(Boolean).length;
+}
+
+/**
+ * Calculate reading time in minutes.
+ */
+export function getReadingTime(html: string): number {
+  const words = countWords(html);
+  return Math.max(1, Math.ceil(words / 200));
+}
+
+/**
+ * Extract [[Wiki Links]] titles from HTML content.
+ */
+export function extractWikiLinks(html: string): string[] {
+  const text = stripHtml(html);
+  const matches = text.match(/\[\[(.*?)\]\]/g) || [];
+  return matches.map((m) => m.replace(/^\[\[/, '').replace(/\]\]$/, '').trim());
+}
+
+/**
  * Get a greeting based on current hour.
  */
 export function getGreeting(): string {

@@ -1,53 +1,85 @@
-@import url('https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&family=JetBrains+Mono:wght@400;500&display=swap');
+@import url('https://fonts.googleapis.com/css2?family=Plus+Jakarta+Sans:ital,wght@0,300..800;1,300..800&family=Fira+Code:wght@400;500;600&family=Inter:wght@300;400;500;600;700&display=swap');
 @import "tailwindcss";
 
 /* ============================================================
-   MyNotes — Global Styles & Design Tokens
+   MyNotes 2.0 — Premium Design Tokens & Obsidian Aesthetics
    ============================================================ */
 
 @theme {
-  /* Dark theme colors (default) */
-  --color-bg-primary: #0D1117;
-  --color-bg-secondary: #161B22;
-  --color-bg-tertiary: #21262D;
-  --color-bg-hover: #292E36;
-  --color-bg-active: #313840;
+  /* Midnight Obsidian Dark Theme */
+  --color-bg-primary: #090D16;
+  --color-bg-secondary: #111726;
+  --color-bg-tertiary: #1A2234;
+  --color-bg-hover: #242E44;
+  --color-bg-active: #2D3A54;
 
-  --color-border: #30363D;
-  --color-border-light: #3D444D;
+  --color-border: #26334D;
+  --color-border-light: #344668;
 
-  --color-text-primary: #E6EDF3;
-  --color-text-secondary: #8B949E;
-  --color-text-tertiary: #6E7681;
+  --color-text-primary: #F1F5F9;
+  --color-text-secondary: #94A3B8;
+  --color-text-tertiary: #64748B;
 
-  --color-accent: #58A6FF;
-  --color-accent-hover: #79C0FF;
-  --color-accent-dim: #1F3A5F;
+  --color-accent: #8B5CF6;
+  --color-accent-hover: #A78BFA;
+  --color-accent-dim: rgba(139, 92, 246, 0.18);
 
-  --color-success: #3FB950;
-  --color-warning: #D29922;
-  --color-error: #F85149;
-  --color-info: #58A6FF;
+  --color-cyan: #06B6D4;
+  --color-emerald: #10B981;
 
-  /* Light theme */
-  --color-light-bg-primary: #FFFFFF;
-  --color-light-bg-secondary: #F6F8FA;
-  --color-light-bg-tertiary: #EAEEF2;
-  --color-light-border: #D0D7DE;
-  --color-light-text-primary: #1F2328;
-  --color-light-text-secondary: #656D76;
-  --color-light-accent: #0969DA;
+  --color-success: #10B981;
+  --color-warning: #F59E0B;
+  --color-error: #EF4444;
+  --color-info: #3B82F6;
+
+  /* Premium Light Theme */
+  --color-light-bg-primary: #F8FAFC;
+  --color-light-bg-secondary: #FFFFFF;
+  --color-light-bg-tertiary: #F1F5F9;
+  --color-light-border: #E2E8F0;
+  --color-light-text-primary: #0F172A;
+  --color-light-text-secondary: #475569;
+  --color-light-accent: #7C3AED;
 }
 
 /* ── Base Styles ── */
 
 :root {
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  font-family: 'Plus Jakarta Sans', 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   font-size: 14px;
   line-height: 1.5;
   color-scheme: dark;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+}
+
+/* Glassmorphism Utilities */
+.glass-header {
+  background: rgba(17, 23, 38, 0.75) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border-bottom: 1px solid rgba(38, 51, 77, 0.6) !important;
+}
+
+.glass-sidebar {
+  background: rgba(17, 23, 38, 0.6) !important;
+  backdrop-filter: blur(12px);
+  -webkit-backdrop-filter: blur(12px);
+  border-right: 1px solid rgba(38, 51, 77, 0.5) !important;
+}
+
+.glass-card {
+  background: rgba(26, 34, 52, 0.6);
+  backdrop-filter: blur(8px);
+  border: 1px solid rgba(52, 70, 104, 0.4);
+}
+
+.glow-accent {
+  box-shadow: 0 0 20px rgba(139, 92, 246, 0.25);
+}
+
+.glow-subtle {
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.35);
 }
 
 * {

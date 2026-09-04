@@ -135,7 +135,7 @@ export function signIn(): Promise<string> {
     }
     tokenResolve = resolve;
     tokenReject = reject;
-    tokenClient.requestAccessToken({ prompt: 'consent' });
+    tokenClient.requestAccessToken({});
   });
 }
 

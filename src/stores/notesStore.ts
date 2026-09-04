@@ -80,7 +80,19 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   loadDays: async () => {
     set({ daysLoading: true });
     try {
-      const days = await repo.getAllDays();
+      let days = await repo.getAllDays();
+
+      // If database is empty on first launch, auto seed demo vault with feature notes
+      if (days.length === 0) {
+        const { seedDemoVault } = await import('../services/database/seedDemo');
+        const { notebook } = await seedDemoVault();
+        days = await repo.getAllDays();
+        set({ days, daysLoading: false });
+        get().selectDay(notebook.dateId);
+        await get().selectNotebook(notebook.id);
+        return;
+      }
+
       set({ days, daysLoading: false });
     } catch (error) {
       console.error('[NotesStore] Failed to load days:', error);

@@ -17,6 +17,10 @@ import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { initNetworkListeners, onSyncStatusChange } from './services/sync/syncManager';
 
+import { GraphViewModal } from './components/modal/GraphViewModal';
+import { TaskManagerModal } from './components/modal/TaskManagerModal';
+import { ExportModal } from './components/modal/ExportModal';
+
 function AppContent() {
   const { isLoggedIn, needsFolderCreation, setSyncStatus, setLastSyncTime, setTheme } = useAppStore();
 
@@ -62,6 +66,8 @@ function AppContent() {
 }
 
 export default function App() {
+  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen } = useAppStore();
+
   return (
     <ErrorBoundary>
       <AppContent />
@@ -69,6 +75,9 @@ export default function App() {
       <CreateNotebookModal />
       <ConfirmModal />
       <SettingsModal />
+      <GraphViewModal />
+      <TaskManagerModal isOpen={taskManagerOpen} onClose={() => setTaskManagerOpen(false)} />
+      <ExportModal isOpen={exportModalOpen} onClose={() => setExportModalOpen(false)} />
       <Toasts />
     </ErrorBoundary>
   );

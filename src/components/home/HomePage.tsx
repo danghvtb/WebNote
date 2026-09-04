@@ -4,18 +4,34 @@
 // ============================================================
 
 import { useEffect } from 'react';
-import { Search, Plus, Notebook, Clock } from 'lucide-react';
+import { Search, Plus, Notebook, Clock, Sparkles } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { getGreeting, timeAgo } from '../../utils';
+import { seedDemoVault } from '../../services/database/seedDemo';
+import { queueSync } from '../../services/sync/syncManager';
 
 export function HomePage() {
-  const { notebooks, recentNotebooks, selectNotebook, loadRecentNotebooks } = useNotesStore();
-  const { toggleSearch, setCreateNotebookOpen, user } = useAppStore();
+  const { notebooks, recentNotebooks, selectNotebook, loadRecentNotebooks, loadDays } = useNotesStore();
+  const { toggleSearch, setCreateNotebookOpen, user, addNotification } = useAppStore();
 
   useEffect(() => {
     loadRecentNotebooks();
   }, [loadRecentNotebooks]);
+
+  const handleGenerateDemoNotes = async () => {
+    try {
+      const { notebook } = await seedDemoVault();
+      await loadDays();
+      await loadRecentNotebooks();
+      await selectNotebook(notebook.id);
+      queueSync('create', 'notebook', notebook.id);
+      addNotification('success', 'Đã tạo bộ ghi chú mẫu cho tất cả tính năng!');
+    } catch (err) {
+      console.error(err);
+      addNotification('error', 'Có lỗi khi tạo bộ ghi chú mẫu.');
+    }
+  };
 
   return (
     <div className="h-full overflow-y-auto px-6 md:px-12 lg:px-16 py-10 max-w-2xl mx-auto">
@@ -70,17 +86,32 @@ export function HomePage() {
         </div>
       )}
 
-      {/* New Notebook Button */}
-      <button
-        onClick={() => setCreateNotebookOpen(true)}
-        className="w-full flex items-center gap-3 px-3 py-2.5 rounded-lg mb-8 transition-colors cursor-pointer"
-        style={{ border: '1px dashed var(--color-border)' }}
-        onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-secondary)')}
-        onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-      >
-        <Plus className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
-        <span className="text-sm" style={{ color: 'var(--color-text-secondary)' }}>New Notebook</span>
-      </button>
+      {/* New Notebook & Demo Notes Buttons */}
+      <div className="space-y-2.5 mb-8">
+        <button
+          onClick={() => setCreateNotebookOpen(true)}
+          className="w-full flex items-center gap-3 px-3.5 py-2.5 rounded-xl transition-colors cursor-pointer"
+          style={{ border: '1px dashed var(--color-border)' }}
+          onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-secondary)')}
+          onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+        >
+          <Plus className="w-4 h-4" style={{ color: 'var(--color-accent)' }} />
+          <span className="text-sm font-medium" style={{ color: 'var(--color-text-secondary)' }}>New Notebook</span>
+        </button>
+
+        <button
+          onClick={handleGenerateDemoNotes}
+          className="w-full flex items-center justify-between px-3.5 py-2.5 rounded-xl transition-all cursor-pointer bg-gradient-to-r from-purple-900/30 to-indigo-900/30 border border-purple-500/30 hover:border-purple-500/60 shadow-lg shadow-purple-950/20"
+        >
+          <div className="flex items-center gap-2.5">
+            <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />
+            <span className="text-xs font-bold text-purple-200">📚 Tạo ghi chú mẫu cho tất cả các tính năng</span>
+          </div>
+          <span className="text-[10px] px-2 py-0.5 rounded-full bg-purple-500/20 text-purple-300 font-semibold border border-purple-500/30">
+            Tutorial Vault
+          </span>
+        </button>
+      </div>
 
       {/* Recent Notebooks */}
       {recentNotebooks.length > 0 && (

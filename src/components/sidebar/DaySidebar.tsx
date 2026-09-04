@@ -51,8 +51,7 @@ export function DaySidebar() {
 
   return (
     <aside
-      className="w-full h-full flex flex-col overflow-hidden"
-      style={{ background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)' }}
+      className="w-56 h-full flex flex-col flex-shrink-0 glass-sidebar hidden lg:flex"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>

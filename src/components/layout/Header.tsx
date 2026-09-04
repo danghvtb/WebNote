@@ -3,7 +3,7 @@
 // Top bar: logo, search, sync status, user avatar.
 // ============================================================
 
-import { Search, Cloud, CloudOff, Loader2, AlertTriangle, Check, Menu } from 'lucide-react';
+import { Search, Cloud, CloudOff, Loader2, AlertTriangle, Check, Menu, Network, CheckSquare, Download } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { formatTime } from '../../utils';
 import { forceSync } from '../../services/sync/syncManager';
@@ -13,7 +13,8 @@ import { useState, useRef, useEffect } from 'react';
 export function Header() {
   const {
     user, syncStatus, lastSyncTime, syncMessage,
-    toggleSearch, setSettingsOpen, logout,
+    toggleSearch, setSettingsOpen, logout, setGraphViewOpen,
+    setTaskManagerOpen, setExportModalOpen,
   } = useAppStore();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
@@ -68,8 +69,7 @@ export function Header() {
 
   return (
     <header
-      className="flex items-center justify-between px-4 h-12 flex-shrink-0"
-      style={{ background: 'var(--color-bg-secondary)', borderBottom: '1px solid var(--color-border)' }}
+      className="flex items-center justify-between px-4 h-13 flex-shrink-0 glass-header"
     >
       {/* Left: Logo + Mobile Menu */}
       <div className="flex items-center gap-2">
@@ -107,7 +107,33 @@ export function Header() {
       </button>
 
       {/* Right: Sync + Avatar */}
-      <div className="flex items-center gap-1">
+      <div className="flex items-center gap-2">
+        <button
+          onClick={() => setGraphViewOpen(true)}
+          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+          title="Open Knowledge Graph View"
+        >
+          <Network className="w-4 h-4 text-cyan-400" />
+          <span className="hidden md:inline">Graph</span>
+        </button>
+
+        <button
+          onClick={() => setTaskManagerOpen(true)}
+          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+          title="Open Task Center & Todo Dashboard"
+        >
+          <CheckSquare className="w-4 h-4 text-purple-400" />
+          <span className="hidden md:inline">Tasks</span>
+        </button>
+
+        <button
+          onClick={() => setExportModalOpen(true)}
+          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+          title="Export / Backup Vault"
+        >
+          <Download className="w-4 h-4 text-emerald-400" />
+          <span className="hidden md:inline">Export</span>
+        </button>
         {renderSyncStatus()}
 
         {/* User Avatar */}

@@ -131,7 +131,7 @@ export function NotebookSidebar() {
   }
 
   return (
-    <aside className="w-full h-full flex flex-col overflow-hidden" style={{ background: 'var(--color-bg-secondary)', borderRight: '1px solid var(--color-border)' }}>
+    <aside className="w-full h-full flex flex-col overflow-hidden glass-sidebar">
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
         <span className="text-sm font-medium" style={{ color: 'var(--color-text-primary)' }}>

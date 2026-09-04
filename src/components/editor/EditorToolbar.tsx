@@ -10,12 +10,14 @@ import {
   List, ListOrdered, CheckSquare,
   Quote, Code, Code2,
   Table, Image, Link, Minus,
-  Undo2, Redo2,
+  Undo2, Redo2, Sparkles,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
 interface ToolbarProps {
   editor: Editor;
+  onOpenAI?: () => void;
+  onToggleSlashMenu?: () => void;
 }
 
 interface ToolbarButton {
@@ -25,7 +27,7 @@ interface ToolbarButton {
   isActive?: () => boolean;
 }
 
-export function EditorToolbar({ editor }: ToolbarProps) {
+export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu }: ToolbarProps) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
@@ -49,6 +51,11 @@ export function EditorToolbar({ editor }: ToolbarProps) {
   }, [editor]);
 
   const groups: ToolbarButton[][] = [
+    // AI & Slash Assistant
+    [
+      { icon: <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />, title: 'AI Assistant (Summarize, Polish, Tasks)', action: () => onOpenAI?.() },
+      { icon: <span className="text-xs font-extrabold px-1 text-purple-400">/</span>, title: 'Slash Command Menu (Type /)', action: () => onToggleSlashMenu?.() },
+    ],
     // Text formatting
     [
       { icon: <Bold className="w-4 h-4" />, title: 'Bold (Ctrl+B)', action: () => editor.chain().focus().toggleBold().run(), isActive: () => editor.isActive('bold') },
