@@ -10,7 +10,7 @@ import {
   List, ListOrdered, CheckSquare,
   Quote, Code, Code2,
   Table, Image, Link, Minus,
-  Undo2, Redo2, Sparkles,
+  Undo2, Redo2, Sparkles, Trash2,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -18,6 +18,7 @@ interface ToolbarProps {
   editor: Editor;
   onOpenAI?: () => void;
   onToggleSlashMenu?: () => void;
+  onDeletePage?: () => void;
 }
 
 interface ToolbarButton {
@@ -27,7 +28,7 @@ interface ToolbarButton {
   isActive?: () => boolean;
 }
 
-export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu }: ToolbarProps) {
+export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePage }: ToolbarProps) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
@@ -92,6 +93,10 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu }: ToolbarPr
     [
       { icon: <Undo2 className="w-4 h-4" />, title: 'Undo (Ctrl+Z)', action: () => editor.chain().focus().undo().run() },
       { icon: <Redo2 className="w-4 h-4" />, title: 'Redo (Ctrl+Shift+Z)', action: () => editor.chain().focus().redo().run() },
+    ],
+    // Delete Note
+    [
+      { icon: <Trash2 className="w-4 h-4 text-rose-400 hover:text-rose-300" />, title: 'Xóa bài viết này (Delete Note)', action: () => onDeletePage?.() },
     ],
   ];
 

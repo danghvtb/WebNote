@@ -34,12 +34,28 @@ import { countWords, getReadingTime, extractWikiLinks } from '../../utils';
 const lowlight = createLowlight(common);
 
 export function Editor() {
-  const { selectedPageId, pages, updatePageContent, updatePageTitle, selectPage } = useNotesStore();
-  const { setSyncStatus } = useAppStore();
+  const { selectedPageId, pages, updatePageContent, updatePageTitle, selectPage, deletePage } = useNotesStore();
+  const { setSyncStatus, setConfirmModal, addNotification } = useAppStore();
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentPageRef = useRef<string | null>(null);
+
+  const handleDeleteCurrentPage = () => {
+    if (!selectedPageId) return;
+    const pageToDelete = pages.find((p) => p.id === selectedPageId);
+
+    setConfirmModal({
+      open: true,
+      title: 'Xóa ghi chú (Delete Page)',
+      message: `Bạn có chắc chắn muốn xóa ghi chú "${pageToDelete?.title || 'Untitled'}" không?`,
+      onConfirm: async () => {
+        await deletePage(selectedPageId);
+        await queueSync('delete', 'page', selectedPageId);
+        addNotification('success', 'Đã xóa ghi chú!');
+      },
+    });
+  };
 
   const selectedPage = pages.find((p) => p.id === selectedPageId);
 
@@ -169,6 +185,7 @@ export function Editor() {
           editor={editor}
           onOpenAI={() => setAiModalOpen(true)}
           onToggleSlashMenu={() => setSlashMenuOpen((prev) => !prev)}
+          onDeletePage={handleDeleteCurrentPage}
         />
       )}
 
