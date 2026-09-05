@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState, useCallback, useEffect, useRef } from 'react';
-import { useEditor, EditorContent } from '@tiptap/react';
+import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
@@ -28,6 +28,7 @@ import { queueSync } from '../../services/sync/syncManager';
 import { EditorToolbar } from './EditorToolbar';
 import { SlashMenu } from './SlashMenu';
 import { AIModal } from '../modal/AIModal';
+import { CustomTaskItemComponent } from './CustomTaskItem';
 import { countWords, getReadingTime, extractWikiLinks } from '../../utils';
 import { getPageOverdueCount, formatRelativeDeadline, getQuickPresetDate } from '../../utils/taskUtils';
 
@@ -107,6 +108,9 @@ export function Editor() {
               },
             },
           };
+        },
+        addNodeView() {
+          return ReactNodeViewRenderer(CustomTaskItemComponent);
         },
       }),
       Image.configure({
