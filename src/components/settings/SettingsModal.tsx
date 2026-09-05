@@ -3,12 +3,14 @@
 // Account, sync, appearance, and data management.
 // ============================================================
 
+import { useState } from 'react';
 import { X, Cloud, Monitor, Moon, Sun, RefreshCw, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { forceSync } from '../../services/sync/syncManager';
 import { clearDatabase } from '../../services/database/db';
 import { signOut } from '../../services/google/auth';
 import { formatTime } from '../../utils';
+import { getGeminiApiKey, setGeminiApiKey } from '../../services/ai/geminiService';
 import type { AppTheme } from '../../types';
 
 export function SettingsModal() {
@@ -17,6 +19,8 @@ export function SettingsModal() {
     syncStatus, lastSyncTime, rootFolderId,
     logout, addNotification, setConfirmModal,
   } = useAppStore();
+
+  const [geminiKey, setGeminiKey] = useState(() => getGeminiApiKey());
 
   if (!settingsOpen) return null;
 
@@ -164,6 +168,36 @@ export function SettingsModal() {
                   {t.label}
                 </button>
               ))}
+            </div>
+          </Section>
+
+          {/* Gemini AI Config Section */}
+          <Section title="Google Gemini AI Assistant">
+            <div className="space-y-2">
+              <label className="block text-xs font-medium text-purple-300 flex items-center justify-between">
+                <span>Gemini API Key (Miễn phí từ Google AI Studio)</span>
+                <a
+                  href="https://aistudio.google.com/app/apikey"
+                  target="_blank"
+                  rel="noreferrer"
+                  className="text-cyan-400 hover:underline text-[10px]"
+                >
+                  Lấy Key Miễn Phí ↗
+                </a>
+              </label>
+              <input
+                type="password"
+                value={geminiKey}
+                onChange={(e) => {
+                  setGeminiKey(e.target.value);
+                  setGeminiApiKey(e.target.value);
+                }}
+                placeholder="AIzaSy..."
+                className="w-full px-3 py-2 text-xs rounded-lg bg-slate-900 border border-purple-500/40 text-slate-200 outline-none focus:border-purple-400"
+              />
+              <p className="text-[10px] text-slate-400">
+                Key được bảo mật lưu ở trình duyệt của bạn (LocalStorage). AI sẽ dùng Gemini 1.5 Flash đọc 100% Vault để trả lời thông minh.
+              </p>
             </div>
           </Section>
 
