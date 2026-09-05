@@ -35,19 +35,19 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
       const textContent = selectedPage.content.replace(/<[^>]*>/g, '').trim();
 
       if (!textContent && action !== 'digest') {
-        setAiResult('⚠️ Page has no text content to analyze.');
+        setAiResult('⚠️ Trang này chưa có nội dung văn bản để AI phân tích.');
         setLoading(false);
         return;
       }
 
       if (action === 'summarize') {
-        result = `📌 <strong>AI Key Takeaways:</strong><ul><li>Main focus: ${selectedPage.title}</li><li>Key point: High-density knowledge note.</li><li>Action item: Review and synchronize with cloud.</li></ul>`;
+        result = `📌 <strong>AI Tóm Tắt Ý Chính:</strong><ul><li>Chủ đề chính: ${selectedPage.title}</li><li>Nội dung trọng tâm: Ghi chú tri thức mật độ cao.</li><li>Hành động tiếp theo: Rà soát và đồng bộ dữ liệu.</li></ul>`;
       } else if (action === 'polish') {
-        result = `<p><strong>Enhanced Content:</strong></p><p>${textContent} (Refined with professional clarity and concise tone).</p>`;
+        result = `<p><strong>Văn Bản Đã Tinh Chỉnh:</strong></p><p>${textContent} (Đã được chuẩn hóa văn phong mượt mà và rõ ràng hơn).</p>`;
       } else if (action === 'tasks') {
-        result = `<ul data-type="taskList"><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T18:00"><label><input type="checkbox"><span>Review ${selectedPage.title} outline</span></label></li><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T20:00"><label><input type="checkbox"><span>Organize key concepts into sub-pages</span></label></li></ul>`;
+        result = `<ul data-type="taskList"><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T18:00"><label><input type="checkbox"><span>Xem lại nội dung ${selectedPage.title}</span></label></li><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T20:00"><label><input type="checkbox"><span>Sắp xếp các ý chính vào mục tương ứng</span></label></li></ul>`;
       } else if (action === 'digest') {
-        result = `☀️ <strong>AI Daily Productivity Standup:</strong><br/><ul><li>🔥 <strong>Priority 1:</strong> Finish upcoming deadlines due within 30 minutes.</li><li>⚡ <strong>Priority 2:</strong> Review notebook "${selectedPage.title}" notes.</li><li>✅ <strong>Goal:</strong> Maintain 100% completion rate for today's tasks.</li></ul>`;
+        result = `☀️ <strong>AI Tổng Hợp Mục Tiêu Trong Ngày:</strong><br/><ul><li>🔥 <strong>Ưu tiên 1:</strong> Hoàn thành các deadline sắp đến hạn trong 30 phút tới.</li><li>⚡ <strong>Ưu tiên 2:</strong> Rà soát và cập nhật ghi chú "${selectedPage.title}".</li><li>✅ <strong>Mục tiêu:</strong> Duy trì 100% tỉ lệ hoàn thành công việc hôm nay.</li></ul>`;
       }
 
       setAiResult(result);
@@ -77,8 +77,8 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
               <Sparkles className="w-4 h-4 animate-pulse" />
             </div>
             <div>
-              <h3 className="font-bold text-base">MyNotes AI Assistant</h3>
-              <p className="text-xs text-slate-400">Smart analysis for "{selectedPage.title}"</p>
+              <h3 className="font-bold text-base">Trợ Lý Thông Minh AI Copilot</h3>
+              <p className="text-xs text-slate-400">Phân tích cho ghi chú "{selectedPage.title}"</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800">
@@ -90,47 +90,47 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
         <div className="grid grid-cols-4 gap-2 mb-4">
           <button
             onClick={() => { setActiveTab('summarize'); handleGenerate('summarize'); }}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
               activeTab === 'summarize'
                 ? 'bg-purple-600/20 border-purple-500 text-purple-300'
                 : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <FileText className="w-4 h-4" />
-            Summarize
+            Tóm Tắt
           </button>
           <button
             onClick={() => { setActiveTab('polish'); handleGenerate('polish'); }}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
               activeTab === 'polish'
                 ? 'bg-purple-600/20 border-purple-500 text-purple-300'
                 : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <Wand2 className="w-4 h-4" />
-            Polish
+            Tinh Chỉnh
           </button>
           <button
             onClick={() => { setActiveTab('tasks'); handleGenerate('tasks'); }}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
               activeTab === 'tasks'
                 ? 'bg-purple-600/20 border-purple-500 text-purple-300'
                 : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <CheckSquare className="w-4 h-4" />
-            Extract Tasks
+            Tạo Task
           </button>
           <button
             onClick={() => { setActiveTab('digest'); handleGenerate('digest'); }}
-            className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
+            className={`flex flex-col items-center gap-1.5 p-2.5 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
               activeTab === 'digest'
                 ? 'bg-purple-600/20 border-purple-500 text-purple-300'
                 : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800'
             }`}
           >
             <Sparkles className="w-4 h-4 text-amber-400" />
-            Daily Digest
+            Lịch Ngày
           </button>
         </div>
 
@@ -139,12 +139,12 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
           {loading ? (
             <div className="flex flex-col items-center justify-center py-8 text-purple-400 gap-2">
               <RefreshCw className="w-6 h-6 animate-spin" />
-              <span className="text-xs font-medium">AI is thinking & analyzing...</span>
+              <span className="text-xs font-medium">AI đang phân tích và xử lý nội dung...</span>
             </div>
           ) : aiResult ? (
             <div className="prose prose-invert prose-sm" dangerouslySetInnerHTML={{ __html: aiResult }} />
           ) : (
-            <p className="text-xs text-slate-500 text-center py-8">Select an AI action above to analyze note.</p>
+            <p className="text-xs text-slate-500 text-center py-8">Chọn một tính năng AI ở trên để phân tích ghi chú.</p>
           )}
         </div>
 
@@ -154,7 +154,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
             onClick={onClose}
             className="px-4 py-2 text-xs font-medium rounded-xl border border-slate-700 text-slate-300 hover:bg-slate-800 cursor-pointer"
           >
-            Cancel
+            Hủy
           </button>
           <button
             onClick={handleApply}
@@ -162,7 +162,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
             className="px-4 py-2 text-xs font-semibold rounded-xl bg-purple-600 hover:bg-purple-500 text-white disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
           >
             <Sparkles className="w-3.5 h-3.5" />
-            Append to Note
+            Chèn Vào Ghi Chú
           </button>
         </div>
       </div>
