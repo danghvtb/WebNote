@@ -20,7 +20,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import { common, createLowlight } from 'lowlight';
-import { Clock, FileText, Link2, Sparkles } from 'lucide-react';
+import { Clock, FileText, Link2, Sparkles, AlertTriangle } from 'lucide-react';
 
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
@@ -29,6 +29,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { SlashMenu } from './SlashMenu';
 import { AIModal } from '../modal/AIModal';
 import { countWords, getReadingTime, extractWikiLinks } from '../../utils';
+import { getPageOverdueCount } from '../../utils/taskUtils';
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -93,7 +94,21 @@ export function Editor() {
         HTMLAttributes: { class: 'editor-link' },
       }),
       TaskList,
-      TaskItem.configure({ nested: true }),
+      TaskItem.configure({ nested: true }).extend({
+        addAttributes() {
+          return {
+            ...this.parent?.(),
+            due: {
+              default: null,
+              parseHTML: (element) => element.getAttribute('data-due'),
+              renderHTML: (attributes) => {
+                if (!attributes.due) return {};
+                return { 'data-due': attributes.due };
+              },
+            },
+          };
+        },
+      }),
       Image.configure({
         HTMLAttributes: { class: 'editor-image' },
       }),
@@ -202,6 +217,19 @@ export function Editor() {
       {/* Editor Content Area */}
       <div className="flex-1 overflow-y-auto px-6 md:px-12 lg:px-16 py-6 max-w-4xl mx-auto w-full flex flex-col justify-between">
         <div>
+          {/* Overdue Task Red Alert Banner */}
+          {getPageOverdueCount(selectedPage) > 0 && (
+            <div className="mb-4 p-3.5 rounded-xl bg-rose-950/90 border border-rose-500 text-rose-100 flex items-center justify-between shadow-[0_0_20px_rgba(244,63,94,0.35)] animate-pulse">
+              <div className="flex items-center gap-2.5 text-xs font-semibold">
+                <AlertTriangle className="w-4 h-4 text-rose-400 flex-shrink-0" />
+                <span>⚠️ CẢNH BÁO DEADLINE: Ghi chú này có {getPageOverdueCount(selectedPage)} công việc đã quá hạn!</span>
+              </div>
+              <span className="text-[10px] px-2.5 py-1 rounded-md bg-rose-900 border border-rose-400 text-rose-200 font-bold tracking-wide">
+                🔴 QUÁ HẠN (OVERDUE)
+              </span>
+            </div>
+          )}
+
           {/* Page Title */}
           <input
             type="text"

@@ -363,6 +363,29 @@ body {
   color: var(--color-text-tertiary);
 }
 
+/* Task Item Deadlines & Overdue Styling */
+.tiptap-editor ul[data-type="taskList"] li[data-due] {
+  position: relative;
+  border-radius: 6px;
+  transition: all 0.2s ease;
+}
+
+.tiptap-editor ul[data-type="taskList"] li[data-due]::after {
+  content: ' 📅 Due ' attr(data-due);
+  font-size: 11px;
+  font-weight: 600;
+  padding: 2px 8px;
+  border-radius: 6px;
+  background: rgba(168, 85, 247, 0.15);
+  border: 1px solid rgba(168, 85, 247, 0.35);
+  color: #d8b4fe;
+  margin-left: 8px;
+  white-space: nowrap;
+  display: inline-flex;
+  align-items: center;
+  align-self: center;
+}
+
 /* Placeholder */
 .tiptap-editor p.is-editor-empty:first-child::before {
   content: attr(data-placeholder);

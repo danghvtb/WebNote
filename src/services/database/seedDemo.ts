@@ -195,23 +195,26 @@ console.log("Reading time:", getReadingTime(450), "minutes");</code></pre>
 </ul>`,
     },
     {
-      title: '✅ 6. Trung Tâm Quản Lý Công Việc (Todo Dashboard)',
-      content: `<h1>✅ Task Center & Todo Dashboard</h1>
-<p>Toàn bộ các danh sách công việc (Checklists) nằm rải rác ở nhiều bài viết khác nhau sẽ được gom về một giao diện quản lý tập trung duy nhất!</p>
+      title: '✅ 6. Trung Tâm Quản Lý Công Việc & Deadline',
+      content: `<h1>✅ Task Center & Deadline Management</h1>
+<p>Toàn bộ các danh sách công việc (Checklists) có gán thời hạn (Deadline) nằm rải rác ở nhiều ghi chú sẽ được tự động tổng hợp, cảnh báo đỏ và ưu tiên hiển thị lên đầu!</p>
+
+<h2>🚨 Cảnh báo deadline quá hạn:</h2>
+<p>Khi công việc chưa hoàn thành và đã vượt quá thời hạn, ghi chú và sổ tay sẽ xuất hiện <strong>nhãn cảnh báo màu đỏ (🔴 Overdue)</strong> nổi bật ở thanh menu bên trái và màn hình soạn thảo.</p>
 
 <h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
-<p>Hãy thử đánh dấu tích hoặc bỏ tích các ô công việc mẫu dưới đây, sau đó bấm nút <strong>Tasks</strong> trên thanh Header để quan sát sự thay đổi ngay trên Dashboard:</p>
+<p>Dưới đây là danh sách công việc đính kèm thời hạn deadline. Hãy nhấp vào nút <strong>Tasks</strong> trên thanh Header để xem danh sách ưu tiên quá hạn:</p>
 
-<h3>📌 Danh sách công việc tuần này (Weekly Checklist):</h3>
+<h3>📌 Danh sách công việc đính kèm Deadline:</h3>
 <ul data-type="taskList">
-  <li data-type="taskItem" data-checked="true"><p>Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới</p></li>
-  <li data-type="taskItem" data-checked="true"><p>Thử nghiệm mở Knowledge Graph View trên thanh Header</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Trải nghiệm Trợ lý AI Copilot để tóm tắt văn bản</p></li>
+  <li data-type="taskItem" data-checked="false" data-due="2026-09-01"><p>⚠️ Nộp báo cáo tổng kết dự án MyNotes 4.0 (Đã quá hạn! @due(2026-09-01))</p></li>
+  <li data-type="taskItem" data-checked="false" data-due="2026-09-03"><p>⚠️ Kiểm thử chức năng phân loại deadline đỏ trên Task Center (@due(2026-09-03))</p></li>
+  <li data-type="taskItem" data-checked="true" data-due="2026-09-04"><p>Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới (@due(2026-09-04))</p></li>
+  <li data-type="taskItem" data-checked="false" data-due="2026-09-10"><p>Trải nghiệm Trợ lý AI Copilot để tóm tắt văn bản (@due(2026-09-10))</p></li>
   <li data-type="taskItem" data-checked="false"><p>Xuất bản sao lưu dữ liệu (.json) dự phòng về máy tính</p></li>
-  <li data-type="taskItem" data-checked="false"><p>Thực hiện kiểm tra đồng bộ ứng dụng với Google Drive</p></li>
 </ul>
 
-<p>👉 Nhấp nút <strong>Tasks</strong> trên Header để theo dõi thanh tiến độ % hoàn thành của toàn bộ danh sách trên!</p>`,
+<p>👉 Nhấp nút <strong>Tasks</strong> trên Header để theo dõi các công việc quá hạn được ưu tiên đỏ lên top 1!</p>`,
     },
     {
       title: '📦 7. Sao Lưu & Xuất/Nhập Dữ Liệu (Backup & Export)',

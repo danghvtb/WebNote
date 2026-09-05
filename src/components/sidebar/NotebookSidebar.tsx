@@ -4,10 +4,11 @@
 // ============================================================
 
 import { useState, useRef, useEffect } from 'react';
-import { Plus, MoreVertical, Notebook, FileText, ChevronRight, ChevronDown, Pencil, Copy, Trash2 } from 'lucide-react';
+import { Plus, MoreVertical, Notebook, FileText, ChevronRight, ChevronDown, Pencil, Copy, Trash2, AlertTriangle } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { formatDateFull } from '../../utils';
+import { getNotebookOverdueCount, getPageOverdueCount } from '../../utils/taskUtils';
 import { queueSync } from '../../services/sync/syncManager';
 
 export function NotebookSidebar() {
@@ -254,9 +255,17 @@ export function NotebookSidebar() {
                       onClick={(e) => e.stopPropagation()}
                     />
                   ) : (
-                    <span className="flex-1 text-sm truncate" style={{ color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
-                      {nb.title}
-                    </span>
+                    <div className="flex-1 flex items-center justify-between min-w-0 pr-1">
+                      <span className="text-sm truncate" style={{ color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+                        {nb.title}
+                      </span>
+                      {getNotebookOverdueCount(nb.id, pages) > 0 && (
+                        <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-rose-950/90 border border-rose-500/80 text-rose-300 text-[10px] font-bold flex items-center gap-1 shadow-[0_0_8px_rgba(244,63,94,0.4)] animate-pulse" title="Notebook chứa công việc quá hạn!">
+                          <AlertTriangle className="w-3 h-3 text-rose-400" />
+                          <span>{getNotebookOverdueCount(nb.id, pages)}</span>
+                        </span>
+                      )}
+                    </div>
                   )}
 
                   {/* Actions: Direct Trash & 3-Dots Button */}
@@ -284,6 +293,8 @@ export function NotebookSidebar() {
                   <div className="ml-5 pl-3 mt-0.5 space-y-0.5" style={{ borderLeft: '1px solid var(--color-border)' }}>
                     {nbPages.map((page) => {
                       const pageSelected = page.id === selectedPageId;
+                      const pageOverdue = getPageOverdueCount(page);
+
                       return (
                         <div
                           key={page.id}
@@ -308,9 +319,17 @@ export function NotebookSidebar() {
                               onClick={(e) => e.stopPropagation()}
                             />
                           ) : (
-                            <span className="flex-1 text-xs truncate" style={{ color: pageSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
-                              {page.title}
-                            </span>
+                            <div className="flex-1 flex items-center justify-between min-w-0 pr-1">
+                              <span className="text-xs truncate" style={{ color: pageSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
+                                {page.title}
+                              </span>
+                              {pageOverdue > 0 && (
+                                <span className="flex-shrink-0 px-1.5 py-0.5 rounded bg-rose-950/90 border border-rose-500/70 text-rose-300 text-[9px] font-bold flex items-center gap-0.5 shadow-[0_0_6px_rgba(244,63,94,0.3)]" title={`${pageOverdue} công việc quá hạn`}>
+                                  <AlertTriangle className="w-2.5 h-2.5 text-rose-400" />
+                                  <span>{pageOverdue}</span>
+                                </span>
+                              )}
+                            </div>
                           )}
 
                           {/* Actions: Direct Trash & 3-Dots Button */}
