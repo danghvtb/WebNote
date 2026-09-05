@@ -131,13 +131,33 @@ QUY TẮC BẮT BUỘC:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
+                // Post-process: Strip out any leaked chain-of-thought bullet points (* User input, * Role, * Constraint, * User asks, etc.)
+                let cleanedText = candidateText
+                  .split('\n')
+                  .filter((line: string) => {
+                    const trimmed = line.trim();
+                    // Remove lines starting with * User, * Role, * Constraint, * Current, * Objective, etc.
+                    return !/^\*\s*(User|Role|Constraint|Current|Objective|Context|Greeting|Identity|Offer|Answer|Thinking)/i.test(trimmed);
+                  })
+                  .join('\n')
+                  .trim();
+
+                // If after cleaning it's empty or still contains prompt quotes, fallback to the last valid line
+                if (!cleanedText) {
+                  const lines = candidateText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                  cleanedText = lines[lines.length - 1] || candidateText;
+                }
+
+                // Remove outer quotes if present
+                cleanedText = cleanedText.replace(/^"|"$/g, '').trim();
+
                 const citedSources = vaultPages
-                  .filter((p) => candidateText.toLowerCase().includes(p.title.toLowerCase()))
+                  .filter((p) => cleanedText.toLowerCase().includes(p.title.toLowerCase()))
                   .slice(0, 4)
                   .map((p) => ({ title: p.title, id: p.id }));
 
                 return {
-                  text: candidateText.replace(/\n/g, '<br/>'),
+                  text: cleanedText.replace(/\n/g, '<br/>'),
                   sourcePages: citedSources,
                 };
               }
