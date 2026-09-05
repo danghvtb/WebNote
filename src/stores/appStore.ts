@@ -97,21 +97,36 @@ export const useAppStore = create<AppState>((set) => ({
   notifications: [],
 
   // Actions
-  setAuth: (user, token) =>
-    set({ isLoggedIn: !!user, user, accessToken: token, authError: null }),
+  setAuth: (user, token) => {
+    if (user) {
+      localStorage.setItem('mynotes_user', JSON.stringify(user));
+    } else {
+      localStorage.removeItem('mynotes_user');
+    }
+    if (token) {
+      localStorage.setItem('mynotes_token', token);
+    } else {
+      localStorage.removeItem('mynotes_token');
+    }
+    set({ isLoggedIn: !!user, user, accessToken: token, authError: null });
+  },
 
   setAuthLoading: (loading) => set({ authLoading: loading }),
 
   setAuthError: (error) => set({ authError: error, authLoading: false }),
 
-  logout: () =>
+  logout: () => {
+    localStorage.removeItem('mynotes_user');
+    localStorage.removeItem('mynotes_token');
+    localStorage.removeItem('mynotes_root_folder');
     set({
       isLoggedIn: false,
       user: null,
       accessToken: null,
       initialized: false,
       rootFolderId: null,
-    }),
+    });
+  },
 
   setSyncStatus: (status, message = null) =>
     set({ syncStatus: status, syncMessage: message }),
@@ -143,7 +158,14 @@ export const useAppStore = create<AppState>((set) => ({
   setMobileDaySidebarOpen: (open) => set({ mobileDaySidebarOpen: open }),
   setConfirmModal: (modal) => set({ confirmModal: modal }),
   setInitialized: (initialized) => set({ initialized }),
-  setRootFolderId: (folderId) => set({ rootFolderId: folderId }),
+  setRootFolderId: (folderId) => {
+    if (folderId) {
+      localStorage.setItem('mynotes_root_folder', folderId);
+    } else {
+      localStorage.removeItem('mynotes_root_folder');
+    }
+    set({ rootFolderId: folderId });
+  },
   setNeedsFolderCreation: (needs) => set({ needsFolderCreation: needs }),
 
   addNotification: (type, message) => {

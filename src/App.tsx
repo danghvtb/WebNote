@@ -22,7 +22,40 @@ import { TaskManagerModal } from './components/modal/TaskManagerModal';
 import { ExportModal } from './components/modal/ExportModal';
 
 function AppContent() {
-  const { isLoggedIn, needsFolderCreation, setSyncStatus, setLastSyncTime, setTheme } = useAppStore();
+  const {
+    isLoggedIn, needsFolderCreation, setSyncStatus, setLastSyncTime, setTheme,
+    setAuth, setRootFolderId, setInitialized,
+  } = useAppStore();
+
+  // Restore session from localStorage on reload
+  useEffect(() => {
+    const savedUserStr = localStorage.getItem('mynotes_user');
+    const savedToken = localStorage.getItem('mynotes_token');
+    const savedFolder = localStorage.getItem('mynotes_root_folder');
+
+    if (savedUserStr) {
+      try {
+        const savedUser = JSON.parse(savedUserStr);
+        setAuth(savedUser, savedToken);
+
+        if (savedFolder) {
+          setRootFolderId(savedFolder);
+        }
+
+        // Auto load notes from IndexedDB
+        import('./stores/notesStore').then(({ useNotesStore }) => {
+          const notesStore = useNotesStore.getState();
+          notesStore.loadDays();
+          notesStore.loadRecentNotebooks();
+          notesStore.selectToday();
+        });
+
+        setInitialized(true);
+      } catch (err) {
+        console.warn('[App] Session restore error:', err);
+      }
+    }
+  }, [setAuth, setRootFolderId, setInitialized]);
 
   // Initialize theme
   useEffect(() => {

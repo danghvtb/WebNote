@@ -155,7 +155,7 @@ export function signInSilent(): Promise<string> {
 }
 
 /**
- * Sign out — revoke the token.
+ * Sign out — revoke the token and clear stored session.
  */
 export function signOut(): void {
   if (currentAccessToken) {
@@ -165,6 +165,9 @@ export function signOut(): void {
   }
   currentAccessToken = null;
   tokenExpiresAt = null;
+  localStorage.removeItem('mynotes_user');
+  localStorage.removeItem('mynotes_token');
+  localStorage.removeItem('mynotes_root_folder');
 }
 
 /**
