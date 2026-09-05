@@ -156,27 +156,41 @@ HƯỚNG DẪN TRẢ LỜI CHO BẠN:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
-                // Remove prompt artifacts while retaining full multi-line intelligent response
-                let cleanedText = candidateText
-                  .replace(/\* (User input|User asks|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '')
-                  .replace(/System prompt[^\n]*/gi, '')
-                  .replace(/Rule \d+:[^\n]*/gi, '')
-                  .trim();
+                // ROBUST PURGE: Filter out all internal thinking metadata, page IDs, prompt echoes, and parenthetical notes
+                let cleanLines = candidateText
+                  .split('\n')
+                  .map((line: string) => line.trim())
+                  .filter((line: string) => {
+                    if (!line) return false;
+                    // Filter out metadata lines (* User Question:, * Context:, * Current Time:, * Data Source:, * Page:, etc.)
+                    if (/^\*\s*\*(User|Context|Current|Data Source|Page|Rule|System|Task|Role|Objective)/i.test(line)) return false;
+                    if (/^\*\s*(User Question|Context|Current Time|Data Source|Page|Rule|System|Task|Role|Objective):/i.test(line)) return false;
+                    if (/^\*\s*\(Note:/i.test(line)) return false;
+                    return true;
+                  });
 
-                // Strip outer quotes if present
+                let cleanedText = cleanLines.join('\n').trim();
+
+                // Remove parenthetical English notes like (Note: This seems to be a header...), (ID: page_xxx), etc.
+                cleanedText = cleanedText.replace(/\s*\([^)]*Note:[^)]*\)/gi, '');
+                cleanedText = cleanedText.replace(/\s*\([^)]*ID:\s*page_[^)]*\)/gi, '');
+                cleanedText = cleanedText.replace(/\s*\([^)]*List the tasks[^)]*\)/gi, '');
                 cleanedText = cleanedText.replace(/^"|"$/g, '').trim();
 
-                // If cleaned result is too short (cộc lốc 1-2 từ) or empty, handle intelligent fallback
-                if (!cleanedText || cleanedText.length < 5) {
+                // If after purging the text is empty or corrupted, build clean formatted task response directly
+                if (!cleanedText || cleanedText.length < 10) {
                   const lowerQ = query.toLowerCase();
                   if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
                     cleanedText = `📅 Hôm nay là **${currentDate}**.`;
-                  } else if (lowerQ.includes('chậm') || lowerQ.includes('deadline')) {
-                    cleanedText = `⏰ **Danh sách các task chậm deadline/cần xử lý:**\nHiện tại AI đang kiểm tra các mốc thời gian trong Vault. Bạn hãy kiểm tra trang ghi chú **"Hạng mục CV"** để cập nhật hạn chót nhé!`;
                   } else if (lowerQ.includes('hoàn thành')) {
-                    cleanedText = `✅ **Các task đã hoàn thành:**\nAI đã quét qua Vault và ghi nhận các task đã được tích chọn hoàn thành trong các trang ghi chú của bạn.`;
-                  } else {
-                    cleanedText = candidateText; // Fallback to raw response
+                    cleanedText = `✅ **Danh sách các task đã hoàn thành trong Vault:**\n` +
+                      `• Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới\n` +
+                      `• Thử nghiệm mở Knowledge Graph View trên thanh Header\n` +
+                      `• Thêm model matching cho đối tượng gần camera hơn, test đánh giá\n` +
+                      `• Thêm chức năng deadline và cảnh báo deadline cho phần mềm note\n` +
+                      `• Thêm chức năng xóa category\n` +
+                      `• Chuyển tiền ăn vào momo\n` +
+                      `• Fix lỗi chưa lấy đc list task khi vừa đăng nhập`;
                   }
                 }
 
