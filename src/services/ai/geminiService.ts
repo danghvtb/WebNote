@@ -100,8 +100,14 @@ NHIỆM VỤ CỦA BẠN:
     return simulateGeminiResponse(query, vaultPages, currentDate);
   }
 
-  // Try supported model names dynamically (gemini-2.5-flash, gemini-1.5-flash-latest, gemini-pro)
-  const candidateModels = ['gemini-2.5-flash', 'gemini-1.5-flash-latest', 'gemini-1.5-pro-latest', 'gemini-pro'];
+  // Try all valid Google AI Studio models (gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro, gemini-pro)
+  const candidateModels = [
+    'gemini-2.0-flash',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro',
+    'gemini-2.0-flash-exp',
+    'gemini-pro'
+  ];
   let lastError = '';
 
   for (const model of candidateModels) {
