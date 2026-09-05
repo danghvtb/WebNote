@@ -56,8 +56,33 @@ export async function queryGeminiVault(
 
   const vaultContextStr = vaultPages
     .map((p) => {
-      const cleanContent = p.content ? p.content.replace(/<[^>]*>/g, ' ').slice(0, 1500) : '(Trống)';
-      return `--- GHI CHÚ: "${p.title}" (ID: ${p.id}) ---\n${cleanContent}\n`;
+      // Parse HTML to convert checkboxes/tasks into explicit readable format for AI: [HOÀN THÀNH] or [CHƯA HOÀN THÀNH]
+      let textContent = p.content || '';
+      if (typeof document !== 'undefined' && textContent) {
+        const tempDiv = document.createElement('div');
+        tempDiv.innerHTML = textContent;
+
+        // Convert task items
+        const taskItems = Array.from(tempDiv.querySelectorAll('li[data-type="taskItem"], li'));
+        taskItems.forEach((item) => {
+          const isChecked = 
+            item.getAttribute('data-checked') === 'true' || 
+            item.querySelector('input[type="checkbox"]')?.hasAttribute('checked') ||
+            (item.querySelector('input[type="checkbox"]') as HTMLInputElement)?.checked;
+
+          const label = item.textContent?.trim() || '';
+          if (label) {
+            const statusTag = isChecked ? '[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]' : '[TRẠNG THÁI: CHƯA HOÀN THÀNH ⏳]';
+            item.textContent = `${statusTag} ${label}`;
+          }
+        });
+
+        textContent = tempDiv.innerText || tempDiv.textContent || textContent.replace(/<[^>]*>/g, ' ');
+      } else {
+        textContent = textContent.replace(/<[^>]*>/g, ' ');
+      }
+
+      return `=== TRANG GHI CHÚ: "${p.title}" (ID: ${p.id}) ===\n${textContent.slice(0, 2000)}\n`;
     })
     .join('\n');
 
