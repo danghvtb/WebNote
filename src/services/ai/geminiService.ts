@@ -126,10 +126,10 @@ YÊU CẦU TRẢ LỜI VÀ LIỆT KÊ CÔNG VIỆC (TASKS):
 
   // Direct execution with verified active Google AI Studio models (gemini-3.6-flash, gemini-flash-latest)
   const modelsToTry = [
+    'gemini-3.5-flash',
+    'gemini-3.1-flash-lite',
     'gemini-3.6-flash',
     'gemini-flash-latest',
-    'gemini-3.5-flash',
-    'gemini-2.5-pro',
   ];
   let lastError = '';
 
@@ -156,7 +156,11 @@ YÊU CẦU TRẢ LỜI VÀ LIỆT KÊ CÔNG VIỆC (TASKS):
       if (response.ok) {
         const data = await response.json();
         const parts = data.candidates?.[0]?.content?.parts || [];
-        let candidateText = parts.map((pt: { text?: string }) => pt.text || '').filter(Boolean).join('\n');
+        // Filter parts that actually contain text
+        let candidateText = parts
+          .map((pt: { text?: string }) => pt.text || '')
+          .filter((txt: string) => txt.trim().length > 0)
+          .join('\n');
         
         if (candidateText) {
           // Format raw task tags like "[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]" into clean Vietnamese bullet points "✅ "
