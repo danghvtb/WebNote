@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useState } from 'react';
-import { X, Sparkles, FileText, CheckSquare, Languages, RefreshCw, Wand2 } from 'lucide-react';
+import { X, Sparkles, FileText, CheckSquare, RefreshCw, Wand2 } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { queueSync } from '../../services/sync/syncManager';
@@ -18,7 +18,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
   const { selectedPageId, pages, updatePageContent } = useNotesStore();
   const { addNotification } = useAppStore();
   const [loading, setLoading] = useState(false);
-  const [activeTab, setActiveTab] = useState<'summarize' | 'polish' | 'tasks' | 'translate'>('summarize');
+  const [activeTab, setActiveTab] = useState<'summarize' | 'polish' | 'tasks' | 'digest'>('summarize');
   const [aiResult, setAiResult] = useState<string | null>(null);
 
   const selectedPage = pages.find((p) => p.id === selectedPageId);
@@ -34,7 +34,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
       let result = '';
       const textContent = selectedPage.content.replace(/<[^>]*>/g, '').trim();
 
-      if (!textContent) {
+      if (!textContent && action !== 'digest') {
         setAiResult('⚠️ Page has no text content to analyze.');
         setLoading(false);
         return;
@@ -45,14 +45,14 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
       } else if (action === 'polish') {
         result = `<p><strong>Enhanced Content:</strong></p><p>${textContent} (Refined with professional clarity and concise tone).</p>`;
       } else if (action === 'tasks') {
-        result = `ul data-type="taskList"><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span>Review ${selectedPage.title} outline</span></label></li><li data-type="taskItem" data-checked="false"><label><input type="checkbox"><span>Organize key concepts into sub-pages</span></label></li></ul>`;
-      } else if (action === 'translate') {
-        result = `<p><em>[English Translation]</em></p><p>${textContent}</p>`;
+        result = `<ul data-type="taskList"><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T18:00"><label><input type="checkbox"><span>Review ${selectedPage.title} outline</span></label></li><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T20:00"><label><input type="checkbox"><span>Organize key concepts into sub-pages</span></label></li></ul>`;
+      } else if (action === 'digest') {
+        result = `☀️ <strong>AI Daily Productivity Standup:</strong><br/><ul><li>🔥 <strong>Priority 1:</strong> Finish upcoming deadlines due within 30 minutes.</li><li>⚡ <strong>Priority 2:</strong> Review notebook "${selectedPage.title}" notes.</li><li>✅ <strong>Goal:</strong> Maintain 100% completion rate for today's tasks.</li></ul>`;
       }
 
       setAiResult(result);
       setLoading(false);
-    }, 1200);
+    }, 1000);
   };
 
   const handleApply = async () => {
@@ -122,15 +122,15 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
             Extract Tasks
           </button>
           <button
-            onClick={() => { setActiveTab('translate'); handleGenerate('translate'); }}
+            onClick={() => { setActiveTab('digest'); handleGenerate('digest'); }}
             className={`flex flex-col items-center gap-1.5 p-3 rounded-xl border text-xs font-medium transition-all cursor-pointer ${
-              activeTab === 'translate'
+              activeTab === 'digest'
                 ? 'bg-purple-600/20 border-purple-500 text-purple-300'
                 : 'bg-slate-800/40 border-slate-700/50 text-slate-400 hover:bg-slate-800'
             }`}
           >
-            <Languages className="w-4 h-4" />
-            Translate
+            <Sparkles className="w-4 h-4 text-amber-400" />
+            Daily Digest
           </button>
         </div>
 

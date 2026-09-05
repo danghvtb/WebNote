@@ -97,15 +97,21 @@ function AppContent() {
     return unsubscribe;
   }, [setSyncStatus, setLastSyncTime]);
 
-  // 30-Minute Deadline Warning Monitor
+  // 30-Minute Deadline Warning Monitor & Native Push + Audio Chime
   const { addNotification } = useAppStore();
   useEffect(() => {
     const alertedTaskIds = new Set<string>();
+
+    // Request Notification Permission on App init
+    import('./services/notification/notificationManager').then(({ requestNotificationPermission }) => {
+      requestNotificationPermission();
+    });
 
     const checkUpcomingDeadlines = async () => {
       try {
         const { getAllVaultPages, getAllVaultNotebooks } = await import('./services/database/repository');
         const { parseAllTasks, isValidDueDate } = await import('./utils/taskUtils');
+        const { playNotificationChime, sendNativeNotification } = await import('./services/notification/notificationManager');
 
         const [pages, notebooks] = await Promise.all([getAllVaultPages(), getAllVaultNotebooks()]);
         const tasks = parseAllTasks(pages, notebooks, true);
@@ -123,10 +129,19 @@ function AppContent() {
           if (diffMs > 0 && diffMs <= THIRTY_MINS_MS && !alertedTaskIds.has(t.id)) {
             alertedTaskIds.add(t.id);
             const remainingMins = Math.ceil(diffMs / (60 * 1000));
-            addNotification(
-              'warning',
-              `⏰ CẢNH BÁO DEADLINE: Task "${t.text.slice(0, 45)}" còn ${remainingMins} phút nữa là đến hạn!`
-            );
+            const msg = `⏰ CẢNH BÁO DEADLINE: Task "${t.text.slice(0, 45)}" còn ${remainingMins} phút nữa là đến hạn!`;
+
+            // 1. Toast Notification inside app
+            addNotification('warning', msg);
+
+            // 2. Play soft audio chime
+            playNotificationChime();
+
+            // 3. Native OS Push Notification
+            sendNativeNotification('⏰ MyNotes - Cảnh Báo Deadline!', {
+              body: msg,
+              tag: `task-deadline-${t.id}`,
+            });
           }
         });
       } catch (err) {

@@ -28,6 +28,7 @@ interface TaskManagerModalProps {
 export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
   const { pages, notebooks, selectPage, updatePageContent } = useNotesStore();
   const [filter, setFilter] = useState<'all' | 'overdue' | 'pending' | 'completed'>('all');
+  const [viewMode, setViewMode] = useState<'list' | 'calendar' | 'kanban'>('list');
   const [searchQuery, setSearchQuery] = useState('');
   const [vaultPages, setVaultPages] = useState<Page[]>([]);
   const [vaultNotebooks, setVaultNotebooks] = useState<Notebook[]>([]);
@@ -195,27 +196,49 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
           />
         </div>
 
-        {/* Filters & Search */}
-        <div className="p-4 bg-slate-900/90 border-b border-purple-500/10 flex flex-col sm:flex-row gap-3 justify-between items-center">
-          {/* Search Input */}
-          <div className="relative w-full sm:w-64">
-            <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
-            <input
-              type="text"
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search tasks or pages..."
-              className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500/50"
-            />
+        {/* Filters, View Modes & Search */}
+        <div className="p-4 bg-slate-900/90 border-b border-purple-500/10 flex flex-col md:flex-row gap-3 justify-between items-center">
+          {/* Left: Search + View Modes */}
+          <div className="flex flex-wrap items-center gap-2 w-full md:w-auto">
+            <div className="relative flex-1 sm:w-56">
+              <Search className="w-4 h-4 absolute left-3 top-2.5 text-slate-400" />
+              <input
+                type="text"
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                placeholder="Search tasks..."
+                className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500/50"
+              />
+            </div>
+
+            {/* View Mode Selector */}
+            <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800">
+              <button
+                onClick={() => setViewMode('list')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'list' ? 'bg-purple-600/40 text-purple-200 border border-purple-500/50' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                📋 List
+              </button>
+              <button
+                onClick={() => setViewMode('kanban')}
+                className={`px-2.5 py-1 text-xs font-semibold rounded-lg transition-all cursor-pointer ${
+                  viewMode === 'kanban' ? 'bg-purple-600/40 text-purple-200 border border-purple-500/50' : 'text-slate-400 hover:text-slate-200'
+                }`}
+              >
+                📊 Kanban
+              </button>
+            </div>
           </div>
 
           {/* Filter Tabs */}
-          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full sm:w-auto justify-center">
+          <div className="flex items-center gap-1 bg-slate-950 p-1 rounded-xl border border-slate-800 w-full md:w-auto justify-center overflow-x-auto">
             {(['all', 'overdue', 'pending', 'completed'] as const).map((tab) => (
               <button
                 key={tab}
                 onClick={() => setFilter(tab)}
-                className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize transition-all cursor-pointer flex items-center gap-1.5 ${
+                className={`px-3 py-1 text-xs font-semibold rounded-lg capitalize transition-all cursor-pointer flex items-center gap-1.5 whitespace-nowrap ${
                   filter === tab
                     ? tab === 'overdue'
                       ? 'bg-rose-950 text-rose-200 border border-rose-500/60 shadow-sm'
@@ -237,9 +260,69 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
           </div>
         </div>
 
-        {/* Task List */}
+        {/* View Mode Content Container */}
         <div className="flex-1 overflow-y-auto p-4 space-y-3">
-          {sortedTasks.length === 0 ? (
+          {viewMode === 'kanban' ? (
+            /* KANBAN BOARD VIEW */
+            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 h-full min-h-[350px]">
+              {/* Column 1: Overdue */}
+              <div className="bg-rose-950/20 border border-rose-500/30 rounded-xl p-3 flex flex-col">
+                <h4 className="text-xs font-bold text-rose-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                  <AlertTriangle className="w-4 h-4 text-rose-400" />
+                  Overdue ({sortedTasks.filter((t) => t.isOverdue && !t.completed).length})
+                </h4>
+                <div className="flex-1 space-y-2 overflow-y-auto max-h-[420px] pr-1">
+                  {sortedTasks.filter((t) => t.isOverdue && !t.completed).map((task) => (
+                    <div key={task.id} className="p-3 bg-slate-900 border border-rose-500/40 rounded-xl shadow-sm">
+                      <p className="text-xs font-medium text-slate-200 mb-2">{task.text}</p>
+                      <div className="flex items-center justify-between text-[10px] text-rose-300">
+                        <span>⏰ {task.dueDate}</span>
+                        <button onClick={() => toggleTask(task)} className="text-emerald-400 hover:underline">✓ Mark Done</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Column 2: To-Do / Pending */}
+              <div className="bg-purple-950/20 border border-purple-500/30 rounded-xl p-3 flex flex-col">
+                <h4 className="text-xs font-bold text-purple-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                  <Clock className="w-4 h-4 text-purple-400" />
+                  Pending ({sortedTasks.filter((t) => !t.isOverdue && !t.completed).length})
+                </h4>
+                <div className="flex-1 space-y-2 overflow-y-auto max-h-[420px] pr-1">
+                  {sortedTasks.filter((t) => !t.isOverdue && !t.completed).map((task) => (
+                    <div key={task.id} className="p-3 bg-slate-900 border border-slate-800 rounded-xl shadow-sm">
+                      <p className="text-xs font-medium text-slate-200 mb-2">{task.text}</p>
+                      <div className="flex items-center justify-between text-[10px] text-purple-300">
+                        <span>📅 {task.dueDate?.split('T')[0]}</span>
+                        <button onClick={() => toggleTask(task)} className="text-emerald-400 hover:underline">✓ Mark Done</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+
+              {/* Column 3: Completed */}
+              <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 flex flex-col">
+                <h4 className="text-xs font-bold text-emerald-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
+                  <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+                  Completed ({sortedTasks.filter((t) => t.completed).length})
+                </h4>
+                <div className="flex-1 space-y-2 overflow-y-auto max-h-[420px] pr-1">
+                  {sortedTasks.filter((t) => t.completed).map((task) => (
+                    <div key={task.id} className="p-3 bg-slate-900 border border-emerald-500/30 rounded-xl opacity-75">
+                      <p className="text-xs font-medium line-through text-slate-400 mb-2">{task.text}</p>
+                      <div className="flex items-center justify-between text-[10px] text-emerald-400">
+                        <span>Completed Today</span>
+                        <button onClick={() => toggleTask(task)} className="text-slate-400 hover:underline">Undo</button>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            </div>
+          ) : sortedTasks.length === 0 ? (
             <div className="py-12 text-center text-slate-500">
               <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-slate-600" />
               <p className="text-sm font-medium">No tasks found</p>
