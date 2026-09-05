@@ -102,57 +102,74 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
 
   return (
     <div
-      className="flex-shrink-0 px-4 py-1.5 flex items-center flex-wrap gap-0.5 overflow-x-auto"
-      style={{ borderBottom: '1px solid var(--color-border)', background: 'var(--color-bg-secondary)' }}
+      className="flex items-center gap-1 p-1.5 overflow-x-auto no-scrollbar max-w-full"
+      style={{
+        background: 'var(--color-bg-secondary)',
+        borderBottom: '1px solid var(--color-border)',
+        WebkitOverflowScrolling: 'touch',
+      }}
     >
-      {groups.map((group, groupIndex) => (
-        <div key={groupIndex} className="flex items-center gap-0.5">
-          {group.map((button, i) => {
+      {groups.map((group, groupIdx) => (
+        <div key={groupIdx} className="flex items-center gap-0.5 flex-shrink-0">
+          {group.map((button, btnIdx) => {
             const active = button.isActive?.();
             return (
               <button
-                key={i}
+                key={btnIdx}
                 onClick={button.action}
                 title={button.title}
-                aria-label={button.title}
-                className="p-1.5 rounded-lg transition-all cursor-pointer flex items-center justify-center"
+                className={`p-1.5 rounded-md transition-colors cursor-pointer flex-shrink-0 ${
+                  active
+                    ? 'bg-slate-700 text-cyan-400'
+                    : 'text-slate-400 hover:text-slate-200 hover:bg-slate-800'
+                }`}
                 style={{
-                  color: active ? '#ffffff' : 'var(--color-text-primary)',
-                  background: active ? 'var(--color-accent)' : 'transparent',
-                  boxShadow: active ? '0 0 8px rgba(88, 166, 255, 0.4)' : 'none',
+                  background: active ? 'var(--color-bg-tertiary)' : undefined,
+                  color: active ? 'var(--color-accent)' : undefined,
                 }}
-                onMouseEnter={(e) => !active && (e.currentTarget.style.background = 'var(--color-bg-hover)')}
-                onMouseLeave={(e) => !active && (e.currentTarget.style.background = 'transparent')}
               >
                 {button.icon}
               </button>
             );
           })}
-          {groupIndex < groups.length - 1 && (
-            <div className="w-px h-5 mx-1" style={{ background: 'var(--color-border)' }} />
+          {groupIdx < groups.length - 1 && (
+            <div
+              className="h-4 w-px mx-1 flex-shrink-0"
+              style={{ background: 'var(--color-border)' }}
+            />
           )}
         </div>
       ))}
 
-      {/* Link Input */}
+      {/* Link Input Popover */}
       {showLinkInput && (
-        <div className="flex items-center gap-2 ml-2 animate-slide-up">
+        <div
+          className="absolute top-12 left-4 z-50 flex items-center gap-2 p-2 rounded-lg shadow-xl"
+          style={{
+            background: 'var(--color-bg-tertiary)',
+            border: '1px solid var(--color-border)',
+          }}
+        >
           <input
             type="url"
+            placeholder="Paste URL..."
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
-            onKeyDown={(e) => { if (e.key === 'Enter') handleAddLink(); if (e.key === 'Escape') setShowLinkInput(false); }}
-            placeholder="Enter URL..."
+            onKeyDown={(e) => e.key === 'Enter' && handleAddLink()}
+            className="px-2 py-1 text-xs rounded bg-slate-900 text-white outline-none border border-slate-700 w-48 sm:w-64"
             autoFocus
-            className="px-2 py-1 text-xs rounded-md bg-transparent outline-none w-48"
-            style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
           />
           <button
             onClick={handleAddLink}
-            className="px-2 py-1 text-xs rounded-md cursor-pointer"
-            style={{ background: 'var(--color-accent)', color: '#fff' }}
+            className="px-2.5 py-1 text-xs rounded font-medium bg-cyan-600 hover:bg-cyan-500 text-white transition-colors"
           >
             Add
+          </button>
+          <button
+            onClick={() => setShowLinkInput(false)}
+            className="text-xs text-slate-400 hover:text-white"
+          >
+            Cancel
           </button>
         </div>
       )}

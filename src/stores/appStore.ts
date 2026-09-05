@@ -28,6 +28,8 @@ interface AppState {
   graphViewOpen: boolean;
   taskManagerOpen: boolean;
   exportModalOpen: boolean;
+  mobileSidebarOpen: boolean;
+  mobileDaySidebarOpen: boolean;
   confirmModal: { open: boolean; title: string; message: string; onConfirm: (() => void) | null };
 
   // App state
@@ -54,6 +56,8 @@ interface AppState {
   setGraphViewOpen: (open: boolean) => void;
   setTaskManagerOpen: (open: boolean) => void;
   setExportModalOpen: (open: boolean) => void;
+  setMobileSidebarOpen: (open: boolean) => void;
+  setMobileDaySidebarOpen: (open: boolean) => void;
   setConfirmModal: (modal: { open: boolean; title: string; message: string; onConfirm: (() => void) | null }) => void;
   setInitialized: (initialized: boolean) => void;
   setRootFolderId: (folderId: string | null) => void;
@@ -82,6 +86,8 @@ export const useAppStore = create<AppState>((set) => ({
   graphViewOpen: false,
   taskManagerOpen: false,
   exportModalOpen: false,
+  mobileSidebarOpen: false,
+  mobileDaySidebarOpen: false,
   confirmModal: { open: false, title: '', message: '', onConfirm: null },
 
   initialized: false,
@@ -133,6 +139,8 @@ export const useAppStore = create<AppState>((set) => ({
   setGraphViewOpen: (open) => set({ graphViewOpen: open }),
   setTaskManagerOpen: (open) => set({ taskManagerOpen: open }),
   setExportModalOpen: (open) => set({ exportModalOpen: open }),
+  setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
+  setMobileDaySidebarOpen: (open) => set({ mobileDaySidebarOpen: open }),
   setConfirmModal: (modal) => set({ confirmModal: modal }),
   setInitialized: (initialized) => set({ initialized }),
   setRootFolderId: (folderId) => set({ rootFolderId: folderId }),

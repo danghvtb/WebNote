@@ -15,9 +15,9 @@ export function Header() {
     user, syncStatus, lastSyncTime, syncMessage,
     toggleSearch, setSettingsOpen, logout, setGraphViewOpen,
     setTaskManagerOpen, setExportModalOpen,
+    mobileSidebarOpen, setMobileSidebarOpen,
   } = useAppStore();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
-  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
   // Close menu on outside click
@@ -56,33 +56,33 @@ export function Header() {
     return (
       <button
         onClick={handleSync}
-        className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer"
+        className="flex items-center gap-1.5 px-2 py-1 rounded-lg text-xs font-medium transition-colors cursor-pointer"
         style={{ color: config.color }}
         title={syncMessage || `Status: ${syncStatus}`}
         aria-label={`Sync status: ${config.text}`}
       >
         {config.icon}
-        <span className="hidden sm:inline">{config.text}</span>
+        <span className="hidden md:inline">{config.text}</span>
       </button>
     );
   };
 
   return (
     <header
-      className="flex items-center justify-between px-4 h-13 flex-shrink-0 glass-header"
+      className="flex items-center justify-between px-3 md:px-4 h-13 flex-shrink-0 glass-header gap-2"
     >
-      {/* Left: Logo + Mobile Menu */}
+      {/* Left: Logo + Mobile Menu Toggle */}
       <div className="flex items-center gap-2">
         <button
-          className="lg:hidden p-1.5 rounded-lg cursor-pointer"
-          style={{ color: 'var(--color-text-secondary)' }}
-          onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
-          aria-label="Toggle menu"
+          className="md:hidden p-1.5 rounded-lg cursor-pointer hover:bg-slate-800 text-slate-300 transition-colors"
+          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          aria-label="Toggle notebook sidebar"
+          title="Notebooks & Pages"
         >
           <Menu className="w-5 h-5" />
         </button>
         <div className="flex items-center gap-2">
-          <div className="w-6 h-6 rounded-md flex items-center justify-center" style={{ background: 'var(--color-accent-dim)' }}>
+          <div className="w-6 h-6 rounded-md flex items-center justify-center flex-shrink-0" style={{ background: 'var(--color-accent-dim)' }}>
             <span className="text-xs font-bold" style={{ color: 'var(--color-accent)' }}>M</span>
           </div>
           <span className="font-semibold text-sm hidden sm:inline" style={{ color: 'var(--color-text-primary)' }}>MyNotes</span>
@@ -92,12 +92,12 @@ export function Header() {
       {/* Center: Search */}
       <button
         onClick={toggleSearch}
-        className="flex items-center gap-2 px-3 py-1.5 rounded-lg transition-colors cursor-pointer max-w-xs w-full sm:w-64"
+        className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg transition-colors cursor-pointer flex-1 max-w-[180px] sm:max-w-xs"
         style={{ background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}
         aria-label="Search notes"
       >
-        <Search className="w-3.5 h-3.5" style={{ color: 'var(--color-text-tertiary)' }} />
-        <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Search notes...</span>
+        <Search className="w-3.5 h-3.5 flex-shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
+        <span className="text-xs truncate" style={{ color: 'var(--color-text-tertiary)' }}>Search...</span>
         <kbd
           className="ml-auto text-xs px-1.5 py-0.5 rounded hidden sm:inline"
           style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-tertiary)', border: '1px solid var(--color-border)' }}
@@ -106,24 +106,24 @@ export function Header() {
         </kbd>
       </button>
 
-      {/* Right: Sync + Avatar */}
-      <div className="flex items-center gap-2">
+      {/* Right: Sync + Actions + Avatar */}
+      <div className="flex items-center gap-1 sm:gap-2">
         <button
           onClick={() => setGraphViewOpen(true)}
           className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
           title="Open Knowledge Graph View"
         >
           <Network className="w-4 h-4 text-cyan-400" />
-          <span className="hidden md:inline">Graph</span>
+          <span className="hidden lg:inline">Graph</span>
         </button>
 
         <button
           onClick={() => setTaskManagerOpen(true)}
           className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
-          title="Open Task Center & Todo Dashboard"
+          title="Open Task Center"
         >
           <CheckSquare className="w-4 h-4 text-purple-400" />
-          <span className="hidden md:inline">Tasks</span>
+          <span className="hidden lg:inline">Tasks</span>
         </button>
 
         <button
@@ -132,7 +132,7 @@ export function Header() {
           title="Export / Backup Vault"
         >
           <Download className="w-4 h-4 text-emerald-400" />
-          <span className="hidden md:inline">Export</span>
+          <span className="hidden lg:inline">Export</span>
         </button>
         {renderSyncStatus()}
 
