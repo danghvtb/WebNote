@@ -131,11 +131,17 @@ async function processSyncQueue(): Promise<void> {
   setStatus('syncing');
 
   try {
-    const rootFolderId = await getRootFolderId();
+    let rootFolderId = await getRootFolderId();
     if (!rootFolderId) {
-      setStatus('error', 'No root folder configured');
-      syncInProgress = false;
-      return;
+      const { ensureRootFolder } = await import('../google/rootFolderManager');
+      const folderRes = await ensureRootFolder();
+      if (folderRes.status === 'found') {
+        rootFolderId = folderRes.folderId;
+      } else {
+        setStatus('error', 'No root folder configured');
+        syncInProgress = false;
+        return;
+      }
     }
 
     // Check pending operations to optimize sync

@@ -42,6 +42,20 @@ function AppContent() {
           setRootFolderId(savedFolder);
         }
 
+        // Initialize Google Auth script & root folder in background
+        import('./services/google/auth').then(async ({ initGoogleAuth }) => {
+          try {
+            await initGoogleAuth();
+            const { ensureRootFolder } = await import('./services/google/rootFolderManager');
+            const res = await ensureRootFolder();
+            if (res.status === 'found') {
+              setRootFolderId(res.folderId);
+            }
+          } catch (err) {
+            console.warn('[App] Background auth/folder init warning:', err);
+          }
+        });
+
         // Auto load notes from IndexedDB
         import('./stores/notesStore').then(({ useNotesStore }) => {
           const notesStore = useNotesStore.getState();
