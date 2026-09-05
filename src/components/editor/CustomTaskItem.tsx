@@ -45,9 +45,9 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
   };
 
   return (
-    <NodeViewWrapper as="li" data-type="taskItem" data-checked={isChecked} data-due={dueDate || ''} className="custom-task-item flex items-center gap-2 group my-1">
+    <NodeViewWrapper as="li" data-type="taskItem" data-checked={isChecked} data-due={dueDate || ''} className="custom-task-item flex items-start sm:items-center gap-2 group my-1.5 w-full">
       {/* Checkbox */}
-      <label className="flex items-center cursor-pointer select-none flex-shrink-0">
+      <label className="flex items-center cursor-pointer select-none flex-shrink-0 mt-1 sm:mt-0">
         <input
           type="checkbox"
           checked={isChecked}
@@ -57,7 +57,7 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
       </label>
 
       {/* Task Text Content */}
-      <NodeViewContent className={`flex-1 min-w-0 ${isChecked ? 'line-through text-slate-500' : 'text-slate-200'}`} />
+      <NodeViewContent className={`flex-1 min-w-0 break-words ${isChecked ? 'line-through text-slate-500' : 'text-slate-200'}`} />
 
       {/* Deadline Badge & Action Button at the end of task */}
       <div className="relative flex-shrink-0 flex items-center gap-1.5 select-none" contentEditable={false}>
