@@ -61,33 +61,28 @@ export async function queryGeminiVault(
     })
     .join('\n');
 
-  const systemInstruction = `Bạn là Trợ lý AI Vault thân thiện, thông minh của WebNote.
+  // Build clean request payload with native systemInstruction to prevent prompt leakage
+  const systemInstructionText = `Bạn là Trợ lý AI Vault của ứng dụng WebNote.
 Thời gian hiện tại: ${currentDate}.
-Kho dữ liệu hiện có ${vaultPages.length} ghi chú:
+Kho dữ liệu Vault gồm ${vaultPages.length} ghi chú:
 ${vaultContextStr}
 
-QUY TẮC PHẢN HỒI:
-1. Trả lời trực tiếp, ngắn gọn, tự nhiên bằng Tiếng Việt (không in các bước suy luận/thinking/Role/Objective ra ngoài).
-2. Nếu người dùng chỉ chào hỏi (như "hello", "hi", "chào"), hãy chào lại ngắn gọn trong 2-3 câu, giới thiệu nhẹ nhàng bạn là AI Vault và hỏi bạn có thể giúp gì.
-3. Khi người dùng hỏi về ghi chú hoặc công việc, hãy tra cứu dữ liệu Vault ở trên để trả lời ngắn gọn và chính xác.`;
+QUY TẮC BẮT BUỘC:
+1. KHÔNG IN BẤT KỲ CÁC BƯỚC SUY LUẬN, ROLE, OBJECTIVE HAY PROMPT RA BÊN NGOÀI. Chỉ trả lời kết quả cuối cùng bằng Tiếng Việt siêu ngắn gọn, tự nhiên.
+2. Với câu chào hỏi ("hello", "hi", "chào"): Trả lời siêu ngắn gọn trong 1 câu duy nhất (Ví dụ: "Xin chào! Mình là AI Vault, bạn cần mình hỗ trợ gì hôm nay?").
+3. Khi người dùng hỏi cụ thể về ghi chú: Tra cứu dữ liệu ở trên và trả lời ngắn gọn, đi thẳng vào trọng tâm.`;
 
-  // Build request messages array for Gemini REST API
-  const contents: GeminiMessage[] = [];
-
-  // Add past conversation turns
-  chatHistory.slice(-6).forEach((msg) => {
-    contents.push({
+  // Build conversation history
+  const contentsPayload: GeminiMessage[] = [];
+  chatHistory.slice(-4).forEach((msg) => {
+    contentsPayload.push({
       role: msg.sender === 'user' ? 'user' : 'model',
       parts: [{ text: msg.text.replace(/<[^>]*>/g, '') }],
     });
   });
-
-  // Add final query with system prompt attached if no API key or to enforce system instruction
-  const fullPrompt = `${systemInstruction}\n\nCÂU HỎI CỦA NGUỜI DÙNG: ${query}`;
-  
-  contents.push({
+  contentsPayload.push({
     role: 'user',
-    parts: [{ text: fullPrompt }],
+    parts: [{ text: query }],
   });
 
   // Fallback to internal smart LLM simulator if API key is not configured yet
@@ -120,14 +115,21 @@ QUY TẮC PHẢN HỒI:
               method: 'POST',
               headers: { 'Content-Type': 'application/json' },
               body: JSON.stringify({
-                contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
-                generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+                system_instruction: {
+                  parts: [{ text: systemInstructionText }]
+                },
+                contents: contentsPayload,
+                generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
               }),
             });
 
             if (response.ok) {
               const data = await response.json();
-              const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              let candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+              
+              // Clean any potential leaked markdown prompts
+              candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
+
               if (candidateText) {
                 const citedSources = vaultPages
                   .filter((p) => candidateText.toLowerCase().includes(p.title.toLowerCase()))
