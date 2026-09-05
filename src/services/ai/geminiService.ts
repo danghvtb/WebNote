@@ -156,35 +156,23 @@ QUY TẮC BẮT BUỘC:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
-                // Completely purge all internal Gemini reasoning bullet lines (lines starting with *)
-                const rawLines = candidateText.split('\n').map((l: string) => l.trim()).filter(Boolean);
-                
-                // Filter out ANY line starting with * (star / bullet point reasoning)
-                const cleanLines = rawLines.filter((line: string) => !line.startsWith('*'));
+                // Post-process to remove prompt artifacts if present
+                let finalAnswer = candidateText
+                  .replace(/\* (User input|User asks|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '')
+                  .trim();
 
-                let finalAnswer = '';
-                if (cleanLines.length > 0) {
-                  finalAnswer = cleanLines.join('\n');
-                } else {
-                  // Extract Vietnamese text inside quotes if all lines start with *
-                  const matchQuote = candidateText.match(/"([^"]+)"/);
-                  if (matchQuote && matchQuote[1]) {
-                    finalAnswer = matchQuote[1];
-                  } else {
-                    // Fallback to last line with parentheticals stripped
-                    const lastLine = rawLines[rawLines.length - 1] || '';
-                    finalAnswer = lastLine.replace(/^\*\s*/, '').replace(/\([^)]*\)/g, '').replace(/^"|"$/g, '').trim();
-                  }
+                // If Gemini repeated the exact user query back, extract the actual response after it
+                const lines = finalAnswer.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                if (lines.length > 1 && lines[0].toLowerCase() === query.toLowerCase().trim()) {
+                  finalAnswer = lines.slice(1).join('\n');
+                } else if (lines.length === 1 && lines[0].toLowerCase() === query.toLowerCase().trim()) {
+                  // Fallback for date queries or simple echoes
+                  const nowStr = `${currentDate}`;
+                  finalAnswer = `📅 Hôm nay là **${nowStr}**.`;
                 }
 
-                // Clean parenthetical notes like (Matches the example provided...) or (as suggested...)
-                finalAnswer = finalAnswer.replace(/\s*\([^)]*matches[^)]*\)/gi, '');
-                finalAnswer = finalAnswer.replace(/\s*\([^)]*instructions[^)]*\)/gi, '');
+                // Strip quotes if wrapped
                 finalAnswer = finalAnswer.replace(/^"|"$/g, '').trim();
-
-                if (!finalAnswer) {
-                  finalAnswer = 'Xin chào! Mình là AI Vault, bạn cần hỗ trợ gì về các ghi chú hôm nay không?';
-                }
 
                 const citedSources = vaultPages
                   .filter((p) => finalAnswer.toLowerCase().includes(p.title.toLowerCase()))
