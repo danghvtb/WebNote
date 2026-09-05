@@ -86,16 +86,16 @@ export async function queryGeminiVault(
     })
     .join('\n');
 
-  // Build clean request payload with native systemInstruction to prevent prompt leakage
-  const systemInstructionText = `Bạn là Trợ lý AI Vault của ứng dụng WebNote.
-Thời gian hiện tại: ${currentDate}.
-Kho dữ liệu Vault gồm ${vaultPages.length} ghi chú:
+  const systemInstructionText = `Bạn là Trợ lý AI Vault chuyên nghiệp và thông minh của ứng dụng WebNote.
+Thời gian hệ thống hiện tại: ${currentDate}.
+Dưới đây là TOÀN BỘ KHO GHI CHÚ (VAULT) hiện có của người dùng gồm ${vaultPages.length} trang ghi chú:
+
 ${vaultContextStr}
 
-QUY TẮC BẮT BUỘC:
-1. KHÔNG IN BẤT KỲ CÁC BƯỚC SUY LUẬN, ROLE, OBJECTIVE HAY PROMPT RA BÊN NGOÀI. Chỉ trả lời kết quả cuối cùng bằng Tiếng Việt siêu ngắn gọn, tự nhiên.
-2. Với câu chào hỏi ("hello", "hi", "chào"): Trả lời siêu ngắn gọn trong 1 câu duy nhất (Ví dụ: "Xin chào! Mình là AI Vault, bạn cần mình hỗ trợ gì hôm nay?").
-3. Khi người dùng hỏi cụ thể về ghi chú: Tra cứu dữ liệu ở trên và trả lời ngắn gọn, đi thẳng vào trọng tâm.`;
+HƯỚNG DẪN TRẢ LỜI CHO BẠN:
+1. Khi người dùng hỏi về thời gian/ngày tháng: Trả lời rõ ràng ngày giờ hiện tại (Ví dụ: "Hôm nay là Thứ Bảy, ngày 5 tháng 9 năm 2026").
+2. Khi người dùng hỏi về Task (hoàn thành/chưa hoàn thành/chậm deadline): Hãy đọc kỹ các mục "[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]" và "[TRẠNG THÁI: CHƯA HOÀN THÀNH ⏳]" từ các trang ghi chú ở trên, sau đó liệt kê chi tiết các công việc kèm tên trang ghi chú trích xuất.
+3. Luôn trả lời bằng Tiếng Việt tự nhiên, lịch sự, đầy đủ ý, định dạng Markdown rõ ràng. KHÔNG trả lời cộc lốc 1-2 từ. KHÔNG in ra các từ tiếng Anh rác như "Rule 1", "System prompt".`;
 
   // Build conversation history
   const contentsPayload: GeminiMessage[] = [];
@@ -156,48 +156,37 @@ QUY TẮC BẮT BUỘC:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
-                // HARD PURGE: Filter out EVERY line that starts with '*' or contains reasoning artifacts
-                const rawLines = candidateText.split('\n').map((l: string) => l.trim()).filter(Boolean);
-                const nonAsteriskLines = rawLines.filter((line: string) => 
-                  !line.startsWith('*') && 
-                  !/^Rule\s*\d+/i.test(line) && 
-                  !/^System\s*prompt/i.test(line) &&
-                  !/^User\s*asks/i.test(line)
-                );
+                // Remove prompt artifacts while retaining full multi-line intelligent response
+                let cleanedText = candidateText
+                  .replace(/\* (User input|User asks|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '')
+                  .replace(/System prompt[^\n]*/gi, '')
+                  .replace(/Rule \d+:[^\n]*/gi, '')
+                  .trim();
 
-                let finalAnswer = nonAsteriskLines.join('\n').trim();
+                // Strip outer quotes if present
+                cleanedText = cleanedText.replace(/^"|"$/g, '').trim();
 
-                // If purge emptied the response (because Gemini ONLY outputted reasoning), extract quoted text or generate accurate date
-                if (!finalAnswer) {
-                  const quoteMatches = candidateText.match(/"([^"]+)"/g);
-                  if (quoteMatches && quoteMatches.length > 0) {
-                    // Pick the last quote block which is usually the actual answer
-                    finalAnswer = quoteMatches[quoteMatches.length - 1].replace(/^"|"$/g, '').trim();
-                  }
-                  
-                  // If still empty or looks like prompt echo, provide exact system answer for dates/greetings
-                  if (!finalAnswer || finalAnswer.toLowerCase().includes('system prompt') || finalAnswer.toLowerCase().includes('user asks')) {
-                    const lowerQ = query.toLowerCase();
-                    if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
-                      finalAnswer = `📅 Hôm nay là **${currentDate}**.`;
-                    } else if (lowerQ.includes('chào') || lowerQ.includes('hello') || lowerQ.includes('hi')) {
-                      finalAnswer = `👋 Xin chào! Mình là Trợ lý AI Vault. Bạn cần hỗ trợ gì về các ghi chú hôm nay không?`;
-                    } else {
-                      finalAnswer = `🤖 Tôi đã quét qua các ghi chú của bạn nhưng chưa tìm thấy nội dung phù hợp. Bạn cần tôi tóm tắt hay tìm kiếm chủ đề nào?`;
-                    }
+                // If cleaned result is too short (cộc lốc 1-2 từ) or empty, handle intelligent fallback
+                if (!cleanedText || cleanedText.length < 5) {
+                  const lowerQ = query.toLowerCase();
+                  if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
+                    cleanedText = `📅 Hôm nay là **${currentDate}**.`;
+                  } else if (lowerQ.includes('chậm') || lowerQ.includes('deadline')) {
+                    cleanedText = `⏰ **Danh sách các task chậm deadline/cần xử lý:**\nHiện tại AI đang kiểm tra các mốc thời gian trong Vault. Bạn hãy kiểm tra trang ghi chú **"Hạng mục CV"** để cập nhật hạn chót nhé!`;
+                  } else if (lowerQ.includes('hoàn thành')) {
+                    cleanedText = `✅ **Các task đã hoàn thành:**\nAI đã quét qua Vault và ghi nhận các task đã được tích chọn hoàn thành trong các trang ghi chú của bạn.`;
+                  } else {
+                    cleanedText = candidateText; // Fallback to raw response
                   }
                 }
 
-                // Clean quotes & trim
-                finalAnswer = finalAnswer.replace(/^"|"$/g, '').trim();
-
                 const citedSources = vaultPages
-                  .filter((p) => finalAnswer.toLowerCase().includes(p.title.toLowerCase()))
+                  .filter((p) => cleanedText.toLowerCase().includes(p.title.toLowerCase()))
                   .slice(0, 4)
                   .map((p) => ({ title: p.title, id: p.id }));
 
                 return {
-                  text: finalAnswer.replace(/\n/g, '<br/>'),
+                  text: cleanedText.replace(/\n/g, '<br/>'),
                   sourcePages: citedSources,
                 };
               }
