@@ -97,6 +97,51 @@ function AppContent() {
     return unsubscribe;
   }, [setSyncStatus, setLastSyncTime]);
 
+  // 30-Minute Deadline Warning Monitor
+  const { addNotification } = useAppStore();
+  useEffect(() => {
+    const alertedTaskIds = new Set<string>();
+
+    const checkUpcomingDeadlines = async () => {
+      try {
+        const { getAllVaultPages, getAllVaultNotebooks } = await import('./services/database/repository');
+        const { parseAllTasks, isValidDueDate } = await import('./utils/taskUtils');
+
+        const [pages, notebooks] = await Promise.all([getAllVaultPages(), getAllVaultNotebooks()]);
+        const tasks = parseAllTasks(pages, notebooks, true);
+
+        const now = Date.now();
+        const THIRTY_MINS_MS = 30 * 60 * 1000;
+
+        tasks.forEach((t) => {
+          if (t.completed || !isValidDueDate(t.dueDate)) return;
+
+          const dueMs = new Date(t.dueDate.includes('T') ? t.dueDate : `${t.dueDate}T18:00`).getTime();
+          const diffMs = dueMs - now;
+
+          // If task deadline is within 30 minutes (between 0 and 30 mins from now)
+          if (diffMs > 0 && diffMs <= THIRTY_MINS_MS && !alertedTaskIds.has(t.id)) {
+            alertedTaskIds.add(t.id);
+            const remainingMins = Math.ceil(diffMs / (60 * 1000));
+            addNotification(
+              'warning',
+              `⏰ CẢNH BÁO DEADLINE: Task "${t.text.slice(0, 45)}" còn ${remainingMins} phút nữa là đến hạn!`
+            );
+          }
+        });
+      } catch (err) {
+        console.warn('[App] Deadline monitor error:', err);
+      }
+    };
+
+    // Initial check
+    checkUpcomingDeadlines();
+
+    // Check every 30 seconds
+    const interval = setInterval(checkUpcomingDeadlines, 30000);
+    return () => clearInterval(interval);
+  }, [addNotification]);
+
   // Keyboard shortcuts
   useKeyboardShortcuts();
 

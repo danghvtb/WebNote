@@ -127,24 +127,22 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
     });
   }, [allTasks, filter, searchQuery]);
 
-  // Prioritize Overdue Tasks at the top of the list!
+  // Sort tasks: Earliest deadline at the very top!
+  // Order:
+  // 1. Pending (uncompleted) tasks come before Completed tasks.
+  // 2. Overdue tasks appear first at top (sorted from oldest overdue to newest).
+  // 3. Upcoming tasks sorted chronologically by earliest date & time (e.g. 08:00 before 17:00).
+  // 4. Completed tasks go to the bottom.
   const sortedTasks = useMemo(() => {
     return [...filteredTasks].sort((a, b) => {
       // Completed tasks go to the bottom
       if (a.completed !== b.completed) return a.completed ? 1 : -1;
 
-      // Overdue tasks prioritized FIRST at top
-      if (a.isOverdue !== b.isOverdue) return a.isOverdue ? -1 : 1;
+      // Compare exact due date timestamps
+      const timeA = a.dueDate ? new Date(a.dueDate.includes('T') ? a.dueDate : `${a.dueDate}T18:00`).getTime() : Infinity;
+      const timeB = b.dueDate ? new Date(b.dueDate.includes('T') ? b.dueDate : `${b.dueDate}T18:00`).getTime() : Infinity;
 
-      // Due today tasks second
-      if (a.isDueToday !== b.isDueToday) return a.isDueToday ? -1 : 1;
-
-      // Sort by earliest due date
-      if (a.dueDate && b.dueDate) return a.dueDate.localeCompare(b.dueDate);
-      if (a.dueDate && !b.dueDate) return -1;
-      if (!a.dueDate && b.dueDate) return 1;
-
-      return 0;
+      return timeA - timeB;
     });
   }, [filteredTasks]);
 
