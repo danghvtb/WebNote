@@ -195,26 +195,26 @@ console.log("Reading time:", getReadingTime(450), "minutes");</code></pre>
 </ul>`,
     },
     {
-      title: '✅ 6. Trung Tâm Quản Lý Công Việc & Deadline',
-      content: `<h1>✅ Task Center & Deadline Management</h1>
-<p>Toàn bộ các danh sách công việc (Checklists) có gán thời hạn (Deadline) nằm rải rác ở nhiều ghi chú sẽ được tự động tổng hợp, cảnh báo đỏ và ưu tiên hiển thị lên đầu!</p>
+      title: '✅ 6. Trung Tâm Quản Lý Công Việc & Deadline Thông Minh',
+      content: `<h1>✅ Smart Task & Exact Time Deadline Management</h1>
+<p>Toàn bộ danh sách công việc có đính kèm <strong>Ngày & Giờ (Date & Time)</strong> hoặc gõ từ khóa tự nhiên (NLP như <code>@today</code>, <code>@ngaymai</code>, <code>@sau 2 gio</code>) sẽ được tự động đếm ngược, cảnh báo đỏ và sắp xếp ưu tiên!</p>
 
-<h2>🚨 Cảnh báo deadline quá hạn:</h2>
-<p>Khi công việc chưa hoàn thành và đã vượt quá thời hạn, ghi chú và sổ tay sẽ xuất hiện <strong>nhãn cảnh báo màu đỏ (🔴 Overdue)</strong> nổi bật ở thanh menu bên trái và màn hình soạn thảo.</p>
+<h2>🚨 Cảnh báo deadline đếm ngược theo Giờ & Phút:</h2>
+<p>Hệ thống tự động hiển thị thời gian đếm ngược chính xác: <code>🔴 Quá hạn 2 giờ</code>, <code>🔥 Hôm nay 18:00 (Còn 35m)</code>, <code>⚡ Ngày mai 09:00</code>.</p>
 
 <h2>💡 Ví dụ thực tế mẫu (Live Example Demonstration):</h2>
-<p>Dưới đây là danh sách công việc đính kèm thời hạn deadline. Hãy nhấp vào nút <strong>Tasks</strong> trên thanh Header để xem danh sách ưu tiên quá hạn:</p>
+<p>Thử sử dụng menu lệnh <strong>/deadline</strong> hoặc gõ trực tiếp <code>@homnay</code>, <code>@ngaymai</code>, <code>@sau 3 gio</code> trong văn bản:</p>
 
-<h3>📌 Danh sách công việc đính kèm Deadline:</h3>
+<h3>📌 Danh sách công việc đính kèm Ngày & Giờ:</h3>
 <ul data-type="taskList">
-  <li data-type="taskItem" data-checked="false" data-due="2026-09-01"><p>⚠️ Nộp báo cáo tổng kết dự án MyNotes 4.0 (Đã quá hạn! @due(2026-09-01))</p></li>
-  <li data-type="taskItem" data-checked="false" data-due="2026-09-03"><p>⚠️ Kiểm thử chức năng phân loại deadline đỏ trên Task Center (@due(2026-09-03))</p></li>
-  <li data-type="taskItem" data-checked="true" data-due="2026-09-04"><p>Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới (@due(2026-09-04))</p></li>
-  <li data-type="taskItem" data-checked="false" data-due="2026-09-10"><p>Trải nghiệm Trợ lý AI Copilot để tóm tắt văn bản (@due(2026-09-10))</p></li>
+  <li data-type="taskItem" data-checked="false" data-due="2026-09-01T09:00"><p>⚠️ Nộp báo cáo tổng kết dự án MyNotes 4.0 (@due(2026-09-01 09:00))</p></li>
+  <li data-type="taskItem" data-checked="false" data-due="2026-09-04T15:30"><p>⚠️ Kiểm thử chức năng đếm ngược giờ/phút trên Task Center (@due(2026-09-04 15:30))</p></li>
+  <li data-type="taskItem" data-checked="true" data-due="2026-09-05T18:00"><p>Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới @today</p></li>
+  <li data-type="taskItem" data-checked="false" data-due="2026-09-06T09:00"><p>Trải nghiệm Trợ lý AI Copilot để tóm tắt văn bản @tomorrow</p></li>
   <li data-type="taskItem" data-checked="false"><p>Xuất bản sao lưu dữ liệu (.json) dự phòng về máy tính</p></li>
 </ul>
 
-<p>👉 Nhấp nút <strong>Tasks</strong> trên Header để theo dõi các công việc quá hạn được ưu tiên đỏ lên top 1!</p>`,
+<p>👉 Nhấp nút <strong>Tasks</strong> trên Header để dùng các phím chọn nhanh 1-Click (⚡ Hôm nay, ☀️ Ngày mai, +1h, +1d, +1w) và bộ chọn Ngày & Giờ chính xác!</p>`,
     },
     {
       title: '📦 7. Sao Lưu & Xuất/Nhập Dữ Liệu (Backup & Export)',

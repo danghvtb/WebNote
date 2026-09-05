@@ -10,7 +10,8 @@ import {
   Quote,
   Table as TableIcon,
   Minus,
-  Sparkles
+  Sparkles,
+  Calendar,
 } from 'lucide-react';
 
 interface SlashMenuProps {
@@ -61,6 +62,20 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI }: SlashMenuProps)
       label: 'Task List',
       description: 'Track tasks with checkboxes',
       command: (ed) => ed.chain().focus().toggleTaskList().run(),
+    },
+    {
+      icon: <Calendar className="w-4 h-4 text-rose-400" />,
+      label: 'Task with Deadline',
+      description: 'Insert task with @today deadline tag',
+      command: (ed) => {
+        const d = new Date();
+        d.setHours(18, 0, 0, 0);
+        const yyyy = d.getFullYear();
+        const mm = String(d.getMonth() + 1).padStart(2, '0');
+        const dd = String(d.getDate()).padStart(2, '0');
+        const iso = `${yyyy}-${mm}-${dd}T18:00`;
+        ed.chain().focus().toggleTaskList().insertContent(`Công việc đính kèm thời hạn @due(${iso})`).run();
+      },
     },
     {
       icon: <Code className="w-4 h-4 text-purple-400" />,
