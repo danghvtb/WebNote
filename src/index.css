@@ -336,20 +336,25 @@ body {
 
 /* Task list */
 .tiptap-editor ul[data-type="taskList"] {
-  list-style: none;
-  padding-left: 0;
+  list-style: none !important;
+  padding-left: 0 !important;
+  margin: 0.5em 0 !important;
 }
 
-.tiptap-editor ul[data-type="taskList"] li {
-  display: flex;
-  align-items: flex-start;
-  gap: 0.5rem;
-  width: 100%;
+.tiptap-editor ul[data-type="taskList"] li[data-type="taskItem"],
+.tiptap-editor li.custom-task-item {
+  display: flex !important;
+  flex-direction: row !important;
+  align-items: flex-start !important;
+  gap: 0.5rem !important;
+  width: 100% !important;
+  min-width: 0 !important;
+  margin: 0.35em 0 !important;
 }
 
 .tiptap-editor ul[data-type="taskList"] li > label {
-  flex-shrink: 0;
-  margin-top: 0.25em;
+  flex-shrink: 0 !important;
+  margin-top: 0.2em !important;
 }
 
 .tiptap-editor ul[data-type="taskList"] li > label input[type="checkbox"] {
@@ -359,13 +364,25 @@ body {
   cursor: pointer;
 }
 
-.tiptap-editor ul[data-type="taskList"] li > div:not([contenteditable="false"]) {
-  flex: 1 1 auto;
-  min-width: 0;
-  word-break: break-word;
+/* Force Tiptap NodeViewContent paragraph to take available width */
+.tiptap-editor ul[data-type="taskList"] li > div,
+.tiptap-editor ul[data-type="taskList"] li [data-node-view-content],
+.custom-task-item [data-node-view-content] {
+  flex: 1 1 auto !important;
+  min-width: 0 !important;
+  width: auto !important;
+  word-break: break-word !important;
+  overflow-wrap: anywhere !important;
 }
 
-.tiptap-editor ul[data-type="taskList"] li[data-checked="true"] > div > p {
+.custom-task-item [data-node-view-content] p {
+  margin: 0 !important;
+  display: inline-block !important;
+  width: 100% !important;
+  word-break: break-word !important;
+}
+
+.tiptap-editor ul[data-type="taskList"] li[data-checked="true"] [data-node-view-content] {
   text-decoration: line-through;
   color: var(--color-text-tertiary);
 }
