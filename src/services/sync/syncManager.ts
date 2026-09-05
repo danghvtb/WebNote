@@ -232,29 +232,56 @@ export async function syncFromCloud(): Promise<void> {
     const dbContent = await downloadFile(dbFile.id);
     const dbData = JSON.parse(dbContent);
 
-    // Load pages from pages/ folder
-    const pagesFolder = await findFileInFolder(rootFolderId, 'pages');
-    const pages: { id: string; title: string; content: string; notebookId: string }[] = [];
+    // Merge pages from database.json AND pages/ folder
+    const pagesMap = new Map<string, Page>();
 
+    if (dbData.pages && Array.isArray(dbData.pages)) {
+      dbData.pages.forEach((p: Page) => {
+        if (p && p.id) {
+          pagesMap.set(p.id, p);
+        }
+      });
+    }
+
+    // Load/override pages from pages/ folder on Drive if available
+    const pagesFolder = await findFileInFolder(rootFolderId, 'pages');
     if (pagesFolder) {
       const pageFiles = await listFiles(pagesFolder.id);
       for (const pf of pageFiles) {
         try {
           const pageContent = await downloadFile(pf.id);
           const pageData = JSON.parse(pageContent);
-          pages.push(pageData);
+          if (pageData && pageData.id) {
+            const existing = pagesMap.get(pageData.id);
+            pagesMap.set(pageData.id, {
+              ...existing,
+              ...pageData,
+            });
+          }
         } catch (err) {
           console.warn(`[Sync] Failed to load page ${pf.name}:`, err);
         }
       }
     }
 
+    const finalPages = Array.from(pagesMap.values());
+
     // Merge data into IndexedDB
     await loadFromDatabase({
       days: dbData.days || [],
       notebooks: dbData.notebooks || [],
-      pages: pages as Page[],
+      pages: finalPages,
     });
+
+    // Refresh active notesStore state after cloud sync
+    try {
+      const { useNotesStore } = await import('../../stores/notesStore');
+      const notesStore = useNotesStore.getState();
+      await notesStore.loadDays();
+      await notesStore.loadRecentNotebooks();
+    } catch (err) {
+      console.warn('[Sync] Failed to refresh notes store after cloud sync:', err);
+    }
 
     lastSyncTime = nowISO();
     setStatus('saved');

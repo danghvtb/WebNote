@@ -488,8 +488,8 @@ export async function exportDatabase(): Promise<{
   pages: Page[];
 }> {
   const days = await db.days.toArray();
-  const notebooks = await db.notebooks.toArray();
-  const pages = await db.pages.toArray();
+  const notebooks = await db.notebooks.filter((nb) => !nb.deleted).toArray();
+  const pages = await db.pages.filter((p) => !p.deleted).toArray();
 
   return {
     version: 1,
