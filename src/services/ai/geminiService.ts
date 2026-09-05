@@ -67,13 +67,12 @@ export async function queryGeminiVault(
 
   const vaultContextStr = vaultPages
     .map((p) => {
-      // Parse HTML to convert checkboxes/tasks into explicit readable format for AI: [HOÀN THÀNH] or [CHƯA HOÀN THÀNH]
       let textContent = p.content || '';
       if (typeof document !== 'undefined' && textContent) {
         const tempDiv = document.createElement('div');
         tempDiv.innerHTML = textContent;
 
-        // Convert task items
+        // Parse list task items into readable text lines with clear status tags
         const taskItems = Array.from(tempDiv.querySelectorAll('li[data-type="taskItem"], li'));
         taskItems.forEach((item) => {
           const isChecked = 
@@ -83,8 +82,8 @@ export async function queryGeminiVault(
 
           const label = item.textContent?.trim() || '';
           if (label) {
-            const statusTag = isChecked ? '[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]' : '[TRẠNG THÁI: CHƯA HOÀN THÀNH ⏳]';
-            item.textContent = `${statusTag} ${label}`;
+            const statusTag = isChecked ? '[CÔNG VIỆC ĐÃ HOÀN THÀNH ✅]' : '[CÔNG VIỆC CHƯA HOÀN THÀNH ⏳]';
+            item.innerHTML = `\n${statusTag} ${label}\n`;
           }
         });
 
@@ -93,7 +92,7 @@ export async function queryGeminiVault(
         textContent = textContent.replace(/<[^>]*>/g, ' ');
       }
 
-      return `=== TRANG GHI CHÚ: "${p.title}" (ID: ${p.id}) ===\n${textContent.slice(0, 2000)}\n`;
+      return `=== TRANG GHI CHÚ: "${p.title}" ===\n${textContent.slice(0, 3000)}\n`;
     })
     .join('\n');
 
@@ -103,10 +102,11 @@ Dưới đây là TOÀN BỘ KHO GHI CHÚ (VAULT) hiện có của người dùn
 
 ${vaultContextStr}
 
-YÊU CẦU QUAN TRỌNG VỀ LIỆT KÊ TASK:
-1. Khi người dùng yêu cầu "liệt kê task", "xem công việc đã hoàn thành", "các việc dở dang": Bạn PHẢI LIỆT KÊ CHI TIẾT TỪNG DÒNG CÔNG VIỆC (Bullet points) tìm thấy trong Vault. Tuyệt đối KHÔNG được dừng ở câu chào hỏi hoặc câu kết luận ngắn mà KHÔNG in ra danh sách!
-2. Mỗi công việc liệt kê cần ghi rõ: tên task + tên trang ghi chú chứa task đó.
-3. Luôn sử dụng Tiếng Việt tự nhiên, định dạng danh sách gạch đầu dòng rõ ràng, đầy đủ thông tin.`;
+YÊU CẦU TRẢ LỜI VÀ LIỆT KÊ CÔNG VIỆC (TASKS):
+1. Bạn phải liệt kê ĐẦY ĐỦ VÀ CHI TIẾT TẤT CẢ các công việc (Task) tương ứng được tìm thấy trong kho ghi chú. Tuyệt đối KHÔNG bỏ sót công việc nào!
+2. Trình bày ngắn gọn câu mở đầu, sau đó LIỆT KÊ DANH SÁCH BẰNG DẤU GẠCH ĐẦU DÒNG (Bullet points).
+3. Mỗi mục công việc ghi rõ: [Tên task] (trích xuất từ trang ghi chú: [Tên Trang Ghi Chú]).
+4. Trả lời bằng Tiếng Việt mượt mà, định dạng rõ ràng.`;
 
   // Build conversation history
   const contentsPayload: GeminiMessage[] = [];
