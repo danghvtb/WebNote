@@ -31,7 +31,6 @@ interface TokenResponse {
 // Token client from Google Identity Services
 let tokenClient: google.accounts.oauth2.TokenClient | null = null;
 let currentAccessToken: string | null = null;
-let tokenExpiresAt: number | null = null;
 
 // Promise resolvers for the token callback
 let tokenResolve: ((token: string) => void) | null = null;
@@ -99,6 +98,12 @@ export async function initGoogleAuth(): Promise<void> {
     throw new Error('Google Client ID is not configured. Set VITE_GOOGLE_CLIENT_ID in .env');
   }
 
+  // Restore stored token if available
+  const storedToken = localStorage.getItem('mynotes_token');
+  if (storedToken) {
+    currentAccessToken = storedToken;
+  }
+
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
     scope: SCOPES,
@@ -110,7 +115,7 @@ export async function initGoogleAuth(): Promise<void> {
         return;
       }
       currentAccessToken = response.access_token;
-      tokenExpiresAt = Date.now() + response.expires_in * 1000;
+      localStorage.setItem('mynotes_token', response.access_token);
       tokenResolve?.(response.access_token);
       tokenResolve = null;
       tokenReject = null;
@@ -143,14 +148,18 @@ export function signIn(): Promise<string> {
  * Sign in silently (no popup) — used for token refresh.
  */
 export function signInSilent(): Promise<string> {
-  return new Promise((resolve, reject) => {
+  return new Promise(async (resolve, reject) => {
     if (!tokenClient) {
-      reject(new Error('Google Auth not initialized'));
-      return;
+      try {
+        await initGoogleAuth();
+      } catch (err) {
+        reject(err);
+        return;
+      }
     }
     tokenResolve = resolve;
     tokenReject = reject;
-    tokenClient.requestAccessToken({ prompt: '' });
+    tokenClient?.requestAccessToken({ prompt: '' });
   });
 }
 
@@ -159,12 +168,15 @@ export function signInSilent(): Promise<string> {
  */
 export function signOut(): void {
   if (currentAccessToken) {
-    google.accounts.oauth2.revoke(currentAccessToken, () => {
-      console.log('[Auth] Token revoked');
-    });
+    try {
+      google.accounts.oauth2.revoke(currentAccessToken, () => {
+        console.log('[Auth] Token revoked');
+      });
+    } catch {
+      // Ignore if GIS script isn't loaded
+    }
   }
   currentAccessToken = null;
-  tokenExpiresAt = null;
   localStorage.removeItem('mynotes_user');
   localStorage.removeItem('mynotes_token');
   localStorage.removeItem('mynotes_root_folder');
@@ -172,19 +184,16 @@ export function signOut(): void {
 
 /**
  * Get the current valid access token.
- * Returns null if not logged in or token expired.
  */
 export function getAccessToken(): string | null {
-  if (!currentAccessToken) return null;
-  if (tokenExpiresAt && Date.now() > tokenExpiresAt - 60000) {
-    // Token is about to expire (within 1 minute)
-    return null;
+  if (!currentAccessToken) {
+    currentAccessToken = localStorage.getItem('mynotes_token');
   }
   return currentAccessToken;
 }
 
 /**
- * Ensure we have a valid access token — refresh if needed.
+ * Ensure we have a valid access token — refresh silently if needed.
  */
 export async function ensureAccessToken(): Promise<string> {
   const token = getAccessToken();
@@ -193,8 +202,10 @@ export async function ensureAccessToken(): Promise<string> {
   // Try silent refresh
   try {
     return await signInSilent();
-  } catch {
-    throw new Error('Session expired. Please sign in again.');
+  } catch (err) {
+    console.warn('[Auth] Silent token refresh failed:', err);
+    // If token is missing, attempt prompt-less OAuth re-request
+    return await signIn();
   }
 }
 
