@@ -54,49 +54,49 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
   const groups: ToolbarButton[][] = [
     // AI & Slash Assistant
     [
-      { icon: <Sparkles className="w-4 h-4 text-purple-400 animate-pulse" />, title: 'AI Assistant (Summarize, Polish, Tasks)', action: () => onOpenAI?.() },
-      { icon: <span className="text-xs font-extrabold px-1 text-purple-400">/</span>, title: 'Slash Command Menu (Type /)', action: () => onToggleSlashMenu?.() },
+      { icon: <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />, title: 'AI Assistant (Summarize, Polish, Tasks)', action: () => onOpenAI?.() },
+      { icon: <span className="text-sm font-extrabold px-1 text-purple-400">/</span>, title: 'Slash Command Menu (Type /)', action: () => onToggleSlashMenu?.() },
     ],
     // Text formatting
     [
-      { icon: <Bold className="w-4 h-4" />, title: 'Bold (Ctrl+B)', action: () => editor.chain().focus().toggleBold().run(), isActive: () => editor.isActive('bold') },
-      { icon: <Italic className="w-4 h-4" />, title: 'Italic (Ctrl+I)', action: () => editor.chain().focus().toggleItalic().run(), isActive: () => editor.isActive('italic') },
-      { icon: <Underline className="w-4 h-4" />, title: 'Underline (Ctrl+U)', action: () => editor.chain().focus().toggleUnderline().run(), isActive: () => editor.isActive('underline') },
-      { icon: <Strikethrough className="w-4 h-4" />, title: 'Strikethrough', action: () => editor.chain().focus().toggleStrike().run(), isActive: () => editor.isActive('strike') },
+      { icon: <Bold className="w-5 h-5" />, title: 'Bold (Ctrl+B)', action: () => editor.chain().focus().toggleBold().run(), isActive: () => editor.isActive('bold') },
+      { icon: <Italic className="w-5 h-5" />, title: 'Italic (Ctrl+I)', action: () => editor.chain().focus().toggleItalic().run(), isActive: () => editor.isActive('italic') },
+      { icon: <Underline className="w-5 h-5" />, title: 'Underline (Ctrl+U)', action: () => editor.chain().focus().toggleUnderline().run(), isActive: () => editor.isActive('underline') },
+      { icon: <Strikethrough className="w-5 h-5" />, title: 'Strikethrough', action: () => editor.chain().focus().toggleStrike().run(), isActive: () => editor.isActive('strike') },
     ],
     // Headings
     [
-      { icon: <Heading1 className="w-4 h-4" />, title: 'Heading 1', action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), isActive: () => editor.isActive('heading', { level: 1 }) },
-      { icon: <Heading2 className="w-4 h-4" />, title: 'Heading 2', action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), isActive: () => editor.isActive('heading', { level: 2 }) },
-      { icon: <Heading3 className="w-4 h-4" />, title: 'Heading 3', action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), isActive: () => editor.isActive('heading', { level: 3 }) },
+      { icon: <Heading1 className="w-5 h-5" />, title: 'Heading 1', action: () => editor.chain().focus().toggleHeading({ level: 1 }).run(), isActive: () => editor.isActive('heading', { level: 1 }) },
+      { icon: <Heading2 className="w-5 h-5" />, title: 'Heading 2', action: () => editor.chain().focus().toggleHeading({ level: 2 }).run(), isActive: () => editor.isActive('heading', { level: 2 }) },
+      { icon: <Heading3 className="w-5 h-5" />, title: 'Heading 3', action: () => editor.chain().focus().toggleHeading({ level: 3 }).run(), isActive: () => editor.isActive('heading', { level: 3 }) },
     ],
     // Lists
     [
-      { icon: <List className="w-4 h-4" />, title: 'Bullet List', action: () => editor.chain().focus().toggleBulletList().run(), isActive: () => editor.isActive('bulletList') },
-      { icon: <ListOrdered className="w-4 h-4" />, title: 'Numbered List', action: () => editor.chain().focus().toggleOrderedList().run(), isActive: () => editor.isActive('orderedList') },
-      { icon: <CheckSquare className="w-4 h-4" />, title: 'Checklist', action: () => editor.chain().focus().toggleTaskList().run(), isActive: () => editor.isActive('taskList') },
+      { icon: <List className="w-5 h-5" />, title: 'Bullet List', action: () => editor.chain().focus().toggleBulletList().run(), isActive: () => editor.isActive('bulletList') },
+      { icon: <ListOrdered className="w-5 h-5" />, title: 'Numbered List', action: () => editor.chain().focus().toggleOrderedList().run(), isActive: () => editor.isActive('orderedList') },
+      { icon: <CheckSquare className="w-5 h-5" />, title: 'Checklist', action: () => editor.chain().focus().toggleTaskList().run(), isActive: () => editor.isActive('taskList') },
     ],
     // Blocks
     [
-      { icon: <Quote className="w-4 h-4" />, title: 'Quote', action: () => editor.chain().focus().toggleBlockquote().run(), isActive: () => editor.isActive('blockquote') },
-      { icon: <Code className="w-4 h-4" />, title: 'Inline Code', action: () => editor.chain().focus().toggleCode().run(), isActive: () => editor.isActive('code') },
-      { icon: <Code2 className="w-4 h-4" />, title: 'Code Block', action: () => editor.chain().focus().toggleCodeBlock().run(), isActive: () => editor.isActive('codeBlock') },
+      { icon: <Quote className="w-5 h-5" />, title: 'Quote', action: () => editor.chain().focus().toggleBlockquote().run(), isActive: () => editor.isActive('blockquote') },
+      { icon: <Code className="w-5 h-5" />, title: 'Inline Code', action: () => editor.chain().focus().toggleCode().run(), isActive: () => editor.isActive('code') },
+      { icon: <Code2 className="w-5 h-5" />, title: 'Code Block', action: () => editor.chain().focus().toggleCodeBlock().run(), isActive: () => editor.isActive('codeBlock') },
     ],
     // Insert
     [
-      { icon: <Table className="w-4 h-4" />, title: 'Insert Table', action: handleInsertTable },
-      { icon: <Minus className="w-4 h-4" />, title: 'Horizontal Line', action: () => editor.chain().focus().setHorizontalRule().run() },
-      { icon: <Link className="w-4 h-4" />, title: 'Insert Link', action: () => setShowLinkInput(!showLinkInput), isActive: () => editor.isActive('link') },
-      { icon: <Image className="w-4 h-4" />, title: 'Insert Image', action: handleAddImage },
+      { icon: <Table className="w-5 h-5" />, title: 'Insert Table', action: handleInsertTable },
+      { icon: <Minus className="w-5 h-5" />, title: 'Horizontal Line', action: () => editor.chain().focus().setHorizontalRule().run() },
+      { icon: <Link className="w-5 h-5" />, title: 'Insert Link', action: () => setShowLinkInput(!showLinkInput), isActive: () => editor.isActive('link') },
+      { icon: <Image className="w-5 h-5" />, title: 'Insert Image', action: handleAddImage },
     ],
     // History
     [
-      { icon: <Undo2 className="w-4 h-4" />, title: 'Undo (Ctrl+Z)', action: () => editor.chain().focus().undo().run() },
-      { icon: <Redo2 className="w-4 h-4" />, title: 'Redo (Ctrl+Shift+Z)', action: () => editor.chain().focus().redo().run() },
+      { icon: <Undo2 className="w-5 h-5" />, title: 'Undo (Ctrl+Z)', action: () => editor.chain().focus().undo().run() },
+      { icon: <Redo2 className="w-5 h-5" />, title: 'Redo (Ctrl+Shift+Z)', action: () => editor.chain().focus().redo().run() },
     ],
     // Delete Note
     [
-      { icon: <Trash2 className="w-4 h-4 text-rose-400 hover:text-rose-300" />, title: 'Xóa bài viết này (Delete Note)', action: () => onDeletePage?.() },
+      { icon: <Trash2 className="w-5 h-5 text-rose-400 hover:text-rose-300" />, title: 'Xóa bài viết này (Delete Note)', action: () => onDeletePage?.() },
     ],
   ];
 

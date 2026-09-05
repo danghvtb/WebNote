@@ -107,31 +107,31 @@ export function Header() {
       </button>
 
       {/* Right: Sync + Actions + Avatar */}
-      <div className="flex items-center gap-1 sm:gap-2">
+      <div className="flex items-center gap-1.5 sm:gap-2.5">
         <button
           onClick={() => setGraphViewOpen(true)}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all cursor-pointer flex items-center gap-1.5 text-sm font-semibold border border-transparent hover:border-cyan-500/30"
           title="Open Knowledge Graph View"
         >
-          <Network className="w-4 h-4 text-cyan-400" />
+          <Network className="w-5 h-5 text-cyan-400" />
           <span className="hidden lg:inline">Graph</span>
         </button>
 
         <button
           onClick={() => setTaskManagerOpen(true)}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all cursor-pointer flex items-center gap-1.5 text-sm font-semibold border border-transparent hover:border-purple-500/30"
           title="Open Task Center"
         >
-          <CheckSquare className="w-4 h-4 text-purple-400" />
+          <CheckSquare className="w-5 h-5 text-purple-400" />
           <span className="hidden lg:inline">Tasks</span>
         </button>
 
         <button
           onClick={() => setExportModalOpen(true)}
-          className="p-1.5 rounded-lg text-slate-300 hover:text-white hover:bg-slate-800 transition-colors cursor-pointer flex items-center gap-1 text-xs font-medium"
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all cursor-pointer flex items-center gap-1.5 text-sm font-semibold border border-transparent hover:border-emerald-500/30"
           title="Export / Backup Vault"
         >
-          <Download className="w-4 h-4 text-emerald-400" />
+          <Download className="w-5 h-5 text-emerald-400" />
           <span className="hidden lg:inline">Export</span>
         </button>
         {renderSyncStatus()}
@@ -140,7 +140,7 @@ export function Header() {
         <div className="relative" ref={menuRef}>
           <button
             onClick={() => setUserMenuOpen(!userMenuOpen)}
-            className="w-7 h-7 rounded-full overflow-hidden cursor-pointer focus:outline-none"
+            className="w-8 h-8 rounded-full overflow-hidden cursor-pointer focus:outline-none ring-2 ring-purple-500/40 hover:ring-purple-400 transition-all"
             style={{ border: '2px solid var(--color-border)' }}
             aria-label="User menu"
           >
