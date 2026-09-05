@@ -20,7 +20,7 @@ import CodeBlockLowlight from '@tiptap/extension-code-block-lowlight';
 import Highlight from '@tiptap/extension-highlight';
 import TextAlign from '@tiptap/extension-text-align';
 import { common, createLowlight } from 'lowlight';
-import { Clock, FileText, Link2, Sparkles, AlertTriangle } from 'lucide-react';
+import { Clock, FileText, Link2, Sparkles, AlertTriangle, Calendar, Zap, Trash2 } from 'lucide-react';
 
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
@@ -29,7 +29,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { SlashMenu } from './SlashMenu';
 import { AIModal } from '../modal/AIModal';
 import { countWords, getReadingTime, extractWikiLinks } from '../../utils';
-import { getPageOverdueCount } from '../../utils/taskUtils';
+import { getPageOverdueCount, formatRelativeDeadline, getQuickPresetDate } from '../../utils/taskUtils';
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -192,6 +192,20 @@ export function Editor() {
     (p) => p.id !== selectedPage.id && (p.content.includes(selectedPage.title) || extractWikiLinks(p.content).includes(selectedPage.title))
   );
 
+  // Active Task Deadline state & helper functions
+  const isTaskActive = editor?.isActive('taskItem') ?? false;
+  const currentTaskDue = isTaskActive ? (editor?.getAttributes('taskItem')?.due as string | undefined) : undefined;
+
+  const handleUpdateActiveTaskDue = (dateStr: string | null) => {
+    if (!editor) return;
+    editor.chain().focus().updateAttributes('taskItem', { due: dateStr || null }).run();
+  };
+
+  const handleApplyPresetToActiveTask = (action: 'today' | 'tomorrow' | 'add_1h' | 'add_1d' | 'add_1w') => {
+    const newDate = getQuickPresetDate(action, currentTaskDue);
+    handleUpdateActiveTaskDue(newDate);
+  };
+
   return (
     <div className="h-full flex flex-col relative" style={{ background: 'var(--color-bg-primary)' }}>
       {/* Toolbar */}
@@ -227,6 +241,78 @@ export function Editor() {
               <span className="text-[10px] px-2.5 py-1 rounded-md bg-rose-900 border border-rose-400 text-rose-200 font-bold tracking-wide">
                 🔴 QUÁ HẠN (OVERDUE)
               </span>
+            </div>
+          )}
+
+          {/* Quick Deadline Selector Toolbar when cursor is inside a Task Item */}
+          {editor && isTaskActive && (
+            <div className="sticky top-0 z-30 mb-4 p-2.5 rounded-xl bg-slate-900/95 border border-purple-500/40 shadow-2xl backdrop-blur-md flex flex-wrap items-center justify-between gap-2.5 animate-fade-in">
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-bold text-purple-300 flex items-center gap-1 px-2 py-0.5 rounded bg-purple-950/70 border border-purple-500/30">
+                  <Calendar className="w-3.5 h-3.5 text-purple-400" />
+                  Task Deadline:
+                </span>
+                {currentTaskDue ? (
+                  <span className="text-xs font-semibold text-rose-300 bg-rose-950/80 px-2 py-0.5 rounded border border-rose-500/50">
+                    {formatRelativeDeadline(currentTaskDue).label}
+                  </span>
+                ) : (
+                  <span className="text-xs text-slate-400 italic">Chưa cài thời hạn</span>
+                )}
+              </div>
+
+              <div className="flex items-center gap-1.5 flex-wrap">
+                {/* 1-Click Quick Presets */}
+                <button
+                  onClick={() => handleApplyPresetToActiveTask('today')}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-purple-950/80 border border-purple-500/40 text-purple-200 hover:bg-purple-900/80 transition-all cursor-pointer flex items-center gap-1"
+                  title="Gán deadline Hôm nay 18:00"
+                >
+                  <Zap className="w-3 h-3 text-amber-400" /> Hôm nay
+                </button>
+                <button
+                  onClick={() => handleApplyPresetToActiveTask('tomorrow')}
+                  className="px-2.5 py-1 text-[11px] font-semibold rounded-lg bg-slate-800 border border-slate-700 text-slate-200 hover:bg-slate-700 transition-all cursor-pointer"
+                  title="Gán deadline Ngày mai 09:00"
+                >
+                  ☀️ Ngày mai
+                </button>
+                <button
+                  onClick={() => handleApplyPresetToActiveTask('add_1d')}
+                  className="px-2 py-1 text-[11px] font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer"
+                  title="Gia hạn +1 Ngày"
+                >
+                  +1d
+                </button>
+                <button
+                  onClick={() => handleApplyPresetToActiveTask('add_1w')}
+                  className="px-2 py-1 text-[11px] font-medium rounded-lg bg-slate-800 text-slate-300 hover:bg-slate-700 transition-all cursor-pointer"
+                  title="Gia hạn +1 Tuần"
+                >
+                  +1w
+                </button>
+
+                {/* Datetime-local picker */}
+                <div className="flex items-center gap-1 bg-slate-950 px-2 py-1 rounded-lg border border-slate-800 focus-within:border-purple-500/50">
+                  <input
+                    type="datetime-local"
+                    value={currentTaskDue ? (currentTaskDue.includes('T') ? currentTaskDue : `${currentTaskDue}T18:00`) : ''}
+                    onChange={(e) => handleUpdateActiveTaskDue(e.target.value)}
+                    className="text-[11px] bg-transparent outline-none cursor-pointer text-purple-300 font-semibold"
+                    title="Chọn ngày & giờ deadline cụ thể"
+                  />
+                </div>
+
+                {currentTaskDue && (
+                  <button
+                    onClick={() => handleUpdateActiveTaskDue(null)}
+                    className="p-1 text-slate-400 hover:text-rose-400 hover:bg-rose-950/40 rounded-lg transition-all cursor-pointer"
+                    title="Xóa deadline công việc này"
+                  >
+                    <Trash2 className="w-3.5 h-3.5" />
+                  </button>
+                )}
+              </div>
             </div>
           )}
 
