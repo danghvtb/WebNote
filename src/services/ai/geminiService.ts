@@ -100,61 +100,62 @@ NHIỆM VỤ CỦA BẠN:
     return simulateGeminiResponse(query, vaultPages, currentDate);
   }
 
-  // Try all valid Google AI Studio models (gemini-2.0-flash, gemini-1.5-flash, gemini-1.5-pro, gemini-pro)
-  const candidateModels = [
-    'gemini-2.0-flash',
-    'gemini-1.5-flash',
-    'gemini-1.5-pro',
-    'gemini-2.0-flash-exp',
-    'gemini-pro'
-  ];
   let lastError = '';
 
-  for (const model of candidateModels) {
-    try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [
-            {
-              role: 'user',
-              parts: [{ text: fullPrompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            maxOutputTokens: 1024,
-          },
-        }),
-      });
+  // 1. First attempt: Discover available models directly from Google AI Studio API for this specific Key
+  try {
+    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
+    if (listRes.ok) {
+      const listData = await listRes.json();
+      if (listData.models && Array.isArray(listData.models)) {
+        // Filter models supporting generateContent
+        const validModels = listData.models
+          .filter((m: { supportedGenerationMethods?: string[] }) => 
+            m.supportedGenerationMethods?.includes('generateContent')
+          )
+          .map((m: { name: string }) => m.name.replace(/^models\//, ''));
 
-      if (!response.ok) {
-        const errData = await response.json().catch(() => ({}));
-        lastError = errData.error?.message || `HTTP ${response.status}`;
-        console.warn(`[Gemini Model ${model} failed]`, lastError);
-        continue;
+        if (validModels.length > 0) {
+          console.log('[Gemini Service] Discovered available models:', validModels);
+          // Try the first available valid model
+          for (const model of validModels) {
+            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+            const response = await fetch(endpoint, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({
+                contents: [{ role: 'user', parts: [{ text: fullPrompt }] }],
+                generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+              }),
+            });
+
+            if (response.ok) {
+              const data = await response.json();
+              const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
+              if (candidateText) {
+                const citedSources = vaultPages
+                  .filter((p) => candidateText.toLowerCase().includes(p.title.toLowerCase()))
+                  .slice(0, 4)
+                  .map((p) => ({ title: p.title, id: p.id }));
+
+                return {
+                  text: candidateText.replace(/\n/g, '<br/>'),
+                  sourcePages: citedSources,
+                };
+              }
+            } else {
+              const errData = await response.json().catch(() => ({}));
+              lastError = errData.error?.message || `HTTP ${response.status}`;
+            }
+          }
+        }
       }
-
-      const data = await response.json();
-      const candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-      if (candidateText) {
-        const citedSources = vaultPages
-          .filter((p) => candidateText.toLowerCase().includes(p.title.toLowerCase()))
-          .slice(0, 4)
-          .map((p) => ({ title: p.title, id: p.id }));
-
-        return {
-          text: candidateText.replace(/\n/g, '<br/>'),
-          sourcePages: citedSources,
-        };
-      }
-    } catch (err) {
-      lastError = (err as Error).message;
+    } else {
+      const errData = await listRes.json().catch(() => ({}));
+      lastError = errData.error?.message || `HTTP ${listRes.status}`;
     }
+  } catch (err) {
+    lastError = (err as Error).message;
   }
 
   // If all models failed
