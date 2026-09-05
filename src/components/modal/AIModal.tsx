@@ -54,7 +54,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
 
   const targetPages = allVaultPages.length > 0 ? allVaultPages : pages;
 
-  // Handle Full-Vault Chat Query across ALL Notes!
+  // Handle Full-Vault Chat Query across ALL Notes with Smart Intent Processing!
   const handleSendQuery = async (queryText?: string) => {
     const q = queryText || inputQuery;
     if (!q.trim() || loading) return;
@@ -71,29 +71,77 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
     setLoading(true);
 
     setTimeout(() => {
-      const lowerQ = q.toLowerCase();
-      
-      // Search across ALL pages in the entire vault for relevant content
-      const matchedPages = targetPages.filter((page) => {
-        const titleMatch = page.title.toLowerCase().includes(lowerQ);
-        const contentMatch = page.content.toLowerCase().includes(lowerQ);
-        return titleMatch || contentMatch;
-      });
-
+      const lowerQ = q.toLowerCase().trim();
       let responseText = '';
-      const sources: { title: string; id: string }[] = matchedPages.slice(0, 3).map((p) => ({ title: p.title, id: p.id }));
+      let sources: { title: string; id: string }[] = [];
 
-      if (matchedPages.length > 0) {
-        const topMatch = matchedPages[0];
-        const snippet = topMatch.content.replace(/<[^>]*>/g, ' ').slice(0, 200);
-        responseText = `🔍 <strong>Tìm thấy trong toàn bộ Vault (${matchedPages.length} ghi chú liên quan):</strong><br/><br/>` +
-          `Dựa trên thông tin từ ghi chú <strong>"${topMatch.title}"</strong>:<br/>` +
-          `<em>"${snippet}..."</em><br/><br/>` +
-          `💡 <strong>Giải đáp cho câu hỏi của bạn:</strong> Hệ thống đã tổng hợp kiến thức từ các trang ghi chú của bạn để hỗ trợ hoàn thành công việc này.`;
-      } else {
-        responseText = `🤖 <strong>Trợ lý AI Vault:</strong><br/><br/>` +
-          `Tôi đã quét qua <strong>${targetPages.length} ghi chú</strong> trong kho lưu trữ của bạn. ` +
-          `Hiện tại chưa tìm thấy từ khóa trực tiếp cho <em>"${q}"</em>. Tuy nhiên, tôi khuyến nghị bạn tạo một ghi chú mới hoặc bổ sung chủ đề này vào sổ tay chính để AI theo dõi tốt hơn!`;
+      // 1. Check for system / date questions ("hôm nay là ngày bao nhiêu", "thời gian", "mấy giờ")
+      if (lowerQ.includes('ngày bao nhiêu') || lowerQ.includes('hôm nay') && (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy'))) {
+        const today = new Date();
+        const days = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+        const dayName = days[today.getDay()];
+        const dateStr = `${dayName}, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`;
+        responseText = `📅 <strong>Hôm nay là:</strong> <strong>${dateStr}</strong>.<br/><br/>Tôi có thể hỗ trợ bạn kiểm tra các công việc hoặc deadline dự kiến hoàn thành trong ngày hôm nay!`;
+      } 
+      // 2. Check for task / to-do queries ("các việc hôm nay", "task", "việc đã làm", "việc cần làm")
+      else if (lowerQ.includes('việc') || lowerQ.includes('task') || lowerQ.includes('làm gì') || lowerQ.includes('công việc')) {
+        const taskPages: { page: Page; tasks: string[] }[] = [];
+        targetPages.forEach((page) => {
+          if (!page.content) return;
+          const tempEl = document.createElement('div');
+          tempEl.innerHTML = page.content;
+          const taskItems = Array.from(tempEl.querySelectorAll('li[data-type="taskItem"], li input[type="checkbox"]'));
+          if (taskItems.length > 0) {
+            const texts = taskItems.map((el) => el.textContent?.trim() || '').filter(Boolean);
+            if (texts.length > 0) {
+              taskPages.push({ page, tasks: texts });
+            }
+          }
+        });
+
+        if (taskPages.length > 0) {
+          sources = taskPages.slice(0, 3).map((tp) => ({ title: tp.page.title, id: tp.page.id }));
+          let taskListHtml = '✅ <strong>Danh sách các việc ghi nhận từ Vault của bạn:</strong><br/><ul className="list-disc pl-4 mt-2 space-y-1">';
+          taskPages.forEach((tp) => {
+            taskListHtml += `<li><strong>${tp.page.title}:</strong> ${tp.tasks.join(', ')}</li>`;
+          });
+          taskListHtml += '</ul>';
+          responseText = taskListHtml;
+        } else {
+          // Scan for any bullet points or text mentioning work
+          const matched = targetPages.filter((p) => p.content.toLowerCase().includes('task') || p.content.toLowerCase().includes('việc') || p.content.toLowerCase().includes('hôm nay'));
+          if (matched.length > 0) {
+            sources = matched.slice(0, 3).map((p) => ({ title: p.title, id: p.id }));
+            responseText = `📋 <strong>Tìm thấy ${matched.length} ghi chú có liên quan đến công việc:</strong><br/>` +
+              matched.slice(0, 3).map((p) => `• <strong>${p.title}</strong>: ${p.content.replace(/<[^>]*>/g, ' ').slice(0, 100)}...`).join('<br/>');
+          } else {
+            responseText = `📋 Hiện tại trong <strong>${targetPages.length} ghi chú</strong> của Vault chưa có danh sách Task to-do nào. Bạn có thể bấm vào thẻ <strong>"Tạo Task"</strong> để AI tự động trích xuất nhé!`;
+          }
+        }
+      } 
+      // 3. Smart multi-keyword scanning across title and content
+      else {
+        const keywords = lowerQ.split(/\s+/).filter((k) => k.length > 2);
+        const matchedPages = targetPages.filter((page) => {
+          const title = page.title.toLowerCase();
+          const content = page.content.toLowerCase().replace(/<[^>]*>/g, ' ');
+          if (title.includes(lowerQ) || content.includes(lowerQ)) return true;
+          return keywords.some((kw) => title.includes(kw) || content.includes(kw));
+        });
+
+        if (matchedPages.length > 0) {
+          sources = matchedPages.slice(0, 3).map((p) => ({ title: p.title, id: p.id }));
+          const topMatch = matchedPages[0];
+          const snippet = topMatch.content.replace(/<[^>]*>/g, ' ').slice(0, 250);
+          responseText = `🔍 <strong>Tìm thấy ${matchedPages.length} ghi chú phù hợp trong Vault:</strong><br/><br/>` +
+            `📄 Từ ghi chú <strong>"${topMatch.title}"</strong>:<br/>` +
+            `<blockquote className="border-l-2 border-purple-500 pl-2 text-slate-300 my-1">"${snippet}..."</blockquote><br/>` +
+            `💡 Bạn có muốn tôi tóm tắt chi tiết ghi chú này hay tạo danh sách hành động tiếp theo không?`;
+        } else {
+          responseText = `🤖 <strong>Trợ lý AI Vault:</strong><br/><br/>` +
+            `Tôi đã quét qua <strong>${targetPages.length} ghi chú</strong> nhưng chưa thấy thông tin chính xác về <em>"${q}"</em>.<br/>` +
+            `💡 <strong>Gợi ý:</strong> Bạn có thể hỏi về <em>"Thời gian/Ngày hôm nay"</em>, <em>"Danh sách công việc"</em>, hoặc các từ khóa nằm trong tiêu đề ghi chú của bạn!`;
+        }
       }
 
       const aiMsg: ChatMessage = {
@@ -101,12 +149,12 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
         sender: 'ai',
         text: responseText,
         timestamp: new Date().toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' }),
-        sourceNotes: sources,
+        sourceNotes: sources.length > 0 ? sources : undefined,
       };
 
       setMessages((prev) => [...prev, aiMsg]);
       setLoading(false);
-    }, 1000);
+    }, 800);
   };
 
   const handleGenerateAction = async (action: 'summarize' | 'polish' | 'tasks' | 'digest') => {
