@@ -499,3 +499,17 @@ export async function exportDatabase(): Promise<{
     pages,
   };
 }
+
+/**
+ * Get all active pages across all notebooks in the entire vault.
+ */
+export async function getAllVaultPages(): Promise<Page[]> {
+  return db.pages.filter((p) => !p.deleted).toArray();
+}
+
+/**
+ * Get all active notebooks across the entire vault.
+ */
+export async function getAllVaultNotebooks(): Promise<Notebook[]> {
+  return db.notebooks.filter((nb) => !nb.deleted).toArray();
+}

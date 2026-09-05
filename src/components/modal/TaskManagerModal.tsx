@@ -3,10 +3,12 @@
 // Scans all notes for tasks/todos, provides unified view, priority sorting & smart deadline management (Date+Time).
 // ============================================================
 
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import { X, CheckSquare, Search, ExternalLink, CheckCircle2, Circle, AlertTriangle, Calendar, Clock, Zap, Trash2 } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
 import { queueSync } from '../../services/sync/syncManager';
+import { getAllVaultPages, getAllVaultNotebooks } from '../../services/database/repository';
+import type { Page, Notebook } from '../../types';
 import {
   parseAllTasks,
   updateTaskDueDateInHtml,
@@ -25,15 +27,30 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
   const { pages, notebooks, selectPage, updatePageContent } = useNotesStore();
   const [filter, setFilter] = useState<'all' | 'overdue' | 'pending' | 'completed'>('all');
   const [searchQuery, setSearchQuery] = useState('');
+  const [vaultPages, setVaultPages] = useState<Page[]>([]);
+  const [vaultNotebooks, setVaultNotebooks] = useState<Notebook[]>([]);
 
-  // Extract all tasks across all pages
+  // Fetch 100% of all pages and notebooks across the entire vault when Task Center opens
+  useEffect(() => {
+    if (isOpen) {
+      Promise.all([getAllVaultPages(), getAllVaultNotebooks()]).then(([allP, allN]) => {
+        setVaultPages(allP);
+        setVaultNotebooks(allN);
+      });
+    }
+  }, [isOpen, pages, notebooks]);
+
+  const targetPages = vaultPages.length > 0 ? vaultPages : pages;
+  const targetNotebooks = vaultNotebooks.length > 0 ? vaultNotebooks : notebooks;
+
+  // Extract all tasks across ALL vault pages
   const allTasks = useMemo(() => {
-    return parseAllTasks(pages, notebooks);
-  }, [pages, notebooks]);
+    return parseAllTasks(targetPages, targetNotebooks);
+  }, [targetPages, targetNotebooks]);
 
   // Toggle task completed status directly in note HTML
   const toggleTask = async (task: ParsedTask) => {
-    const page = pages.find((p) => p.id === task.pageId);
+    const page = targetPages.find((p) => p.id === task.pageId);
     if (!page || !page.content) return;
 
     const parser = new DOMParser();
@@ -51,16 +68,26 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
     const updatedHtml = doc.body.innerHTML;
     await updatePageContent(task.pageId, updatedHtml);
     queueSync('update', 'page', task.pageId, { content: updatedHtml });
+
+    // Update local vault pages cache for instant UI refresh
+    setVaultPages((prev) =>
+      prev.map((p) => (p.id === task.pageId ? { ...p, content: updatedHtml } : p))
+    );
   };
 
   // Change or assign task deadline date & time
   const handleDateChange = async (task: ParsedTask, dateStr: string) => {
-    const page = pages.find((p) => p.id === task.pageId);
+    const page = targetPages.find((p) => p.id === task.pageId);
     if (!page || !page.content) return;
 
     const updatedHtml = updateTaskDueDateInHtml(page.content, task.text, dateStr || null);
     await updatePageContent(task.pageId, updatedHtml);
     queueSync('update', 'page', task.pageId, { content: updatedHtml });
+
+    // Update local vault pages cache for instant UI refresh
+    setVaultPages((prev) =>
+      prev.map((p) => (p.id === task.pageId ? { ...p, content: updatedHtml } : p))
+    );
   };
 
   // Quick preset action (Today, Tomorrow, +1h, +1d, +1w)

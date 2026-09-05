@@ -9,7 +9,9 @@ import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { formatDateFull } from '../../utils';
 import { getNotebookOverdueCount, getPageOverdueCount } from '../../utils/taskUtils';
+import { getAllVaultPages } from '../../services/database/repository';
 import { queueSync } from '../../services/sync/syncManager';
+import type { Page } from '../../types';
 
 export function NotebookSidebar() {
   const {
@@ -24,7 +26,15 @@ export function NotebookSidebar() {
   const [contextMenu, setContextMenu] = useState<{ x: number; y: number; type: 'notebook' | 'page'; id: string } | null>(null);
   const [editingTitle, setEditingTitle] = useState<{ type: 'notebook' | 'page'; id: string } | null>(null);
   const [editTitle, setEditTitle] = useState('');
+  const [allVaultPages, setAllVaultPages] = useState<Page[]>([]);
   const contextMenuRef = useRef<HTMLDivElement>(null);
+
+  // Fetch 100% of all vault pages for accurate notebook overdue badge counts
+  useEffect(() => {
+    getAllVaultPages().then((p) => setAllVaultPages(p));
+  }, [pages, notebooks]);
+
+  const pagesForOverdue = allVaultPages.length > 0 ? allVaultPages : pages;
 
   const selectedDay = days.find((d) => d.id === selectedDayId);
 
@@ -259,10 +269,10 @@ export function NotebookSidebar() {
                       <span className="text-sm truncate" style={{ color: isSelected ? 'var(--color-text-primary)' : 'var(--color-text-secondary)' }}>
                         {nb.title}
                       </span>
-                      {getNotebookOverdueCount(nb.id, pages) > 0 && (
+                      {getNotebookOverdueCount(nb.id, pagesForOverdue) > 0 && (
                         <span className="flex-shrink-0 px-1.5 py-0.5 rounded-full bg-rose-950/90 border border-rose-500/80 text-rose-300 text-[10px] font-bold flex items-center gap-1 shadow-[0_0_8px_rgba(244,63,94,0.4)] animate-pulse" title="Notebook chứa công việc quá hạn!">
                           <AlertTriangle className="w-3 h-3 text-rose-400" />
-                          <span>{getNotebookOverdueCount(nb.id, pages)}</span>
+                          <span>{getNotebookOverdueCount(nb.id, pagesForOverdue)}</span>
                         </span>
                       )}
                     </div>
