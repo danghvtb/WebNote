@@ -6,7 +6,7 @@
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from '@tiptap/react';
 import { useState, useRef, useEffect } from 'react';
 import { Calendar, Zap, Trash2, Clock, AlertTriangle } from 'lucide-react';
-import { formatRelativeDeadline, getQuickPresetDate } from '../../utils/taskUtils';
+import { formatRelativeDeadline, getQuickPresetDate, formatForDateTimeInput } from '../../utils/taskUtils';
 
 export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -153,7 +153,7 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
             <div className="flex items-center gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 focus-within:border-purple-500/50">
               <input
                 type="datetime-local"
-                value={dueDate ? (dueDate.includes('T') ? dueDate : `${dueDate}T18:00`) : ''}
+                value={formatForDateTimeInput(dueDate)}
                 onChange={(e) => handleSetDue(e.target.value)}
                 className="w-full text-xs bg-transparent outline-none cursor-pointer text-purple-300 font-semibold"
               />

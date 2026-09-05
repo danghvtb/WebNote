@@ -12,6 +12,7 @@ import {
   updateTaskDueDateInHtml,
   formatRelativeDeadline,
   getQuickPresetDate,
+  formatForDateTimeInput,
   type ParsedTask,
 } from '../../utils/taskUtils';
 
@@ -330,7 +331,7 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
                       <Calendar className={`w-3.5 h-3.5 ${isOverdue ? 'text-rose-400' : 'text-slate-400'}`} />
                       <input
                         type="datetime-local"
-                        value={task.dueDate ? (task.dueDate.includes('T') ? task.dueDate : `${task.dueDate}T18:00`) : ''}
+                        value={formatForDateTimeInput(task.dueDate)}
                         onChange={(e) => handleDateChange(task, e.target.value)}
                         className={`text-[11px] bg-transparent outline-none cursor-pointer ${
                           isOverdue

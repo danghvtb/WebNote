@@ -33,6 +33,27 @@ export function formatDateTimeISO(date: Date): string {
 }
 
 /**
+ * Safely format any date string to YYYY-MM-DDTHH:mm for datetime-local input
+ */
+export function formatForDateTimeInput(dateStr?: string): string {
+  if (!dateStr) return '';
+  const trimmed = dateStr.trim();
+  if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}$/.test(trimmed)) return trimmed;
+  if (/^\d{4}-\d{2}-\d{2} \d{2}:\d{2}$/.test(trimmed)) return trimmed.replace(' ', 'T');
+  if (/^\d{4}-\d{2}-\d{2}$/.test(trimmed)) return `${trimmed}T18:00`;
+  
+  try {
+    const d = new Date(trimmed.includes('T') ? trimmed : trimmed.replace(' ', 'T'));
+    if (!isNaN(d.getTime())) {
+      return formatDateTimeISO(d);
+    }
+  } catch {
+    // fallback
+  }
+  return '';
+}
+
+/**
  * Parse Natural Language Date phrases into exact YYYY-MM-DDTHH:mm string
  * Handles: @today, @homnay, @tomorrow, @ngaymai, @thuhai, @sau 3 gio, @in 2 hours, @YYYY-MM-DD HH:mm
  */
