@@ -9,6 +9,7 @@ import { useNotesStore } from '../../stores/notesStore';
 import { queueSync } from '../../services/sync/syncManager';
 import { getAllVaultPages, getAllVaultNotebooks } from '../../services/database/repository';
 import type { Page, Notebook } from '../../types';
+import { todayDate } from '../../utils';
 import {
   parseAllTasks,
   updateTaskDueDateInHtml,
@@ -42,11 +43,23 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
 
   const targetPages = vaultPages.length > 0 ? vaultPages : pages;
   const targetNotebooks = vaultNotebooks.length > 0 ? vaultNotebooks : notebooks;
+  const todayStr = todayDate();
 
-  // Extract all tasks across ALL vault pages (ONLY include tasks with deadline assigned)
+  // Extract tasks across ALL vault pages:
+  // 1. Must have deadline assigned (!!t.dueDate)
+  // 2. Pending tasks (completed === false): show all (Overdue, Due Today, Future Due)
+  // 3. Completed tasks (completed === true): ONLY show if deadline is TODAY
   const allTasks = useMemo(() => {
-    return parseAllTasks(targetPages, targetNotebooks, true);
-  }, [targetPages, targetNotebooks]);
+    const tasks = parseAllTasks(targetPages, targetNotebooks, true);
+    return tasks.filter((t) => {
+      if (!t.dueDate) return false;
+      const datePart = t.dueDate.split('T')[0].split(' ')[0];
+      if (t.completed) {
+        return datePart === todayStr;
+      }
+      return true;
+    });
+  }, [targetPages, targetNotebooks, todayStr]);
 
   // Toggle task completed status directly in note HTML
   const toggleTask = async (task: ParsedTask) => {
@@ -212,7 +225,7 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
                 }`}
               >
                 {tab === 'overdue' && <AlertTriangle className="w-3 h-3 text-rose-400" />}
-                {tab}{' '}
+                {tab === 'completed' ? 'completed (today)' : tab}{' '}
                 {tab === 'all'
                   ? `(${allTasks.length})`
                   : tab === 'overdue'
