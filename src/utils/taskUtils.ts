@@ -273,7 +273,7 @@ export function parseTasksFromPage(page: Page, notebookTitle: string): ParsedTas
 /**
  * Extract all tasks across all pages
  */
-export function parseAllTasks(pages: Page[], notebooks: Notebook[]): ParsedTask[] {
+export function parseAllTasks(pages: Page[], notebooks: Notebook[], onlyWithDueDate: boolean = false): ParsedTask[] {
   const allTasks: ParsedTask[] = [];
 
   pages.forEach((page) => {
@@ -282,6 +282,10 @@ export function parseAllTasks(pages: Page[], notebooks: Notebook[]): ParsedTask[
     const pageTasks = parseTasksFromPage(page, notebookTitle);
     allTasks.push(...pageTasks);
   });
+
+  if (onlyWithDueDate) {
+    return allTasks.filter((t) => !!t.dueDate);
+  }
 
   return allTasks;
 }

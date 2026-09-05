@@ -43,9 +43,9 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
   const targetPages = vaultPages.length > 0 ? vaultPages : pages;
   const targetNotebooks = vaultNotebooks.length > 0 ? vaultNotebooks : notebooks;
 
-  // Extract all tasks across ALL vault pages
+  // Extract all tasks across ALL vault pages (ONLY include tasks with deadline assigned)
   const allTasks = useMemo(() => {
-    return parseAllTasks(targetPages, targetNotebooks);
+    return parseAllTasks(targetPages, targetNotebooks, true);
   }, [targetPages, targetNotebooks]);
 
   // Toggle task completed status directly in note HTML
