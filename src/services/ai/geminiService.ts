@@ -116,8 +116,13 @@ HƯỚNG DẪN TRẢ LỜI CHO BẠN:
     return simulateGeminiResponse(query, vaultPages, currentDate);
   }
 
-  // Direct execution with priority models (gemini-1.5-flash, gemini-2.0-flash)
-  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
+  // Direct execution with Google AI Studio valid models
+  const modelsToTry = [
+    'gemini-1.5-flash-latest',
+    'gemini-2.0-flash-exp',
+    'gemini-1.5-flash',
+    'gemini-1.5-pro-latest',
+  ];
   let lastError = '';
 
   for (const model of modelsToTry) {
