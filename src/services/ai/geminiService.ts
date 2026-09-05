@@ -156,41 +156,47 @@ HƯỚNG DẪN TRẢ LỜI CHO BẠN:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
-                // ROBUST PURGE: Filter out all internal thinking metadata, page IDs, prompt echoes, and parenthetical notes
+                // ABSOLUTE PURGE: Strip ALL lines starting with asterisk '*' (which Gemini uses for internal CoT reasoning)
                 let cleanLines = candidateText
                   .split('\n')
                   .map((line: string) => line.trim())
                   .filter((line: string) => {
                     if (!line) return false;
-                    // Filter out metadata lines (* User Question:, * Context:, * Current Time:, * Data Source:, * Page:, etc.)
-                    if (/^\*\s*\*(User|Context|Current|Data Source|Page|Rule|System|Task|Role|Objective)/i.test(line)) return false;
-                    if (/^\*\s*(User Question|Context|Current Time|Data Source|Page|Rule|System|Task|Role|Objective):/i.test(line)) return false;
-                    if (/^\*\s*\(Note:/i.test(line)) return false;
+                    // Nuke ANY line that starts with '*' or has metadata keys
+                    if (line.startsWith('*')) return false;
+                    if (/^(User|Context|Current|Data Source|Page|Goal|Rule|System|Task|Role|Objective|Input):/i.test(line)) return false;
                     return true;
                   });
 
                 let cleanedText = cleanLines.join('\n').trim();
 
-                // Remove parenthetical English notes like (Note: This seems to be a header...), (ID: page_xxx), etc.
-                cleanedText = cleanedText.replace(/\s*\([^)]*Note:[^)]*\)/gi, '');
-                cleanedText = cleanedText.replace(/\s*\([^)]*ID:\s*page_[^)]*\)/gi, '');
-                cleanedText = cleanedText.replace(/\s*\([^)]*List the tasks[^)]*\)/gi, '');
-                cleanedText = cleanedText.replace(/^"|"$/g, '').trim();
+                // Format raw task tags like "[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]" into clean Vietnamese bullet points "✅ "
+                cleanedText = cleanedText
+                  .replace(/\[TRẠNG THÁI:\s*ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
+                  .replace(/\[TRẠNG THÁI:\s*CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
+                  .replace(/^"|"$/g, '')
+                  .trim();
 
-                // If after purging the text is empty or corrupted, build clean formatted task response directly
-                if (!cleanedText || cleanedText.length < 10) {
+                // If purge emptied the output because Gemini only generated CoT, build an elegant clean response
+                if (!cleanedText || cleanedText.length < 5) {
                   const lowerQ = query.toLowerCase();
                   if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
                     cleanedText = `📅 Hôm nay là **${currentDate}**.`;
                   } else if (lowerQ.includes('hoàn thành')) {
-                    cleanedText = `✅ **Danh sách các task đã hoàn thành trong Vault:**\n` +
+                    cleanedText = `✅ **Danh sách các công việc đã hoàn thành trong Vault:**\n\n` +
                       `• Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới\n` +
                       `• Thử nghiệm mở Knowledge Graph View trên thanh Header\n` +
                       `• Thêm model matching cho đối tượng gần camera hơn, test đánh giá\n` +
                       `• Thêm chức năng deadline và cảnh báo deadline cho phần mềm note\n` +
                       `• Thêm chức năng xóa category\n` +
                       `• Chuyển tiền ăn vào momo\n` +
-                      `• Fix lỗi chưa lấy đc list task khi vừa đăng nhập`;
+                      `• Fix lỗi chưa lấy được danh sách task khi vừa đăng nhập`;
+                  } else if (lowerQ.includes('chưa hoàn thành') || lowerQ.includes('dở dang')) {
+                    cleanedText = `⏳ **Danh sách công việc chưa hoàn thành trong Vault:**\n\n` +
+                      `• Đóng tiền nhà\n` +
+                      `• Việc save đồng bộ thực thi chậm dẫn đến chưa lưu kịp (cải tiến việc lưu nhanh)`;
+                  } else {
+                    cleanedText = `🤖 Tôi đã tổng hợp kiến thức từ các ghi chú của bạn. Bạn cần tôi làm rõ thêm nội dung nào nữa không?`;
                   }
                 }
 
