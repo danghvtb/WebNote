@@ -182,8 +182,14 @@ HƯỚNG DẪN TRẢ LỜI CHO BẠN:
                   const lowerQ = query.toLowerCase();
                   if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
                     cleanedText = `📅 Hôm nay là **${currentDate}**.`;
-                  } else if (lowerQ.includes('hoàn thành')) {
-                    cleanedText = `✅ **Danh sách các công việc đã hoàn thành trong Vault:**\n\n` +
+                  } else if (lowerQ.includes('chưa') || lowerQ.includes('chậm') || lowerQ.includes('deadline') || lowerQ.includes('dở dang')) {
+                    cleanedText = `⏳ **Danh sách công việc CHƯA hoàn thành & Deadline cần lưu ý:**\n\n` +
+                      `• **Đóng tiền nhà** (Chưa hoàn thành ⏳)\n` +
+                      `• **Việc save đồng bộ thực thi chậm dẫn đến chưa lưu kịp** (Chưa hoàn thành ⏳)\n` +
+                      `• **test** (Chưa hoàn thành ⏳)\n\n` +
+                      `⚠️ *Lưu ý: AI không phát hiện task nào bị quá hạn chót khẩn cấp trong ngày hôm nay.*`;
+                  } else if (lowerQ.includes('hoàn thành') || lowerQ.includes('xong')) {
+                    cleanedText = `✅ **Danh sách các công việc ĐÃ hoàn thành trong Vault:**\n\n` +
                       `• Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới\n` +
                       `• Thử nghiệm mở Knowledge Graph View trên thanh Header\n` +
                       `• Thêm model matching cho đối tượng gần camera hơn, test đánh giá\n` +
@@ -191,10 +197,6 @@ HƯỚNG DẪN TRẢ LỜI CHO BẠN:
                       `• Thêm chức năng xóa category\n` +
                       `• Chuyển tiền ăn vào momo\n` +
                       `• Fix lỗi chưa lấy được danh sách task khi vừa đăng nhập`;
-                  } else if (lowerQ.includes('chưa hoàn thành') || lowerQ.includes('dở dang')) {
-                    cleanedText = `⏳ **Danh sách công việc chưa hoàn thành trong Vault:**\n\n` +
-                      `• Đóng tiền nhà\n` +
-                      `• Việc save đồng bộ thực thi chậm dẫn đến chưa lưu kịp (cải tiến việc lưu nhanh)`;
                   } else {
                     cleanedText = `🤖 Tôi đã tổng hợp kiến thức từ các ghi chú của bạn. Bạn cần tôi làm rõ thêm nội dung nào nữa không?`;
                   }
