@@ -116,115 +116,67 @@ HƯỚNG DẪN TRẢ LỜI CHO BẠN:
     return simulateGeminiResponse(query, vaultPages, currentDate);
   }
 
+  // Direct execution with priority models (gemini-1.5-flash, gemini-2.0-flash)
+  const modelsToTry = ['gemini-1.5-flash', 'gemini-2.0-flash', 'gemini-1.5-pro'];
   let lastError = '';
 
-  // 1. First attempt: Discover available models directly from Google AI Studio API for this specific Key
-  try {
-    const listRes = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${apiKey}`);
-    if (listRes.ok) {
-      const listData = await listRes.json();
-      if (listData.models && Array.isArray(listData.models)) {
-        // Filter models supporting generateContent
-        const validModels = listData.models
-          .filter((m: { supportedGenerationMethods?: string[] }) => 
-            m.supportedGenerationMethods?.includes('generateContent')
-          )
-          .map((m: { name: string }) => m.name.replace(/^models\//, ''));
+  for (const model of modelsToTry) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [
+            {
+              role: 'user',
+              parts: [{ text: `${systemInstructionText}\n\nCÂU HỎI CỦA NGUỜI DÙNG: ${query}` }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.3,
+            maxOutputTokens: 1024,
+          },
+        }),
+      });
 
-        if (validModels.length > 0) {
-          console.log('[Gemini Service] Discovered available models:', validModels);
-          // Try the first available valid model
-          for (const model of validModels) {
-            const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-            const response = await fetch(endpoint, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json' },
-              body: JSON.stringify({
-                system_instruction: {
-                  parts: [{ text: systemInstructionText }]
-                },
-                contents: contentsPayload,
-                generationConfig: { temperature: 0.3, maxOutputTokens: 512 },
-              }),
-            });
+      if (response.ok) {
+        const data = await response.json();
+        let candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        
+        if (candidateText) {
+          // Format raw task tags like "[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]" into clean Vietnamese bullet points "✅ "
+          let finalAnswer = candidateText
+            .replace(/\[TRẠNG THÁI:\s*ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
+            .replace(/\[TRẠNG THÁI:\s*CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
+            .replace(/^"|"$/g, '')
+            .trim();
 
-            if (response.ok) {
-              const data = await response.json();
-              let candidateText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
-              
-              // Clean any potential leaked markdown prompts
-              candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
+          // Strip any leaked reasoning lines if present
+          finalAnswer = finalAnswer
+            .split('\n')
+            .filter((l: string) => !/^\*\s*(User|Context|Current|Goal|Rule|System|Task|Role|Objective|Input):/i.test(l.trim()))
+            .join('\n')
+            .trim();
 
-              if (candidateText) {
-                // ABSOLUTE PURGE: Strip ALL lines starting with asterisk '*' (which Gemini uses for internal CoT reasoning)
-                let cleanLines = candidateText
-                  .split('\n')
-                  .map((line: string) => line.trim())
-                  .filter((line: string) => {
-                    if (!line) return false;
-                    // Nuke ANY line that starts with '*' or has metadata keys
-                    if (line.startsWith('*')) return false;
-                    if (/^(User|Context|Current|Data Source|Page|Goal|Rule|System|Task|Role|Objective|Input):/i.test(line)) return false;
-                    return true;
-                  });
+          const citedSources = vaultPages
+            .filter((p) => finalAnswer.toLowerCase().includes(p.title.toLowerCase()))
+            .slice(0, 4)
+            .map((p) => ({ title: p.title, id: p.id }));
 
-                let cleanedText = cleanLines.join('\n').trim();
-
-                // Format raw task tags like "[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]" into clean Vietnamese bullet points "✅ "
-                cleanedText = cleanedText
-                  .replace(/\[TRẠNG THÁI:\s*ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
-                  .replace(/\[TRẠNG THÁI:\s*CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
-                  .replace(/^"|"$/g, '')
-                  .trim();
-
-                // If purge emptied the output because Gemini only generated CoT, build an elegant clean response
-                if (!cleanedText || cleanedText.length < 5) {
-                  const lowerQ = query.toLowerCase();
-                  if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
-                    cleanedText = `📅 Hôm nay là **${currentDate}**.`;
-                  } else if (lowerQ.includes('chưa') || lowerQ.includes('chậm') || lowerQ.includes('deadline') || lowerQ.includes('dở dang')) {
-                    cleanedText = `⏳ **Danh sách công việc CHƯA hoàn thành & Deadline cần lưu ý:**\n\n` +
-                      `• **Đóng tiền nhà** (Chưa hoàn thành ⏳)\n` +
-                      `• **Việc save đồng bộ thực thi chậm dẫn đến chưa lưu kịp** (Chưa hoàn thành ⏳)\n` +
-                      `• **test** (Chưa hoàn thành ⏳)\n\n` +
-                      `⚠️ *Lưu ý: AI không phát hiện task nào bị quá hạn chót khẩn cấp trong ngày hôm nay.*`;
-                  } else if (lowerQ.includes('hoàn thành') || lowerQ.includes('xong')) {
-                    cleanedText = `✅ **Danh sách các công việc ĐÃ hoàn thành trong Vault:**\n\n` +
-                      `• Khám phá tính năng Slash Menu bằng cách gõ / trên dòng mới\n` +
-                      `• Thử nghiệm mở Knowledge Graph View trên thanh Header\n` +
-                      `• Thêm model matching cho đối tượng gần camera hơn, test đánh giá\n` +
-                      `• Thêm chức năng deadline và cảnh báo deadline cho phần mềm note\n` +
-                      `• Thêm chức năng xóa category\n` +
-                      `• Chuyển tiền ăn vào momo\n` +
-                      `• Fix lỗi chưa lấy được danh sách task khi vừa đăng nhập`;
-                  } else {
-                    cleanedText = `🤖 Tôi đã tổng hợp kiến thức từ các ghi chú của bạn. Bạn cần tôi làm rõ thêm nội dung nào nữa không?`;
-                  }
-                }
-
-                const citedSources = vaultPages
-                  .filter((p) => cleanedText.toLowerCase().includes(p.title.toLowerCase()))
-                  .slice(0, 4)
-                  .map((p) => ({ title: p.title, id: p.id }));
-
-                return {
-                  text: cleanedText.replace(/\n/g, '<br/>'),
-                  sourcePages: citedSources,
-                };
-              }
-            } else {
-              const errData = await response.json().catch(() => ({}));
-              lastError = errData.error?.message || `HTTP ${response.status}`;
-            }
-          }
+          return {
+            text: finalAnswer.replace(/\n/g, '<br/>'),
+            sourcePages: citedSources,
+          };
         }
+      } else {
+        const errData = await response.json().catch(() => ({}));
+        lastError = errData.error?.message || `HTTP ${response.status}`;
+        console.warn(`[Gemini model ${model} failed]`, lastError);
       }
-    } else {
-      const errData = await listRes.json().catch(() => ({}));
-      lastError = errData.error?.message || `HTTP ${listRes.status}`;
+    } catch (err) {
+      lastError = (err as Error).message;
     }
-  } catch (err) {
-    lastError = (err as Error).message;
   }
 
   // If all models failed
