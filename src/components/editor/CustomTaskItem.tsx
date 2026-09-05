@@ -61,8 +61,8 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
 
       {/* Deadline Badge & Action Button at the end of task */}
       <div className="relative flex-shrink-0 flex items-center gap-1.5 select-none" contentEditable={false}>
-        {/* Deadline Badge */}
-        {relativeTime && (
+        {/* Deadline Badge — Only display for incomplete tasks */}
+        {relativeTime && !isChecked && (
           <span
             onClick={() => setPopoverOpen((prev) => !prev)}
             className={`px-2 py-0.5 rounded text-[10px] font-bold flex items-center gap-1 cursor-pointer transition-all border ${
