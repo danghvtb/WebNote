@@ -172,8 +172,10 @@ YÊU CẦU TRẢ LỜI VÀ LIỆT KÊ CÔNG VIỆC (TASKS):
           .join('\n');
         
         if (candidateText) {
-          // Format raw task tags like "[TRẠNG THÁI: ĐÃ HOÀN THÀNH ✅]" into clean Vietnamese bullet points "✅ "
+          // Format raw task tags like "[CÔNG VIỆC ĐÃ HOÀN THÀNH ✅]" into clean Vietnamese bullet points "✅ "
           let finalAnswer = candidateText
+            .replace(/\[CÔNG VIỆC ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
+            .replace(/\[CÔNG VIỆC CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
             .replace(/\[TRẠNG THÁI:\s*ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
             .replace(/\[TRẠNG THÁI:\s*CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
             .replace(/^"|"$/g, '')
