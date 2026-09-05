@@ -182,14 +182,11 @@ YÊU CẦU QUAN TRỌNG VỀ LIỆT KÊ TASK:
 
           // Format markdown bold, headers, lists and line breaks properly for dangerouslySetInnerHTML display
           let formattedText = finalAnswer
-            .replace(/###\s*(.*)/g, '<strong className="text-purple-300 block text-xs mt-2 mb-1">$1</strong>')
+            .replace(/###\s*(.*)/g, '<br/><strong>📄 $1</strong><br/>')
             .replace(/\*\*(.*?)\*\*/g, '<strong>$1</strong>')
             .replace(/\*(.*?)\*/g, '<em>$1</em>')
             .replace(/`([^`]+)`/g, '<code class="bg-slate-800 text-cyan-300 px-1 rounded">$1</code>')
-            .split('\n')
-            .map((line: string) => line.trim())
-            .filter((line: string) => line.length > 0)
-            .join('<br/>');
+            .replace(/\n/g, '<br/>');
 
           return {
             text: formattedText,
