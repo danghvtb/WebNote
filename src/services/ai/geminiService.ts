@@ -156,22 +156,39 @@ QUY TẮC BẮT BUỘC:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
-                // Post-process to remove prompt artifacts if present
-                let finalAnswer = candidateText
-                  .replace(/\* (User input|User asks|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '')
-                  .trim();
+                // HARD PURGE: Filter out EVERY line that starts with '*' or contains reasoning artifacts
+                const rawLines = candidateText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                const nonAsteriskLines = rawLines.filter((line: string) => 
+                  !line.startsWith('*') && 
+                  !/^Rule\s*\d+/i.test(line) && 
+                  !/^System\s*prompt/i.test(line) &&
+                  !/^User\s*asks/i.test(line)
+                );
 
-                // If Gemini repeated the exact user query back, extract the actual response after it
-                const lines = finalAnswer.split('\n').map((l: string) => l.trim()).filter(Boolean);
-                if (lines.length > 1 && lines[0].toLowerCase() === query.toLowerCase().trim()) {
-                  finalAnswer = lines.slice(1).join('\n');
-                } else if (lines.length === 1 && lines[0].toLowerCase() === query.toLowerCase().trim()) {
-                  // Fallback for date queries or simple echoes
-                  const nowStr = `${currentDate}`;
-                  finalAnswer = `📅 Hôm nay là **${nowStr}**.`;
+                let finalAnswer = nonAsteriskLines.join('\n').trim();
+
+                // If purge emptied the response (because Gemini ONLY outputted reasoning), extract quoted text or generate accurate date
+                if (!finalAnswer) {
+                  const quoteMatches = candidateText.match(/"([^"]+)"/g);
+                  if (quoteMatches && quoteMatches.length > 0) {
+                    // Pick the last quote block which is usually the actual answer
+                    finalAnswer = quoteMatches[quoteMatches.length - 1].replace(/^"|"$/g, '').trim();
+                  }
+                  
+                  // If still empty or looks like prompt echo, provide exact system answer for dates/greetings
+                  if (!finalAnswer || finalAnswer.toLowerCase().includes('system prompt') || finalAnswer.toLowerCase().includes('user asks')) {
+                    const lowerQ = query.toLowerCase();
+                    if (lowerQ.includes('ngày') || lowerQ.includes('thứ') || lowerQ.includes('mấy') || lowerQ.includes('thời gian')) {
+                      finalAnswer = `📅 Hôm nay là **${currentDate}**.`;
+                    } else if (lowerQ.includes('chào') || lowerQ.includes('hello') || lowerQ.includes('hi')) {
+                      finalAnswer = `👋 Xin chào! Mình là Trợ lý AI Vault. Bạn cần hỗ trợ gì về các ghi chú hôm nay không?`;
+                    } else {
+                      finalAnswer = `🤖 Tôi đã quét qua các ghi chú của bạn nhưng chưa tìm thấy nội dung phù hợp. Bạn cần tôi tóm tắt hay tìm kiếm chủ đề nào?`;
+                    }
+                  }
                 }
 
-                // Strip quotes if wrapped
+                // Clean quotes & trim
                 finalAnswer = finalAnswer.replace(/^"|"$/g, '').trim();
 
                 const citedSources = vaultPages
