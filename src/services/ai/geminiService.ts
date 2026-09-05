@@ -131,33 +131,43 @@ QUY TẮC BẮT BUỘC:
               candidateText = candidateText.replace(/\* (User input|Context|Current time|Database|Response rules|Greeting|Identity|Offer help):[^\n]*/gi, '').trim();
 
               if (candidateText) {
-                // Post-process: Strip out any leaked chain-of-thought bullet points (* User input, * Role, * Constraint, * User asks, etc.)
-                let cleanedText = candidateText
-                  .split('\n')
-                  .filter((line: string) => {
-                    const trimmed = line.trim();
-                    // Remove lines starting with * User, * Role, * Constraint, * Current, * Objective, etc.
-                    return !/^\*\s*(User|Role|Constraint|Current|Objective|Context|Greeting|Identity|Offer|Answer|Thinking)/i.test(trimmed);
-                  })
-                  .join('\n')
-                  .trim();
+                // Completely purge all internal Gemini reasoning bullet lines (lines starting with *)
+                const rawLines = candidateText.split('\n').map((l: string) => l.trim()).filter(Boolean);
+                
+                // Filter out ANY line starting with * (star / bullet point reasoning)
+                const cleanLines = rawLines.filter((line: string) => !line.startsWith('*'));
 
-                // If after cleaning it's empty or still contains prompt quotes, fallback to the last valid line
-                if (!cleanedText) {
-                  const lines = candidateText.split('\n').map((l: string) => l.trim()).filter(Boolean);
-                  cleanedText = lines[lines.length - 1] || candidateText;
+                let finalAnswer = '';
+                if (cleanLines.length > 0) {
+                  finalAnswer = cleanLines.join('\n');
+                } else {
+                  // Extract Vietnamese text inside quotes if all lines start with *
+                  const matchQuote = candidateText.match(/"([^"]+)"/);
+                  if (matchQuote && matchQuote[1]) {
+                    finalAnswer = matchQuote[1];
+                  } else {
+                    // Fallback to last line with parentheticals stripped
+                    const lastLine = rawLines[rawLines.length - 1] || '';
+                    finalAnswer = lastLine.replace(/^\*\s*/, '').replace(/\([^)]*\)/g, '').replace(/^"|"$/g, '').trim();
+                  }
                 }
 
-                // Remove outer quotes if present
-                cleanedText = cleanedText.replace(/^"|"$/g, '').trim();
+                // Clean parenthetical notes like (Matches the example provided...) or (as suggested...)
+                finalAnswer = finalAnswer.replace(/\s*\([^)]*matches[^)]*\)/gi, '');
+                finalAnswer = finalAnswer.replace(/\s*\([^)]*instructions[^)]*\)/gi, '');
+                finalAnswer = finalAnswer.replace(/^"|"$/g, '').trim();
+
+                if (!finalAnswer) {
+                  finalAnswer = 'Xin chào! Mình là AI Vault, bạn cần hỗ trợ gì về các ghi chú hôm nay không?';
+                }
 
                 const citedSources = vaultPages
-                  .filter((p) => cleanedText.toLowerCase().includes(p.title.toLowerCase()))
+                  .filter((p) => finalAnswer.toLowerCase().includes(p.title.toLowerCase()))
                   .slice(0, 4)
                   .map((p) => ({ title: p.title, id: p.id }));
 
                 return {
-                  text: cleanedText.replace(/\n/g, '<br/>'),
+                  text: finalAnswer.replace(/\n/g, '<br/>'),
                   sourcePages: citedSources,
                 };
               }
