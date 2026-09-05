@@ -29,6 +29,9 @@ let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 const MAX_RETRIES = 5;
 const RETRY_DELAY_BASE = 2000; // 2 seconds, exponential backoff
 
+// File ID Cache to prevent expensive findFileInFolder network calls
+const fileIdCache = new Map<string, string>();
+
 /**
  * Subscribe to sync status changes.
  */
@@ -54,6 +57,20 @@ export function getLastSyncTime(): string | null {
 function setStatus(status: SyncStatus, message?: string): void {
   currentStatus = status;
   listeners.forEach((l) => l(status, message));
+}
+
+// Helper to get or find file ID with caching
+async function getCachedFileId(parentFolderId: string, fileName: string): Promise<string | null> {
+  const cacheKey = `${parentFolderId}/${fileName}`;
+  if (fileIdCache.has(cacheKey)) {
+    return fileIdCache.get(cacheKey)!;
+  }
+  const file = await findFileInFolder(parentFolderId, fileName);
+  if (file) {
+    fileIdCache.set(cacheKey, file.id);
+    return file.id;
+  }
+  return null;
 }
 
 // ===================== SYNC TO CLOUD =====================
@@ -82,12 +99,12 @@ export async function queueSync(
 
   await db.syncQueue.put(op);
 
-  // Debounce the actual sync
+  // Debounce the actual sync (reduced from 2s to 1s for fast feel)
   debouncedSync();
 }
 
 /**
- * Debounced sync trigger — waits 2 seconds after last change.
+ * Debounced sync trigger — waits 1 second after last change.
  */
 function debouncedSync(): void {
   if (syncDebounceTimer) {
@@ -97,7 +114,7 @@ function debouncedSync(): void {
 
   syncDebounceTimer = setTimeout(async () => {
     await processSyncQueue();
-  }, 2000);
+  }, 1000);
 }
 
 /**
@@ -121,20 +138,41 @@ async function processSyncQueue(): Promise<void> {
       return;
     }
 
-    // Export full database and save to Drive
-    const dbData = await exportDatabase();
-    const dbJson = JSON.stringify(dbData, null, 2);
+    // Check pending operations to optimize sync
+    const pendingOps = await db.syncQueue.where('status').equals('pending').toArray();
+    const updatedPageIds = new Set<string>();
+    let structureChanged = false;
 
-    // Find or create database.json
-    const dbFile = await findFileInFolder(rootFolderId, 'database.json');
-    if (dbFile) {
-      await updateFile(dbFile.id, dbJson);
-    } else {
-      await createFile('database.json', dbJson, rootFolderId);
+    for (const op of pendingOps) {
+      if (op.entity === 'page' && op.type === 'update') {
+        updatedPageIds.add(op.entityId);
+      } else {
+        structureChanged = true;
+      }
     }
 
-    // Save individual pages to pages/ folder
-    await syncPagesFolder(rootFolderId, dbData.pages);
+    // Export full database for root database.json
+    const dbData = await exportDatabase();
+    const dbJson = JSON.stringify(dbData);
+
+    // Save/update database.json using cache
+    let dbFileId = await getCachedFileId(rootFolderId, 'database.json');
+    if (dbFileId) {
+      await updateFile(dbFileId, dbJson);
+    } else {
+      const created = await createFile('database.json', dbJson, rootFolderId);
+      fileIdCache.set(`${rootFolderId}/database.json`, created.id);
+    }
+
+    // Incremental page sync: Only sync pages that changed if structure didn't radically change,
+    // or sync all modified pages in parallel batches
+    const pagesToSync = structureChanged
+      ? dbData.pages
+      : dbData.pages.filter((p) => updatedPageIds.has(p.id));
+
+    if (pagesToSync.length > 0) {
+      await syncPagesFolderIncremental(rootFolderId, pagesToSync);
+    }
 
     // Clear processed sync queue
     await db.syncQueue.clear();
@@ -167,36 +205,43 @@ async function processSyncQueue(): Promise<void> {
 }
 
 /**
- * Sync pages to individual files in pages/ folder.
+ * Fast Parallel Incremental Page Sync
  */
-async function syncPagesFolder(
+async function syncPagesFolderIncremental(
   rootFolderId: string,
   pages: { id: string; content: string; title: string; notebookId: string }[]
 ): Promise<void> {
-  // Ensure pages/ folder exists
-  let pagesFolder = await findFileInFolder(rootFolderId, 'pages');
-  if (!pagesFolder) {
-    pagesFolder = await createFolder('pages', rootFolderId);
+  let pagesFolderId = await getCachedFileId(rootFolderId, 'pages');
+  if (!pagesFolderId) {
+    const createdFolder = await createFolder('pages', rootFolderId);
+    pagesFolderId = createdFolder.id;
+    fileIdCache.set(`${rootFolderId}/pages`, pagesFolderId);
   }
 
-  // Save each page with content
-  for (const page of pages) {
-    if (page.content) {
-      const fileName = `${page.id}.json`;
-      const pageData = JSON.stringify({
-        id: page.id,
-        title: page.title,
-        content: page.content,
-        notebookId: page.notebookId,
-      });
+  // Execute page updates in parallel batches of 5
+  const BATCH_SIZE = 5;
+  for (let i = 0; i < pages.length; i += BATCH_SIZE) {
+    const batch = pages.slice(i, i + BATCH_SIZE);
+    await Promise.all(
+      batch.map(async (page) => {
+        if (!page.content) return;
+        const fileName = `${page.id}.json`;
+        const pageData = JSON.stringify({
+          id: page.id,
+          title: page.title,
+          content: page.content,
+          notebookId: page.notebookId,
+        });
 
-      const existingFile = await findFileInFolder(pagesFolder.id, fileName);
-      if (existingFile) {
-        await updateFile(existingFile.id, pageData);
-      } else {
-        await createFile(fileName, pageData, pagesFolder.id);
-      }
-    }
+        const fileId = await getCachedFileId(pagesFolderId!, fileName);
+        if (fileId) {
+          await updateFile(fileId, pageData);
+        } else {
+          const created = await createFile(fileName, pageData, pagesFolderId!);
+          fileIdCache.set(`${pagesFolderId}/${fileName}`, created.id);
+        }
+      })
+    );
   }
 }
 

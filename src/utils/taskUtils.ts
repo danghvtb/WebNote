@@ -218,6 +218,18 @@ export function getQuickPresetDate(action: 'today' | 'tomorrow' | 'add_1h' | 'ad
 }
 
 /**
+ * Check if a due date string is valid YYYY-MM-DD format
+ */
+export function isValidDueDate(dueDateStr: unknown): dueDateStr is string {
+  if (!dueDateStr || typeof dueDateStr !== 'string') return false;
+  const trimmed = dueDateStr.trim();
+  if (trimmed === '' || trimmed === 'null' || trimmed === 'undefined' || trimmed === 'Invalid Date') {
+    return false;
+  }
+  return /^\d{4}-\d{2}-\d{2}/.test(trimmed);
+}
+
+/**
  * Parse all tasks from a single page HTML string
  */
 export function parseTasksFromPage(page: Page, notebookTitle: string): ParsedTask[] {
@@ -234,7 +246,18 @@ export function parseTasksFromPage(page: Page, notebookTitle: string): ParsedTas
     const rawText = node.textContent?.trim() || '';
     
     // Read data-due attribute or parse NLP text syntax
-    let dueDate = node.getAttribute('data-due') || extractDueDateFromText(rawText);
+    const rawDue = node.getAttribute('data-due');
+    let dueDate: string | undefined = undefined;
+
+    if (isValidDueDate(rawDue)) {
+      dueDate = rawDue.trim().replace(' ', 'T');
+    } else {
+      const extracted = extractDueDateFromText(rawText);
+      if (isValidDueDate(extracted)) {
+        dueDate = extracted;
+      }
+    }
+
     const cleanedText = cleanTaskText(rawText);
 
     if (rawText) {
@@ -284,7 +307,7 @@ export function parseAllTasks(pages: Page[], notebooks: Notebook[], onlyWithDueD
   });
 
   if (onlyWithDueDate) {
-    return allTasks.filter((t) => !!t.dueDate);
+    return allTasks.filter((t) => isValidDueDate(t.dueDate));
   }
 
   return allTasks;

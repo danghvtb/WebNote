@@ -16,6 +16,7 @@ import {
   formatRelativeDeadline,
   getQuickPresetDate,
   formatForDateTimeInput,
+  isValidDueDate,
   type ParsedTask,
 } from '../../utils/taskUtils';
 
@@ -46,13 +47,13 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
   const todayStr = todayDate();
 
   // Extract tasks across ALL vault pages:
-  // 1. Must have deadline assigned (!!t.dueDate)
+  // 1. Must have VALID deadline assigned (isValidDueDate(t.dueDate))
   // 2. Pending tasks (completed === false): show all (Overdue, Due Today, Future Due)
   // 3. Completed tasks (completed === true): ONLY show if deadline is TODAY
   const allTasks = useMemo(() => {
     const tasks = parseAllTasks(targetPages, targetNotebooks, true);
     return tasks.filter((t) => {
-      if (!t.dueDate) return false;
+      if (!isValidDueDate(t.dueDate)) return false;
       const datePart = t.dueDate.split('T')[0].split(' ')[0];
       if (t.completed) {
         return datePart === todayStr;
