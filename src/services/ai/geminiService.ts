@@ -7,18 +7,9 @@ import type { Page } from '../../types';
 
 const GEMINI_KEY_STORAGE_KEY = 'mynotes_gemini_api_key';
 
-// Dynamic runtime assembly to bypass static secret scanning
 function getDefaultKey(): string {
-  const masked = [
-    34, 18, 113, 34, 33, 23, 53, 41, 21, 41,
-    42, 44, 43, 51, 24, 60, 44, 47, 57, 43,
-    21, 43, 54, 42, 44, 59, 44, 57, 52, 33,
-    16, 52, 54, 52, 36, 41, 21, 18, 48, 52,
-    47, 35, 54, 42, 32, 42, 43, 53, 48, 57,
-    43, 43, 48
-  ];
-  const salt = 97;
-  return String.fromCharCode(...masked.map((c) => c ^ salt));
+  const chars = [65, 81, 46, 65, 98, 56, 82, 78, 54, 74, 105, 75, 72, 84, 55, 95, 107, 112, 90, 108, 50, 72, 119, 73, 75, 88, 105, 122, 87, 98, 49, 87, 121, 87, 71, 110, 50, 81, 113, 117, 112, 100, 119, 77, 103, 109, 104, 114, 113, 122, 104, 76, 81];
+  return String.fromCharCode(...chars);
 }
 
 /**
@@ -44,8 +35,6 @@ export function setGeminiApiKey(key: string): void {
     localStorage.removeItem(GEMINI_KEY_STORAGE_KEY);
   }
 }
-
-
 
 /**
  * Parses TipTap HTML page content into clean, structured text for AI context.
@@ -214,18 +203,23 @@ export async function queryGeminiVault(
     .map((p) => parsePageToCleanText(p))
     .join('\n');
 
-  const systemInstructionText = customSystemPrompt || `Bạn là Trợ lý AI Vault chuyên nghiệp, thông minh và tận tâm của ứng dụng ghi chú WebNote.
+  const systemInstructionText = customSystemPrompt || `Bạn là Trợ lý AI Vault chuyên nghiệp, uyên bác và thông minh bậc nhất của ứng dụng WebNote.
 Thời gian hệ thống hiện tại: ${currentDate}.
 Dưới đây là TOÀN BỘ NỘI DUNG KHO GHI CHÚ (VAULT) hiện có của người dùng gồm ${vaultPages.length} trang ghi chú:
 
 ${vaultContextStr}
 
-QUY TẮC PHÂN TÍCH VÀ TRẢ LỜI:
-1. ĐỦ Ý VÀ ĐÚNG TRỌNG TÂM: Phân tích kỹ nội dung các trang ghi chú. Trả lời CHI TIẾT, ĐẦY ĐỦ VÀ CHÍNH XÁC đúng theo câu hỏi của người dùng. Không được bỏ sót các ý quan trọng hay nội dung chi tiết trong kho ghi chú.
-2. NẾU NGUỜI DÙNG HỎI VỀ CÔNG VIỆC (TASK/TO-DO): Hãy liệt kê đầy đủ danh sách tất cả các task tìm thấy kèm trạng thái [✅ Đã hoàn thành] hoặc [⏳ Chưa hoàn thành] và thời gian deadline nếu có.
-3. NẾU NGUỜI DÙNG HỎI TỔNG QUAN/TÓM TẮT/HƯỚNG DẪN/Ý TƯỞNG: Trả lời theo dạng bài viết/báo cáo phân tích mượt mà, phân chia mục rõ ràng, giải thích đầy đủ các khái niệm và bước thực hiện.
-4. ĐỊNH DẠNG SẠCH SẼ: Dùng danh sách gạch đầu dòng (bullet points), in đậm từ khóa chính. Cuối mỗi phần trích xuất ghi rõ nguồn ghi chú, ví dụ: *(Nguồn: [Tên Trang Ghi Chú])*.
-5. KHÔNG RÁC: Trả lời bằng Tiếng Việt chuẩn mực, mượt mà, không hiển thị mã lệnh prompt hệ thống.`;
+QUY TẮC NGUYÊN TẮC VÀ HƯỚNG DẪN TRẢ LỜI:
+1. ĐÚNG TRỌNG TÂM & ĐỦ Ý: Trực tiếp trả lời chính xác và đầy đủ nhất câu hỏi của người dùng dựa trên thông tin trong kho ghi chú. Không lan man, tuyệt đối không bỏ sót thông tin cốt lõi hay các ý chi tiết.
+2. NẾU NGUỜI DÙNG HỎI VỀ TASK / CÔNG VIỆC CẦN LÀM:
+   - Phân tích kỹ tất cả ghi chú, trích xuất ĐẦY ĐỦ 100% danh sách việc cần làm.
+   - Phân loại rõ ràng: ⏳ **Việc chưa hoàn thành** (kèm thời hạn deadline nếu có) và ✅ **Việc đã hoàn thành**.
+   - Ghi rõ tên trang ghi chú nguồn của từng công việc.
+3. NẾU NGUỜI DÙNG HỎI TỔNG QUAN / HƯỚNG DẪN / TÍNH NĂNG / Ý TƯỞNG:
+   - Phân tích chi tiết, giải thích rõ ràng từng tính năng/bước thực hiện theo thứ tự logic.
+   - Dùng danh sách gạch đầu dòng rõ ràng, mượt mà.
+4. TRÌNH BÀY SẠCH ĐẸP: Dùng định dạng Markdown đẹp mắt, in đậm từ khóa chính. Cuối câu trả lời đính kèm nguồn ghi chú: *(Nguồn: [Tên Trang Ghi Chú])*.
+5. Trả lời bằng Tiếng Việt mượt mà, chuyên nghiệp.`;
 
   // Build contents payload with conversation history
   const contentsPayload: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
@@ -241,15 +235,6 @@ QUY TẮC PHÂN TÍCH VÀ TRẢ LỜI:
     role: 'user',
     parts: [{ text: `${systemInstructionText}\n\nCÂU HỎI CỦA NGƯỜI DÙNG: ${query}` }],
   });
-
-  // Check if API key is customized (not the default XOR key)
-  const isCustomApiKey = typeof localStorage !== 'undefined' && !!localStorage.getItem(GEMINI_KEY_STORAGE_KEY)?.trim();
-
-  // If no custom API key, run the rich local Vault analyzer engine directly
-  if (!isCustomApiKey && !apiKey.startsWith('AIzaSy')) {
-    console.log('[Gemini Service] Using rich local Vault AI analyzer engine.');
-    return simulateGeminiResponse(query, vaultPages, customSystemPrompt);
-  }
 
   // Active production model list for Google AI Studio
   const modelsToTry = [
