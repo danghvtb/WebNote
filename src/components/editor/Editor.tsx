@@ -3,7 +3,7 @@
 // Core editor with autosave, formatting, and code highlighting.
 // ============================================================
 
-import { useState, useCallback, useEffect, useRef } from 'react';
+import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
@@ -293,7 +293,7 @@ export function Editor() {
  * Isolated, Uncontrolled Native Input for Page Title.
  * Prevents React state re-renders from interrupting Vietnamese Unikey IME Composition events.
  */
-function PageTitleInput({
+const PageTitleInput = memo(function PageTitleInput({
   pageId,
   initialTitle,
   onUpdateTitle,
@@ -368,4 +368,4 @@ function PageTitleInput({
       aria-label="Page title"
     />
   );
-}
+});
