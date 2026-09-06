@@ -317,7 +317,7 @@ QUY TẮC PHÂN TÍCH VÀ TRẢ LỜI:
 /**
  * Advanced Local Vault Analyzer Engine.
  * Runs comprehensive semantic & full-text extraction across 100% of vault pages
- * to synthesize clear, detailed, and complete responses.
+ * to synthesize clear, detailed, and complete responses without missing any ideas.
  */
 function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?: string) {
   const lowerQ = query.toLowerCase();
@@ -355,11 +355,20 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
     lowerQ.includes('kế hoạch') ||
     customPrompt?.includes('Quản Lý Thời Gian');
 
-  // Filter matching pages or use all if open query
+  // Filter pages matching query keywords (or use all pages if open summary query)
+  const keywords = lowerQ
+    .split(/\s+/)
+    .map((k) => k.trim())
+    .filter((k) => k.length > 2 && !['tính', 'năng', 'của', 'trong', 'được', 'hướng', 'dẫn', 'bằng', 'chỉ'].includes(k));
+
   const matchedPages = parsedVault.filter((p) => {
-    const titleMatch = p.title.toLowerCase().includes(lowerQ);
-    const contentMatch = p.rawText.toLowerCase().includes(lowerQ);
-    return titleMatch || contentMatch;
+    const pTitleLower = p.title.toLowerCase();
+    const pTextLower = p.rawText.toLowerCase();
+
+    // Check title or content match
+    if (pTitleLower.includes(lowerQ) || pTextLower.includes(lowerQ)) return true;
+    if (keywords.length > 0 && keywords.some((kw) => pTitleLower.includes(kw) || pTextLower.includes(kw))) return true;
+    return false;
   });
 
   const activePages = matchedPages.length > 0 ? matchedPages : parsedVault;
@@ -367,7 +376,7 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
   let resultHtml = '';
 
   if (isTaskQuery) {
-    // Extract all tasks across pages
+    // Extract ALL tasks across all pages
     const tasks: { title: string; isChecked: boolean; pageTitle: string; due?: string }[] = [];
     parsedVault.forEach((p) => {
       p.lines.forEach((line) => {
@@ -419,7 +428,7 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
 
     resultHtml += `<h4 class="text-xs font-bold text-rose-400 mt-2 mb-1">🔥 Ưu Tiên Hàng Đầu:</h4>`;
     resultHtml += `<ul class="list-disc list-inside space-y-1.5 my-2 pl-1">`;
-    activePages.slice(0, 3).forEach((p) => {
+    activePages.slice(0, 5).forEach((p) => {
       const firstLine = p.lines.find((l) => !l.startsWith('===') && l.length > 10) || p.title;
       resultHtml += `<li class="text-xs text-slate-200"><strong>${p.title}:</strong> ${firstLine}</li>`;
     });
@@ -428,23 +437,41 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
     resultHtml += `<h4 class="text-xs font-bold text-cyan-300 mt-3 mb-1">⚡ Đã Quét Toàn Bộ Vault:</h4>`;
     resultHtml += `<p class="text-xs text-slate-300">Tất cả ghi chú đã được đồng bộ an toàn và sẵn sàng cho việc tra cứu nhanh.</p>`;
   } else {
-    // Comprehensive text extraction for open questions or summary queries
-    resultHtml = `<h3 class="text-sm font-bold text-purple-300 mt-1 mb-2 border-b border-slate-800 pb-1">📌 Tổng Hợp Thông Tin Chi Tiết Từ Vault (${activePages.length} ghi chú)</h3>`;
-    resultHtml += `<p class="text-xs text-slate-300 mb-3">Nội dung chi tiết trích xuất từ kho ghi chú liên quan đến: <em>"${query}"</em></p>`;
+    // Complete non-truncated text extraction across matching pages
+    resultHtml = `<h3 class="text-sm font-bold text-purple-300 mt-1 mb-2 border-b border-slate-800 pb-1">📌 Tổng Hợp Thông Tin Chi Tiết & Đầy Đủ Từ Vault (${activePages.length} ghi chú)</h3>`;
+    resultHtml += `<p class="text-xs text-slate-300 mb-3">Nội dung chi tiết trích xuất đầy đủ từ các ghi chú liên quan đến: <em>"${query}"</em></p>`;
 
-    activePages.slice(0, 4).forEach((p) => {
-      resultHtml += `<div class="mb-3 p-3 rounded-xl bg-slate-900/90 border border-slate-800/80">`;
-      resultHtml += `<h4 class="text-xs font-bold text-cyan-300 mb-1.5 flex items-center gap-1">📄 ${p.title}</h4>`;
+    activePages.forEach((p) => {
+      resultHtml += `<div class="mb-4 p-3.5 rounded-xl bg-slate-900/90 border border-slate-800/80 shadow-sm">`;
+      resultHtml += `<h4 class="text-xs font-bold text-cyan-300 mb-2 flex items-center gap-1">📄 ${p.title}</h4>`;
 
-      const relevantLines = p.lines.filter((l) => !l.includes('[✅') && !l.includes('[⏳'));
-      if (relevantLines.length > 0) {
-        resultHtml += `<ul class="list-disc list-inside space-y-1 my-1 pl-1">`;
-        relevantLines.slice(0, 4).forEach((line) => {
-          resultHtml += `<li class="text-xs text-slate-200 leading-relaxed">${line}</li>`;
+      const contentLines = p.lines.filter((l) => !l.includes('[✅') && !l.includes('[⏳'));
+      if (contentLines.length > 0) {
+        let inList = false;
+        contentLines.forEach((line) => {
+          if (line.startsWith('- ') || line.startsWith('• ') || line.startsWith('* ')) {
+            if (!inList) {
+              resultHtml += `<ul class="list-disc list-inside space-y-1 my-1.5 pl-1">`;
+              inList = true;
+            }
+            resultHtml += `<li class="text-xs text-slate-200 leading-relaxed">${line.replace(/^[•\-\*]\s*/, '')}</li>`;
+          } else {
+            if (inList) {
+              resultHtml += `</ul>`;
+              inList = false;
+            }
+            if (line.startsWith('http') || line.includes('Tip:') || line.includes('Ví dụ')) {
+              resultHtml += `<p class="text-xs text-purple-300 font-medium my-1">${line}</p>`;
+            } else {
+              resultHtml += `<p class="text-xs text-slate-200 leading-relaxed mb-1.5">${line}</p>`;
+            }
+          }
         });
-        resultHtml += `</ul>`;
+        if (inList) {
+          resultHtml += `</ul>`;
+        }
       } else {
-        resultHtml += `<p class="text-xs text-slate-300">${p.rawText.slice(0, 250)}...</p>`;
+        resultHtml += `<p class="text-xs text-slate-300">${p.rawText}</p>`;
       }
       resultHtml += `</div>`;
     });
@@ -452,7 +479,8 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
 
   return {
     text: resultHtml,
-    sourcePages: activePages.slice(0, 4).map((p) => ({ title: p.title, id: p.id })),
+    sourcePages: activePages.map((p) => ({ title: p.title, id: p.id })),
   };
 }
+
 
