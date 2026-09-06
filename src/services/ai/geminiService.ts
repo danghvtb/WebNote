@@ -50,9 +50,16 @@ export function parsePageToCleanText(page: Page): string {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = content;
 
-    // Convert list task items explicitly
-    const taskItems = Array.from(tempDiv.querySelectorAll('li[data-type="taskItem"], li'));
-    taskItems.forEach((item) => {
+    // Target ONLY genuine task items (Checklists with data-type="taskItem" or input checkbox)
+    const taskItems = Array.from(
+      tempDiv.querySelectorAll('li[data-type="taskItem"], ul[data-type="taskList"] > li, li input[type="checkbox"]')
+    );
+
+    taskItems.forEach((targetNode) => {
+      const item = targetNode.tagName === 'INPUT' ? (targetNode.closest('li') || targetNode.parentElement) : targetNode;
+      if (!item || item.getAttribute('data-task-parsed') === 'true') return;
+      item.setAttribute('data-task-parsed', 'true');
+
       const isChecked =
         item.getAttribute('data-checked') === 'true' ||
         item.querySelector('input[type="checkbox"]')?.hasAttribute('checked') ||
@@ -61,12 +68,12 @@ export function parsePageToCleanText(page: Page): string {
       const dueAttr = item.getAttribute('data-due');
       let dueText = '';
       if (dueAttr) {
-        dueText = ` (Hạn deadline: ${dueAttr.replace('T', ' ')})`;
+        dueText = ` (Deadline: ${dueAttr.replace('T', ' ')})`;
       }
 
       const label = item.textContent?.trim() || '';
       if (label) {
-        const statusTag = isChecked ? '[✅ ĐÃ HOÀN THÀNH]' : '[⏳ CHƯA HOÀN THÀNH]';
+        const statusTag = isChecked ? '[TASK ĐÃ HOÀN THÀNH ✅]' : '[TASK CHƯA HOÀN THÀNH ⏳]';
         item.textContent = `${statusTag} ${label}${dueText}`;
       }
     });
@@ -107,10 +114,10 @@ export function formatMarkdownToHTML(markdownText: string): string {
 
   // Clean up raw internal status tags if returned by model
   html = html
+    .replace(/\[TASK ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
+    .replace(/\[TASK CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
     .replace(/\[CÔNG VIỆC ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
     .replace(/\[CÔNG VIỆC CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
-    .replace(/\[TRẠNG THÁI:\s*ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
-    .replace(/\[TRẠNG THÁI:\s*CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
     .replace(/\[✅ ĐÃ HOÀN THÀNH\]/g, '✅ ')
     .replace(/\[⏳ CHƯA HOÀN THÀNH\]/g, '⏳ ')
     .replace(/^"|"$/g, '');
@@ -361,15 +368,20 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
   let resultHtml = '';
 
   if (isTaskQuery) {
-    // Extract ALL tasks across all pages
+    // Extract ALL genuine tasks across all pages
     const tasks: { title: string; isChecked: boolean; pageTitle: string; due?: string }[] = [];
     parsedVault.forEach((p) => {
       p.lines.forEach((line) => {
-        if (line.includes('[✅ ĐÃ HOÀN THÀNH]') || line.includes('[⏳ CHƯA HOÀN THÀNH]')) {
-          const isChecked = line.includes('[✅ ĐÃ HOÀN THÀNH]');
-          let taskTitle = line.replace('[✅ ĐÃ HOÀN THÀNH]', '').replace('[⏳ CHƯA HOÀN THÀNH]', '').trim();
+        if (line.includes('[TASK ĐÃ HOÀN THÀNH ✅]') || line.includes('[TASK CHƯA HOÀN THÀNH ⏳]') || line.includes('[✅ ĐÃ HOÀN THÀNH]') || line.includes('[⏳ CHƯA HOÀN THÀNH]')) {
+          const isChecked = line.includes('[TASK ĐÃ HOÀN THÀNH ✅]') || line.includes('[✅ ĐÃ HOÀN THÀNH]');
+          let taskTitle = line
+            .replace('[TASK ĐÃ HOÀN THÀNH ✅]', '')
+            .replace('[TASK CHƯA HOÀN THÀNH ⏳]', '')
+            .replace('[✅ ĐÃ HOÀN THÀNH]', '')
+            .replace('[⏳ CHƯA HOÀN THÀNH]', '')
+            .trim();
           let dueStr = '';
-          const dueMatch = /\(Hạn deadline:\s*([^)]+)\)/.exec(taskTitle);
+          const dueMatch = /\(Deadline:\s*([^)]+)\)/.exec(taskTitle) || /\(Hạn deadline:\s*([^)]+)\)/.exec(taskTitle);
           if (dueMatch) {
             dueStr = dueMatch[1];
             taskTitle = taskTitle.replace(dueMatch[0], '').trim();
