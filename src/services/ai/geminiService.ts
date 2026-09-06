@@ -243,7 +243,8 @@ QUY TẮC NGUYÊN TẮC VÀ HƯỚNG DẪN TRẢ LỜI:
    - Phân tích chi tiết, giải thích rõ ràng từng tính năng/bước thực hiện theo thứ tự logic.
    - Dùng danh sách gạch đầu dòng rõ ràng, mượt mà.
 4. TRÌNH BÀY SẠCH ĐẸP: Dùng định dạng Markdown đẹp mắt, in đậm từ khóa chính. Cuối câu trả lời đính kèm nguồn ghi chú: *(Nguồn: [Tên Trang Ghi Chú])*.
-5. Trả lời bằng Tiếng Việt mượt mà, chuyên nghiệp.`;
+5. HOÀN THÀNH 100% CÂU TRẢ LỜI: Phải viết hoàn chỉnh câu từ, chấm dứt bằng dấu chấm đầy đủ. Tuyệt đối KHÔNG dừng dở chừng hay bỏ lửng câu cuối.
+6. Trả lời bằng Tiếng Việt mượt mà, chuyên nghiệp.`;
 
   // Build contents payload with conversation history
   const contentsPayload: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
@@ -280,7 +281,7 @@ QUY TẮC NGUYÊN TẮC VÀ HƯỚNG DẪN TRẢ LỜI:
           contents: contentsPayload,
           generationConfig: {
             temperature: 0.2,
-            maxOutputTokens: 3500,
+            maxOutputTokens: 8192,
           },
         }),
       });

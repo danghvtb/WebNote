@@ -232,7 +232,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
         </div>
 
         {/* Content Area: Chat or Action Result */}
-        <div className="flex-1 min-h-[260px] max-h-[360px] overflow-y-auto p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-sm mb-4 flex flex-col">
+        <div className="flex-1 min-h-[320px] max-h-[55vh] overflow-y-auto p-4 rounded-xl bg-slate-950/80 border border-slate-800 text-sm mb-4 flex flex-col">
           {activeTab === 'chat' ? (
             /* FULL VAULT CHAT INTERFACE */
             <div className="flex-1 flex flex-col space-y-3">
