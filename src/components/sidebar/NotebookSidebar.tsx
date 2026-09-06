@@ -157,6 +157,8 @@ export function NotebookSidebar() {
     addNotification('success', 'Notebook duplicated');
   };
 
+  const isComposingRef = useRef(false);
+
   const handleStartRename = (type: 'notebook' | 'page', id: string, currentTitle: string) => {
     setContextMenu(null);
     setEditingTitle({ type, id });
@@ -164,6 +166,7 @@ export function NotebookSidebar() {
   };
 
   const handleFinishRename = async () => {
+    if (isComposingRef.current) return;
     if (!editingTitle || !editTitle.trim()) {
       setEditingTitle(null);
       return;
@@ -258,8 +261,10 @@ export function NotebookSidebar() {
                       autoFocus
                       value={editTitle}
                       onChange={(e) => setEditTitle(e.target.value)}
+                      onCompositionStart={() => { isComposingRef.current = true; }}
+                      onCompositionEnd={() => { isComposingRef.current = false; }}
                       onBlur={handleFinishRename}
-                      onKeyDown={(e) => { if (e.key === 'Enter') handleFinishRename(); if (e.key === 'Escape') setEditingTitle(null); }}
+                      onKeyDown={(e) => { if (e.key === 'Enter' && !isComposingRef.current) handleFinishRename(); if (e.key === 'Escape') setEditingTitle(null); }}
                       className="flex-1 text-sm bg-transparent outline-none px-1 rounded"
                       style={{ color: 'var(--color-text-primary)', border: '1px solid var(--color-accent)' }}
                       onClick={(e) => e.stopPropagation()}
@@ -322,8 +327,10 @@ export function NotebookSidebar() {
                               autoFocus
                               value={editTitle}
                               onChange={(e) => setEditTitle(e.target.value)}
+                              onCompositionStart={() => { isComposingRef.current = true; }}
+                              onCompositionEnd={() => { isComposingRef.current = false; }}
                               onBlur={handleFinishRename}
-                              onKeyDown={(e) => { if (e.key === 'Enter') handleFinishRename(); if (e.key === 'Escape') setEditingTitle(null); }}
+                              onKeyDown={(e) => { if (e.key === 'Enter' && !isComposingRef.current) handleFinishRename(); if (e.key === 'Escape') setEditingTitle(null); }}
                               className="flex-1 text-xs bg-transparent outline-none px-1 rounded"
                               style={{ color: 'var(--color-text-primary)', border: '1px solid var(--color-accent)' }}
                               onClick={(e) => e.stopPropagation()}
