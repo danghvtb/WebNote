@@ -76,10 +76,10 @@ export function parsePageToCleanText(page: Page): string {
 
       // Clean pre-existing status tags to prevent tag corruption
       let label = item.textContent?.trim() || '';
-      label = label.replace(/\[(TASK|CÔNG VIỆC|\s|✅|⏳|ĐÃ|CHƯA|HOÀN|THÀNH)*\]/gi, '').trim();
+      label = label.replace(/\[(TASK|CÔNG VIỆC|\s|✅|⏳|ĐÃ|CHƯA|HOÀN|THÀNH|XONG)*\]/gi, '').trim();
 
       if (label) {
-        const statusTag = isChecked ? '[✅ HOÀN THÀNH]' : '[⏳ CHƯA HOÀN THÀNH]';
+        const statusTag = isChecked ? '[ĐÃ XONG]' : '[CHƯA XONG]';
         item.textContent = `${statusTag} ${label}${dueText}`;
       }
     });
@@ -137,14 +137,19 @@ export function formatMarkdownToHTML(markdownText: string): string {
     })
     .join('\n');
 
-  // Clean up any raw internal status tags or broken status fragments
+  // Clean up any raw internal status tags or broken status fragments (e.g., HOÀN THÀNH ⏳ ], [CÔNG VIỆC CHƯA HOÀN)
   html = html
     .replace(/\[?TASK\s*ĐÃ\s*HOÀN\s*THÀNH\s*✅\]?/gi, '✅ ')
     .replace(/\[?TASK\s*CHƯA\s*HOÀN\s*THÀNH\s*⏳\]?/gi, '⏳ ')
     .replace(/\[?CÔNG\s*VIỆC\s*ĐÃ\s*HOÀN\s*THÀNH\s*✅\]?/gi, '✅ ')
     .replace(/\[?CÔNG\s*VIỆC\s*CHƯA\s*HOÀN\s*THÀNH\s*⏳\]?/gi, '⏳ ')
-    .replace(/\[?CÔNG\s*VIỆC\s*CHƯA\s*HOÀN\s*\]?/gi, '⏳ ')
-    .replace(/\[?CÔNG\s*VIỆC\s*ĐÃ\s*HOÀN\s*\]?/gi, '✅ ')
+    .replace(/\[?CÔNG\s*VIỆC\s*CHƯA\s*HOÀN\b/gi, '⏳ ')
+    .replace(/\[?CÔNG\s*VIỆC\s*ĐÃ\s*HOÀN\b/gi, '✅ ')
+    .replace(/\[?CÔNG\s*VIỆC\b/gi, '')
+    .replace(/\[?CHƯA\s*HOÀN\s*THÀNH\s*⏳?\]?/gi, '⏳ ')
+    .replace(/\[?ĐÃ\s*HOÀN\s*THÀNH\s*✅?\]?/gi, '✅ ')
+    .replace(/HOÀN\s*THÀNH\s*⏳\s*\]?/gi, '⏳ ')
+    .replace(/HOÀN\s*THÀNH\s*✅\s*\]?/gi, '✅ ')
     .replace(/\[?✅\s*HOÀN\s*THÀNH\]?/gi, '✅ ')
     .replace(/\[?⏳\s*CHƯA\s*HOÀN\s*THÀNH\]?/gi, '⏳ ')
     .replace(/THÀNH\s*⏳\s*\]/gi, '⏳ ')
