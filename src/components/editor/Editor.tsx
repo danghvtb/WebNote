@@ -161,13 +161,7 @@ export function Editor() {
     }
   }, [editor, selectedPage, selectedPageId]);
 
-  // Handle title Enter key → focus editor
-  const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
-      e.preventDefault();
-      editor?.commands.focus('start');
-    }
-  };
+
 
   if (!selectedPage) {
     return (
