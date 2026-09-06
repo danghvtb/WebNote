@@ -107,23 +107,32 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
 
     const currentPage = selectedPage || targetPages[0];
 
-    setTimeout(() => {
-      let result = '';
-      const textContent = currentPage ? currentPage.content.replace(/<[^>]*>/g, '').trim() : '';
+    try {
+      let promptQuery = '';
+      let customSystemInstruction = '';
 
       if (action === 'summarize') {
-        result = `📌 <strong>AI Tóm Tắt Ý Chính Vault (${currentPage?.title || 'Tất cả ghi chú'}):</strong><ul><li>Tổng số ghi chú đã quét: <strong>${targetPages.length} ghi chú</strong>.</li><li>Nội dung trọng tâm: Quản trị mục tiêu và kiến thức cá nhân.</li><li>Hành động tiếp theo: Rà soát danh sách công việc và kiểm tra deadline.</li></ul>`;
+        promptQuery = `Hãy tóm tắt ngắn gọn, đầy đủ và súc tích các ý chính quan trọng nhất trong trang ghi chú "${currentPage?.title || 'tất cả ghi chú'}" và toàn bộ Vault.`;
+        customSystemInstruction = `Bạn là Trợ lý AI Tóm Tắt Chuyên Nghiệp của WebNote. Hãy phân tích kỹ ghi chú và tổng hợp lại các điểm cốt lõi, thành tựu hoặc nội dung chính theo định dạng danh sách gạch đầu dòng rõ ràng.`;
       } else if (action === 'polish') {
-        result = `<p><strong>Văn Bản Đã Tinh Chỉnh:</strong></p><p>${textContent || 'Nội dung mẫu đã được tối ưu hóa văn phong.'} (Đã được chuẩn hóa mượt mà và chuyên nghiệp hơn).</p>`;
+        promptQuery = `Hãy tinh chỉnh văn phong, sửa lỗi từ ngữ và cấu trúc bài viết của trang ghi chú "${currentPage?.title || 'hiện tại'}" để trở nên chuyên nghiệp, mượt mà hơn.`;
+        customSystemInstruction = `Bạn là Trợ lý Biên Tập Viên AI. Hãy trau chuốt lại nội dung trang ghi chú hiện tại sao cho văn phong mượt mà, chuyên nghiệp, giữ nguyên 100% ý chính và thông tin quan trọng.`;
       } else if (action === 'tasks') {
-        result = `<ul data-type="taskList"><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T18:00"><label><input type="checkbox"><span>Hoàn thành rà soát ghi chú ${currentPage?.title || 'chính'}</span></label></li><li data-type="taskItem" data-checked="false" data-due="${new Date().toISOString().split('T')[0]}T20:00"><label><input type="checkbox"><span>Đồng bộ kho lưu trữ vault lên Google Drive</span></label></li></ul>`;
+        promptQuery = `Hãy trích xuất ĐẦY ĐỦ TẤT CẢ các việc cần làm (tasks/to-do list) có trong các ghi chú Vault, phân loại công việc đã xong và chưa xong.`;
+        customSystemInstruction = `Bạn là Trợ lý Quản Lý Công Việc AI. Bạn phải quét toàn bộ Vault và liệt kê 100% các công việc (Task) được tìm thấy cùng trạng thái (đã xong/chưa xong) và tên ghi chú nguồn. KHÔNG bỏ sót bất kỳ task nào.`;
       } else if (action === 'digest') {
-        result = `☀️ <strong>AI Tổng Hợp Toàn Bộ Vault Trong Ngày:</strong><br/><ul><li>🔥 <strong>Ưu tiên 1:</strong> Xử lý các task đến hạn trong 30 phút tới.</li><li>⚡ <strong>Ưu tiên 2:</strong> Đã quét <strong>${targetPages.length} trang ghi chú</strong> trong kho lưu trữ.</li><li>✅ <strong>Mục tiêu:</strong> Đạt tỉ lệ hoàn thành 100% cho ngày hôm nay.</li></ul>`;
+        promptQuery = `Tổng hợp toàn bộ lịch trình, việc cần làm gấp và định hướng trong ngày dựa trên tất cả các trang ghi chú trong Vault.`;
+        customSystemInstruction = `Bạn là Trợ lý Quản Lý Thời Gian AI. Hãy tổng hợp kế hoạch ngày hôm nay cho người dùng: chia thành 🔥 Việc ưu tiên cao, ⚡ Việc cần lưu ý, và ✅ Tiến độ chung.`;
       }
 
-      setAiResult(result);
+      const res = await queryGeminiVault(promptQuery, targetPages, [], customSystemInstruction);
+      setAiResult(res.text);
+    } catch (err) {
+      console.error('[AI Action error]', err);
+      setAiResult('⚠️ <strong>Lỗi xử lý AI:</strong> Không thể hoàn tất yêu cầu. Vui lòng kiểm tra lại Gemini API Key.');
+    } finally {
       setLoading(false);
-    }, 1000);
+    }
   };
 
   const handleApply = async () => {
