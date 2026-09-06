@@ -24,7 +24,7 @@ import { ExportModal } from './components/modal/ExportModal';
 function AppContent() {
   const {
     isLoggedIn, needsFolderCreation, setSyncStatus, setLastSyncTime, setTheme,
-    setAuth, setRootFolderId, setInitialized,
+    setAuth, setRootFolderId, setInitialized, addNotification,
   } = useAppStore();
 
   // Restore session from localStorage on reload
@@ -43,9 +43,14 @@ function AppContent() {
         }
 
         // Initialize Google Auth script & root folder in background
-        import('./services/google/auth').then(async ({ initGoogleAuth }) => {
+        import('./services/google/auth').then(async ({ initGoogleAuth, ensureAccessToken }) => {
           try {
             await initGoogleAuth();
+            // Attempt auto refresh token if expired
+            await ensureAccessToken().catch((err) => {
+              console.warn('[App] Silent token restore attempt failed:', err);
+            });
+
             const { ensureRootFolder } = await import('./services/google/rootFolderManager');
             const res = await ensureRootFolder();
             if (res.status === 'found') {
@@ -86,7 +91,7 @@ function AppContent() {
     initNetworkListeners();
   }, []);
 
-  // Listen to sync status changes
+  // Listen to sync status changes & Auth expiration events
   useEffect(() => {
     const unsubscribe = onSyncStatusChange((status, message) => {
       setSyncStatus(status, message);
@@ -94,11 +99,23 @@ function AppContent() {
         setLastSyncTime(new Date().toISOString());
       }
     });
-    return unsubscribe;
-  }, [setSyncStatus, setLastSyncTime]);
+
+    const handleAuthRequired = () => {
+      addNotification(
+        'warning',
+        'Phiên đồng bộ Google Drive đã hết hạn. Vui lòng nhấn vào avatar/nút đăng nhập để kết nối lại.'
+      );
+    };
+
+    window.addEventListener('mynotes_auth_required', handleAuthRequired);
+
+    return () => {
+      unsubscribe();
+      window.removeEventListener('mynotes_auth_required', handleAuthRequired);
+    };
+  }, [setSyncStatus, setLastSyncTime, addNotification]);
 
   // 30-Minute Deadline Warning Monitor & Native Push + Audio Chime
-  const { addNotification } = useAppStore();
   useEffect(() => {
     const alertedTaskIds = new Set<string>();
 

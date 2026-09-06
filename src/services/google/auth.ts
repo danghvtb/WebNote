@@ -116,6 +116,11 @@ export async function initGoogleAuth(): Promise<void> {
       }
       currentAccessToken = response.access_token;
       localStorage.setItem('mynotes_token', response.access_token);
+      
+      // Calculate token expiration timestamp (expires_in is in seconds, minus 60s safety window)
+      const expiresAt = Date.now() + (response.expires_in || 3600) * 1000 - 60000;
+      localStorage.setItem('mynotes_token_expiry', expiresAt.toString());
+
       tokenResolve?.(response.access_token);
       tokenResolve = null;
       tokenReject = null;
@@ -179,16 +184,26 @@ export function signOut(): void {
   currentAccessToken = null;
   localStorage.removeItem('mynotes_user');
   localStorage.removeItem('mynotes_token');
+  localStorage.removeItem('mynotes_token_expiry');
   localStorage.removeItem('mynotes_root_folder');
 }
 
 /**
- * Get the current valid access token.
+ * Get the current access token if not expired.
  */
 export function getAccessToken(): string | null {
-  if (!currentAccessToken) {
-    currentAccessToken = localStorage.getItem('mynotes_token');
+  const token = currentAccessToken || localStorage.getItem('mynotes_token');
+  const expiry = localStorage.getItem('mynotes_token_expiry');
+  if (!token) return null;
+
+  if (expiry) {
+    const expiresAt = parseInt(expiry, 10);
+    if (Date.now() >= expiresAt) {
+      // Token has expired
+      return null;
+    }
   }
+  currentAccessToken = token;
   return currentAccessToken;
 }
 
@@ -204,8 +219,9 @@ export async function ensureAccessToken(): Promise<string> {
     return await signInSilent();
   } catch (err) {
     console.warn('[Auth] Silent token refresh failed:', err);
-    // If token is missing, attempt prompt-less OAuth re-request
-    return await signIn();
+    // Notify app that user needs re-authorization if silent refresh is rejected/blocked
+    window.dispatchEvent(new CustomEvent('mynotes_auth_required'));
+    throw new Error('AUTH_REQUIRED');
   }
 }
 
