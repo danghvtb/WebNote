@@ -309,14 +309,15 @@ function PageTitleInput({
   const currentTitleRef = useRef(initialTitle);
   const currentPageIdRef = useRef(pageId);
 
-  // Sync value on mount and page switch
+  // Sync value ONLY on initial mount or when pageId changes (switching pages)
   useEffect(() => {
     currentPageIdRef.current = pageId;
     currentTitleRef.current = initialTitle;
     if (inputRef.current) {
       inputRef.current.innerText = initialTitle;
     }
-  }, [pageId, initialTitle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [pageId]);
 
   const commitTitle = () => {
     if (!inputRef.current) return;
