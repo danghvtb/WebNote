@@ -164,11 +164,12 @@ export function Editor() {
   // Local state for Page Title to support smooth IME composition (Unikey, EVKey, Gboard, etc.)
   const [localTitle, setLocalTitle] = useState(selectedPage?.title || '');
   const isComposingRef = useRef(false);
+  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Sync local title when selected page changes
+  // Sync local title ONLY when switching to a different page (not on every store update)
   useEffect(() => {
     setLocalTitle(selectedPage?.title || '');
-  }, [selectedPageId, selectedPage?.title]);
+  }, [selectedPageId]);
 
   // Handle title editing with IME Composition support
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -177,11 +178,14 @@ export function Editor() {
 
     if (!selectedPageId) return;
 
-    // Only commit store & sync when not in the middle of Vietnamese IME composition
-    if (!isComposingRef.current) {
-      updatePageTitle(selectedPageId, val);
-      queueSync('update', 'page', selectedPageId);
-    }
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+
+    titleDebounceRef.current = setTimeout(() => {
+      if (!isComposingRef.current && selectedPageId) {
+        updatePageTitle(selectedPageId, val);
+        queueSync('update', 'page', selectedPageId);
+      }
+    }, 800);
   };
 
   const handleCompositionStart = () => {
@@ -190,9 +194,24 @@ export function Editor() {
 
   const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
     isComposingRef.current = false;
-    if (!selectedPageId) return;
     const finalVal = (e.target as HTMLInputElement).value;
-    updatePageTitle(selectedPageId, finalVal);
+    setLocalTitle(finalVal);
+
+    if (!selectedPageId) return;
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+
+    titleDebounceRef.current = setTimeout(() => {
+      if (selectedPageId) {
+        updatePageTitle(selectedPageId, finalVal);
+        queueSync('update', 'page', selectedPageId);
+      }
+    }, 500);
+  };
+
+  const handleTitleBlur = () => {
+    if (!selectedPageId) return;
+    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
+    updatePageTitle(selectedPageId, localTitle);
     queueSync('update', 'page', selectedPageId);
   };
 
@@ -269,6 +288,7 @@ export function Editor() {
             onChange={handleTitleChange}
             onCompositionStart={handleCompositionStart}
             onCompositionEnd={handleCompositionEnd}
+            onBlur={handleTitleBlur}
             onKeyDown={handleTitleKeyDown}
             placeholder="Untitled Page"
             className="w-full text-3xl font-extrabold bg-transparent border-none outline-none mb-6 tracking-tight"
