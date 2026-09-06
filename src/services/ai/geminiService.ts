@@ -135,6 +135,8 @@ export function formatMarkdownToHTML(markdownText: string): string {
     .replace(/\[?TASK\s*CHƯA\s*HOÀN\s*THÀNH\s*⏳\]?/gi, '⏳ ')
     .replace(/\[?CÔNG\s*VIỆC\s*ĐÃ\s*HOÀN\s*THÀNH\s*✅\]?/gi, '✅ ')
     .replace(/\[?CÔNG\s*VIỆC\s*CHƯA\s*HOÀN\s*THÀNH\s*⏳\]?/gi, '⏳ ')
+    .replace(/\[?CÔNG\s*VIỆC\s*CHƯA\s*HOÀN\s*\]?/gi, '⏳ ')
+    .replace(/\[?CÔNG\s*VIỆC\s*ĐÃ\s*HOÀN\s*\]?/gi, '✅ ')
     .replace(/\[?✅\s*HOÀN\s*THÀNH\]?/gi, '✅ ')
     .replace(/\[?⏳\s*CHƯA\s*HOÀN\s*THÀNH\]?/gi, '⏳ ')
     .replace(/THÀNH\s*⏳\s*\]/gi, '⏳ ')
