@@ -50,14 +50,17 @@ export function parsePageToCleanText(page: Page): string {
     const tempDiv = document.createElement('div');
     tempDiv.innerHTML = content;
 
-    // Target ONLY genuine task items (Checklists with data-type="taskItem" or input checkbox)
-    const taskItems = Array.from(
-      tempDiv.querySelectorAll('li[data-type="taskItem"], ul[data-type="taskList"] > li, li input[type="checkbox"]')
-    );
+    // Target ONLY genuine task items (Checklists with data-type="taskItem" or input checkbox or taskList parent)
+    const allLis = Array.from(tempDiv.querySelectorAll('li'));
+    const taskItems = allLis.filter((item) => {
+      const isTaskAttr = item.getAttribute('data-type') === 'taskItem';
+      const hasCheckbox = item.querySelector('input[type="checkbox"]') !== null;
+      const parentIsTaskList = item.parentElement?.getAttribute('data-type') === 'taskList';
+      return isTaskAttr || hasCheckbox || parentIsTaskList;
+    });
 
-    taskItems.forEach((targetNode) => {
-      const item = targetNode.tagName === 'INPUT' ? (targetNode.closest('li') || targetNode.parentElement) : targetNode;
-      if (!item || item.getAttribute('data-task-parsed') === 'true') return;
+    taskItems.forEach((item) => {
+      if (item.getAttribute('data-task-parsed') === 'true') return;
       item.setAttribute('data-task-parsed', 'true');
 
       const isChecked =
