@@ -218,9 +218,10 @@ ${vaultContextStr}
 
 QUY TẮC NGUYÊN TẮC VÀ HƯỚNG DẪN TRẢ LỜI:
 1. ĐÚNG TRỌNG TÂM & ĐỦ Ý: Trực tiếp trả lời chính xác và đầy đủ nhất câu hỏi của người dùng dựa trên thông tin trong kho ghi chú. Không lan man, tuyệt đối không bỏ sót thông tin cốt lõi hay các ý chi tiết.
-2. NẾU NGUỜI DÙNG HỎI VỀ TASK / CÔNG VIỆC CẦN LÀM:
-   - Phân tích kỹ tất cả ghi chú, trích xuất ĐẦY ĐỦ 100% danh sách việc cần làm.
-   - Phân loại rõ ràng: ⏳ **Việc chưa hoàn thành** (kèm thời hạn deadline nếu có) và ✅ **Việc đã hoàn thành**.
+2. NẾU NGUỜI DÙNG HỎI VỀ TASK / CÔNG VIỆC CẦN LÀM HÔM NAY:
+   - Chỉ lọc ra CHÍNH XÁC danh sách các việc cần làm (Checklist items) có đính kèm thời hạn HÔM NAY (${currentDate}) hoặc tag @today/@homnay.
+   - Nếu trong Vault chỉ có đúng 3 task đến hạn hôm nay, chỉ liệt kê ĐÚNG 3 TASK ĐÓ. Tuyệt đối không liệt kê tràn lan các task cũ hay bài viết thông thường.
+   - Phân loại rõ ràng: ⏳ **Việc chưa hoàn thành hôm nay** và ✅ **Việc đã hoàn thành**.
    - Ghi rõ tên trang ghi chú nguồn của từng công việc.
 3. NẾU NGUỜI DÙNG HỎI TỔNG QUAN / HƯỚNG DẪN / TÍNH NĂNG / Ý TƯỞNG:
    - Phân tích chi tiết, giải thích rõ ràng từng tính năng/bước thực hiện theo thứ tự logic.
@@ -391,10 +392,27 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
       });
     });
 
-    const pendingTasks = tasks.filter((t) => !t.isChecked);
-    const completedTasks = tasks.filter((t) => t.isChecked);
+    const isTodayQuery = lowerQ.includes('hôm nay') || lowerQ.includes('today');
+    let displayedTasks = tasks;
+    if (isTodayQuery) {
+      const todayTasks = tasks.filter((t) => {
+        const fullText = (t.title + ' ' + (t.due || '')).toLowerCase();
+        return (
+          fullText.includes('@today') ||
+          fullText.includes('@homnay') ||
+          fullText.includes('hôm nay') ||
+          (t.due && t.due.startsWith(new Date().toISOString().split('T')[0]))
+        );
+      });
+      if (todayTasks.length > 0) {
+        displayedTasks = todayTasks;
+      }
+    }
 
-    resultHtml = `<h3 class="text-sm font-bold text-cyan-300 mt-1 mb-2 border-b border-slate-800 pb-1">📌 Danh Sách Công Việc Toàn Bộ Vault (${tasks.length} công việc)</h3>`;
+    const pendingTasks = displayedTasks.filter((t) => !t.isChecked);
+    const completedTasks = displayedTasks.filter((t) => t.isChecked);
+
+    resultHtml = `<h3 class="text-sm font-bold text-cyan-300 mt-1 mb-2 border-b border-slate-800 pb-1">📌 Danh Sách Công Việc ${isTodayQuery ? 'Hôm Nay' : 'Toàn Bộ Vault'} (${displayedTasks.length} công việc)</h3>`;
     resultHtml += `<p class="text-xs text-slate-300 mb-2">Đã quét <strong>${parsedVault.length} trang ghi chú</strong> trong kho lưu trữ của bạn:</p>`;
 
     if (pendingTasks.length > 0) {
