@@ -71,9 +71,12 @@ export function parsePageToCleanText(page: Page): string {
         dueText = ` (Deadline: ${dueAttr.replace('T', ' ')})`;
       }
 
-      const label = item.textContent?.trim() || '';
+      // Clean pre-existing status tags to prevent tag corruption
+      let label = item.textContent?.trim() || '';
+      label = label.replace(/\[(TASK|CÔNG VIỆC|\s|✅|⏳|ĐÃ|CHƯA|HOÀN|THÀNH)*\]/gi, '').trim();
+
       if (label) {
-        const statusTag = isChecked ? '[TASK ĐÃ HOÀN THÀNH ✅]' : '[TASK CHƯA HOÀN THÀNH ⏳]';
+        const statusTag = isChecked ? '[✅ HOÀN THÀNH]' : '[⏳ CHƯA HOÀN THÀNH]';
         item.textContent = `${statusTag} ${label}${dueText}`;
       }
     });
@@ -112,14 +115,27 @@ export function formatMarkdownToHTML(markdownText: string): string {
 
   let html = markdownText.trim();
 
-  // Clean up raw internal status tags if returned by model
+  // Strip leaked system instruction headers or prompt rules
   html = html
-    .replace(/\[TASK ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
-    .replace(/\[TASK CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
-    .replace(/\[CÔNG VIỆC ĐÃ HOÀN THÀNH\s*✅\]/gi, '✅ ')
-    .replace(/\[CÔNG VIỆC CHƯA HOÀN THÀNH\s*⏳\]/gi, '⏳ ')
-    .replace(/\[✅ ĐÃ HOÀN THÀNH\]/g, '✅ ')
-    .replace(/\[⏳ CHƯA HOÀN THÀNH\]/g, '⏳ ')
+    .split('\n')
+    .filter((line) => {
+      const trimmed = line.trim();
+      if (/^\d+\.\s*(Format Requirements|System|Instruction|Rule|Quy tắc|Yêu cầu|Goal|Role):/i.test(trimmed)) return false;
+      if (/^\*\s*(Format Requirements|System|Instruction|Rule|Quy tắc|Yêu cầu):/i.test(trimmed)) return false;
+      return true;
+    })
+    .join('\n');
+
+  // Clean up any raw internal status tags or broken status fragments
+  html = html
+    .replace(/\[?TASK\s*ĐÃ\s*HOÀN\s*THÀNH\s*✅\]?/gi, '✅ ')
+    .replace(/\[?TASK\s*CHƯA\s*HOÀN\s*THÀNH\s*⏳\]?/gi, '⏳ ')
+    .replace(/\[?CÔNG\s*VIỆC\s*ĐÃ\s*HOÀN\s*THÀNH\s*✅\]?/gi, '✅ ')
+    .replace(/\[?CÔNG\s*VIỆC\s*CHƯA\s*HOÀN\s*THÀNH\s*⏳\]?/gi, '⏳ ')
+    .replace(/\[?✅\s*HOÀN\s*THÀNH\]?/gi, '✅ ')
+    .replace(/\[?⏳\s*CHƯA\s*HOÀN\s*THÀNH\]?/gi, '⏳ ')
+    .replace(/THÀNH\s*⏳\s*\]/gi, '⏳ ')
+    .replace(/THÀNH\s*✅\s*\]/gi, '✅ ')
     .replace(/^"|"$/g, '');
 
   // Convert Markdown headers
