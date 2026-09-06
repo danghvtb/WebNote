@@ -306,28 +306,34 @@ function PageTitleInput({
 }) {
   const inputRef = useRef<HTMLInputElement>(null);
   const isComposingRef = useRef(false);
-  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const currentTitleRef = useRef(initialTitle);
+  const currentPageIdRef = useRef(pageId);
 
-  // Sync value on page switch
+  // Sync value ONLY when switching to a different page ID
   useEffect(() => {
-    if (inputRef.current) {
-      inputRef.current.value = initialTitle;
+    if (currentPageIdRef.current !== pageId) {
+      currentPageIdRef.current = pageId;
+      currentTitleRef.current = initialTitle;
+      if (inputRef.current) {
+        inputRef.current.value = initialTitle;
+      }
     }
   }, [pageId, initialTitle]);
 
   const commitTitle = () => {
     if (!inputRef.current) return;
     const val = inputRef.current.value;
-    onUpdateTitle(pageId, val);
+    if (val !== currentTitleRef.current) {
+      currentTitleRef.current = val;
+      onUpdateTitle(pageId, val);
+    }
   };
 
   const handleInput = () => {
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      if (!isComposingRef.current) {
-        commitTitle();
-      }
-    }, 1000);
+    // Keep local ref updated without triggering external re-renders during typing
+    if (inputRef.current) {
+      currentTitleRef.current = inputRef.current.value;
+    }
   };
 
   const handleCompositionStart = () => {
@@ -336,10 +342,7 @@ function PageTitleInput({
 
   const handleCompositionEnd = () => {
     isComposingRef.current = false;
-    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
-    debounceTimerRef.current = setTimeout(() => {
-      commitTitle();
-    }, 600);
+    commitTitle();
   };
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
