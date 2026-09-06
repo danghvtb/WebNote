@@ -304,25 +304,23 @@ function PageTitleInput({
   onUpdateTitle: (id: string, title: string) => void;
   onEnterKey: () => void;
 }) {
-  const inputRef = useRef<HTMLInputElement>(null);
+  const inputRef = useRef<HTMLDivElement>(null);
   const isComposingRef = useRef(false);
   const currentTitleRef = useRef(initialTitle);
   const currentPageIdRef = useRef(pageId);
 
-  // Sync value ONLY when switching to a different page ID
+  // Sync value on mount and page switch
   useEffect(() => {
-    if (currentPageIdRef.current !== pageId) {
-      currentPageIdRef.current = pageId;
-      currentTitleRef.current = initialTitle;
-      if (inputRef.current) {
-        inputRef.current.value = initialTitle;
-      }
+    currentPageIdRef.current = pageId;
+    currentTitleRef.current = initialTitle;
+    if (inputRef.current) {
+      inputRef.current.innerText = initialTitle;
     }
   }, [pageId, initialTitle]);
 
   const commitTitle = () => {
     if (!inputRef.current) return;
-    const val = inputRef.current.value;
+    const val = inputRef.current.innerText.trim();
     if (val !== currentTitleRef.current) {
       currentTitleRef.current = val;
       onUpdateTitle(pageId, val);
@@ -332,7 +330,7 @@ function PageTitleInput({
   const handleInput = () => {
     // Keep local ref updated without triggering external re-renders during typing
     if (inputRef.current) {
-      currentTitleRef.current = inputRef.current.value;
+      currentTitleRef.current = inputRef.current.innerText.trim();
     }
   };
 
@@ -354,17 +352,17 @@ function PageTitleInput({
   };
 
   return (
-    <input
+    <div
       ref={inputRef}
-      type="text"
-      defaultValue={initialTitle}
+      contentEditable
+      suppressContentEditableWarning
       onInput={handleInput}
       onCompositionStart={handleCompositionStart}
       onCompositionEnd={handleCompositionEnd}
       onBlur={commitTitle}
       onKeyDown={handleKeyDown}
-      placeholder="Untitled Page"
-      className="w-full text-3xl font-extrabold bg-transparent border-none outline-none mb-6 tracking-tight"
+      data-placeholder="Untitled Page"
+      className="w-full text-3xl font-extrabold bg-transparent border-none outline-none mb-6 tracking-tight empty:before:content-[attr(data-placeholder)] empty:before:opacity-40"
       style={{ color: 'var(--color-text-primary)' }}
       aria-label="Page title"
     />
