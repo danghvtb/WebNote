@@ -161,63 +161,9 @@ export function Editor() {
     }
   }, [editor, selectedPage, selectedPageId]);
 
-  // Local state for Page Title to support smooth IME composition (Unikey, EVKey, Gboard, etc.)
-  const [localTitle, setLocalTitle] = useState(selectedPage?.title || '');
-  const isComposingRef = useRef(false);
-  const titleDebounceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Sync local title ONLY when switching to a different page (not on every store update)
-  useEffect(() => {
-    setLocalTitle(selectedPage?.title || '');
-  }, [selectedPageId]);
-
-  // Handle title editing with IME Composition support
-  const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const val = e.target.value;
-    setLocalTitle(val);
-
-    if (!selectedPageId) return;
-
-    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
-
-    titleDebounceRef.current = setTimeout(() => {
-      if (!isComposingRef.current && selectedPageId) {
-        updatePageTitle(selectedPageId, val);
-        queueSync('update', 'page', selectedPageId);
-      }
-    }, 800);
-  };
-
-  const handleCompositionStart = () => {
-    isComposingRef.current = true;
-  };
-
-  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
-    isComposingRef.current = false;
-    const finalVal = (e.target as HTMLInputElement).value;
-    setLocalTitle(finalVal);
-
-    if (!selectedPageId) return;
-    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
-
-    titleDebounceRef.current = setTimeout(() => {
-      if (selectedPageId) {
-        updatePageTitle(selectedPageId, finalVal);
-        queueSync('update', 'page', selectedPageId);
-      }
-    }, 500);
-  };
-
-  const handleTitleBlur = () => {
-    if (!selectedPageId) return;
-    if (titleDebounceRef.current) clearTimeout(titleDebounceRef.current);
-    updatePageTitle(selectedPageId, localTitle);
-    queueSync('update', 'page', selectedPageId);
-  };
-
   // Handle title Enter key → focus editor
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter' && !isComposingRef.current) {
+    if (e.key === 'Enter') {
       e.preventDefault();
       editor?.commands.focus('start');
     }
@@ -282,18 +228,15 @@ export function Editor() {
           )}
 
           {/* Page Title */}
-          <input
-            type="text"
-            value={localTitle}
-            onChange={handleTitleChange}
-            onCompositionStart={handleCompositionStart}
-            onCompositionEnd={handleCompositionEnd}
-            onBlur={handleTitleBlur}
-            onKeyDown={handleTitleKeyDown}
-            placeholder="Untitled Page"
-            className="w-full text-3xl font-extrabold bg-transparent border-none outline-none mb-6 tracking-tight"
-            style={{ color: 'var(--color-text-primary)' }}
-            aria-label="Page title"
+          <PageTitleInput
+            key={selectedPage.id}
+            pageId={selectedPage.id}
+            initialTitle={selectedPage.title}
+            onUpdateTitle={(id, title) => {
+              updatePageTitle(id, title);
+              queueSync('update', 'page', id);
+            }}
+            onEnterKey={() => editor?.commands.focus('start')}
           />
 
           {/* Tiptap Editor */}
@@ -349,5 +292,84 @@ export function Editor() {
       {/* AI Assistant Modal */}
       <AIModal isOpen={aiModalOpen} onClose={() => setAiModalOpen(false)} />
     </div>
+  );
+}
+
+/**
+ * Isolated, Uncontrolled Native Input for Page Title.
+ * Prevents React state re-renders from interrupting Vietnamese Unikey IME Composition events.
+ */
+function PageTitleInput({
+  pageId,
+  initialTitle,
+  onUpdateTitle,
+  onEnterKey,
+}: {
+  pageId: string;
+  initialTitle: string;
+  onUpdateTitle: (id: string, title: string) => void;
+  onEnterKey: () => void;
+}) {
+  const inputRef = useRef<HTMLInputElement>(null);
+  const isComposingRef = useRef(false);
+  const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+  // Sync value on page switch
+  useEffect(() => {
+    if (inputRef.current) {
+      inputRef.current.value = initialTitle;
+    }
+  }, [pageId, initialTitle]);
+
+  const commitTitle = () => {
+    if (!inputRef.current) return;
+    const val = inputRef.current.value;
+    onUpdateTitle(pageId, val);
+  };
+
+  const handleInput = () => {
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      if (!isComposingRef.current) {
+        commitTitle();
+      }
+    }, 1000);
+  };
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = () => {
+    isComposingRef.current = false;
+    if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
+    debounceTimerRef.current = setTimeout(() => {
+      commitTitle();
+    }, 600);
+  };
+
+  const handleKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' && !isComposingRef.current) {
+      e.preventDefault();
+      commitTitle();
+      onEnterKey();
+    }
+  };
+
+  return (
+    <input
+      ref={inputRef}
+      type="text"
+      defaultValue={initialTitle}
+      onInput={handleInput}
+      onCompositionStart={handleCompositionStart}
+      onCompositionEnd={handleCompositionEnd}
+      onBlur={commitTitle}
+      onKeyDown={handleKeyDown}
+      placeholder="Untitled Page"
+      className="w-full text-3xl font-extrabold bg-transparent border-none outline-none mb-6 tracking-tight"
+      style={{ color: 'var(--color-text-primary)' }}
+      aria-label="Page title"
+    />
   );
 }
