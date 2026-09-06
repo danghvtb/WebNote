@@ -161,16 +161,44 @@ export function Editor() {
     }
   }, [editor, selectedPage, selectedPageId]);
 
-  // Handle title editing
+  // Local state for Page Title to support smooth IME composition (Unikey, EVKey, Gboard, etc.)
+  const [localTitle, setLocalTitle] = useState(selectedPage?.title || '');
+  const isComposingRef = useRef(false);
+
+  // Sync local title when selected page changes
+  useEffect(() => {
+    setLocalTitle(selectedPage?.title || '');
+  }, [selectedPageId, selectedPage?.title]);
+
+  // Handle title editing with IME Composition support
   const handleTitleChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const val = e.target.value;
+    setLocalTitle(val);
+
     if (!selectedPageId) return;
-    updatePageTitle(selectedPageId, e.target.value);
+
+    // Only commit store & sync when not in the middle of Vietnamese IME composition
+    if (!isComposingRef.current) {
+      updatePageTitle(selectedPageId, val);
+      queueSync('update', 'page', selectedPageId);
+    }
+  };
+
+  const handleCompositionStart = () => {
+    isComposingRef.current = true;
+  };
+
+  const handleCompositionEnd = (e: React.CompositionEvent<HTMLInputElement>) => {
+    isComposingRef.current = false;
+    if (!selectedPageId) return;
+    const finalVal = (e.target as HTMLInputElement).value;
+    updatePageTitle(selectedPageId, finalVal);
     queueSync('update', 'page', selectedPageId);
   };
 
   // Handle title Enter key → focus editor
   const handleTitleKeyDown = (e: React.KeyboardEvent) => {
-    if (e.key === 'Enter') {
+    if (e.key === 'Enter' && !isComposingRef.current) {
       e.preventDefault();
       editor?.commands.focus('start');
     }
@@ -237,8 +265,10 @@ export function Editor() {
           {/* Page Title */}
           <input
             type="text"
-            value={selectedPage.title}
+            value={localTitle}
             onChange={handleTitleChange}
+            onCompositionStart={handleCompositionStart}
+            onCompositionEnd={handleCompositionEnd}
             onKeyDown={handleTitleKeyDown}
             placeholder="Untitled Page"
             className="w-full text-3xl font-extrabold bg-transparent border-none outline-none mb-6 tracking-tight"
