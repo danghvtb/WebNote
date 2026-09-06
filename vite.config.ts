@@ -8,7 +8,14 @@ export default defineConfig({
     react(),
     tailwindcss(),
   ],
-  // For GitHub Pages: set base to repo name
-  // Update this to match your repository name
   base: '/WebNote/',
+  build: {
+    rollupOptions: {
+      output: {
+        entryFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        chunkFileNames: `assets/[name]-[hash]-${Date.now()}.js`,
+        assetFileNames: `assets/[name]-[hash]-${Date.now()}[extname]`,
+      },
+    },
+  },
 })
