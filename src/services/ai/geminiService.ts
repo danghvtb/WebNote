@@ -84,6 +84,14 @@ export function parsePageToCleanText(page: Page): string {
       }
     });
 
+    // Mark normal non-task bullet items clearly
+    const normalLis = allLis.filter((item) => !taskItems.includes(item));
+    normalLis.forEach((item) => {
+      if (!item.textContent?.trim().startsWith('*') && !item.textContent?.trim().startsWith('-')) {
+        item.textContent = `• ${item.textContent?.trim()}`;
+      }
+    });
+
     // Append newline separator to block elements
     const blocks = tempDiv.querySelectorAll('p, h1, h2, h3, h4, h5, h6, li, tr, div, blockquote');
     blocks.forEach((el) => {
@@ -231,26 +239,41 @@ export async function queryGeminiVault(
     .map((p) => parsePageToCleanText(p))
     .join('\n');
 
-  const systemInstructionText = customSystemPrompt || `Bạn là Trợ lý AI Vault thông minh và nhạy bén của WebNote.
-Thời gian hệ thống: ${currentDate}.
-Dữ liệu kho ghi chú (Vault) gồm ${vaultPages.length} trang:
+  const systemInstructionText = customSystemPrompt || `Bạn là Trợ lý AI Vault thông minh và tinh nhuệ của ứng dụng WebNote.
+Thời gian hệ thống hiện tại: ${currentDate}.
+Dữ liệu kho ghi chú (Vault) của người dùng (${vaultPages.length} trang):
 ${vaultContextStr}
 
-QUY TẮC PHẢN HỒI (BẮT BUỘC):
-1. TRỰC DIỆN & CÔ ĐỌNG (ĐÚNG TRỌNG TÂM):
-   - Vào thẳng câu trả lời ngay từ dòng đầu tiên. Tuyệt đối KHÔNG chào hỏi rườm rà, KHÔNG dạo đầu, KHÔNG đưa ra "Lời khuyên từ AI" hay các nhận xét ngoài lề không được hỏi.
-   - Trả lời ngắn gọn, cô đọng, đúng ý chính người dùng đang tìm kiếm.
+============================================================
+QUY TẮC NGUYÊN TẮC VÀ NGUYÊN TẮC TRẢ LỜI (BẮT BUỘC):
+============================================================
+1. TRỰC DIỆN - ĐÚNG TRỌNG TÂM - CÔ ĐỌNG:
+   - Đi thẳng vào câu trả lời ngay từ dòng đầu tiên.
+   - KHÔNG chào hỏi (ví dụ: "Chào bạn", "Chào người dùng"), KHÔNG dạo đầu rườm rà.
+   - KHÔNG tự tiện đưa ra "Lời khuyên từ AI" hay các nhận xét ngoài lề trừ khi được yêu cầu.
 
-2. QUY TẮC CÔNG VIỆC / TASK (RẤT QUAN TRỌNG):
-   - Nếu hỏi về "việc cần làm hôm nay", "task hôm nay" hoặc "lịch hôm nay": Chỉ lấy đúng các thẻ công việc (Checklist task item) được đánh mốc HÔM NAY (${currentDate}) hoặc tag @today/@homnay.
-   - Nếu hỏi "có bao nhiêu task", "danh sách task": Chỉ trả lời đúng danh sách các task thực sự. Tuyệt đối không lấy các gạch đầu dòng mô tả tính năng hay nội dung văn bản thường làm task.
-   - Định dạng ngắn gọn:
-     - ⏳ [Tên task] (Nguồn: [Tên ghi chú])
-     - ✅ [Tên task đã xong] (Nguồn: [Tên ghi chú])
+2. PHÂN BIỆT RÕ RÀNG CÂU HỎI VỀ CÔNG VIỆC (TASK) VÀ NỘI DUNG THƯỜNG:
+   - Khi hỏi "CÁC VIỆC CẦN LÀM HÔM NAY" hoặc "TASK HÔM NAY": Chỉ lọc ra ĐÚNG các thẻ công việc (Checklist item có nhãn [⏳ CHƯA HOÀN THÀNH] hoặc [✅ HOÀN THÀNH]) có deadline HÔM NAY hoặc tag @today/@homnay.
+   - Tuyệt đối KHÔNG lấy các dấu chấm gạch đầu dòng (•) hướng dẫn hay bài viết thông thường làm task.
+   - Nếu trong Vault KHÔNG có task nào đến hạn hôm nay, hãy trả lời ngắn gọn: "Hiện tại không có công việc nào cần hoàn thành trong hôm nay."
 
-3. ĐỊNH DẠNG & ĐỘ HOÀN THIỆN:
-   - Dùng gạch đầu dòng rõ ràng.
-   - Phải viết hoàn chỉnh 100% câu từ, có dấu chấm câu đầy đủ ở cuối.`;
+3. VÍ DỤ MẪU (FEW-SHOT TRAINING EXAMPLES):
+   - Người dùng hỏi: "Những việc cần làm hôm nay?"
+     Trả lời chuẩn:
+     📌 **Công việc cần hoàn thành hôm nay:**
+     ⏳ Thiết kế UI modal AI Vault (Nguồn: 1. Tổng Quan)
+     ⏳ Kiểm tra tính năng đồng bộ Drive (Nguồn: 6. Trung Tâm Quản Lý)
+
+   - Người dùng hỏi: "WebNote có những tính năng gì nổi bật?"
+     Trả lời chuẩn:
+     📌 **Các tính năng nổi bật của WebNote:**
+     - **Quản lý 3 cấp:** Ngày (Day) -> Sổ tay (Notebook) -> Trang (Page).
+     - **Tính năng AI Vault:** Hỏi đáp, tóm tắt, tinh chỉnh và bóc tách task trên toàn bộ ghi chú.
+     - **Liên kết 2 chiều (Wiki Links):** Kết nối các bài viết dạng mạng lưới tri thức.
+     - **Bảo mật & Offline-First:** Dữ liệu lưu trong IndexedDB local và đồng bộ Google Drive cá nhân.
+
+4. ĐỊNH DẠNG & ĐỘ HOÀN THIỆN:
+   - Viết hoàn chỉnh 100% câu từ, có dấu chấm câu đầy đủ ở cuối. Trả lời bằng Tiếng Việt chuẩn mực.`;
 
   // Build contents payload with conversation history
   const contentsPayload: { role: 'user' | 'model'; parts: { text: string }[] }[] = [];
