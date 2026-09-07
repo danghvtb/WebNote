@@ -6,6 +6,7 @@
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
 import { todayDate } from '../../utils';
+import { formatLunarDateShort } from '../../utils/lunarCalendar';
 
 export function WeekView() {
   const { selectedDate, getFilteredBlocks, setAddModalOpen, setSelectedDate } = useScheduleStore();
@@ -127,15 +128,30 @@ export function WeekView() {
                   <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block uppercase truncate">
                     {day.dayName}
                   </span>
-                  <span
-                    className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[11px] sm:text-xs font-bold mt-0.5 ${
-                      day.isToday
-                        ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                        : 'text-slate-200'
-                    }`}
-                  >
-                    {day.dayNum}
-                  </span>
+                  <div className="flex items-center justify-center gap-1.5 mt-0.5">
+                    <span
+                      className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[11px] sm:text-xs font-bold ${
+                        day.isToday
+                          ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                          : 'text-slate-200'
+                      }`}
+                    >
+                      {day.dayNum}
+                    </span>
+                    {(() => {
+                      const lunarInfo = formatLunarDateShort(day.dateStr);
+                      return (
+                        <span
+                          className={`text-[10px] font-medium ${
+                            lunarInfo.isSpecial ? 'text-amber-400 font-bold' : 'text-slate-400/75'
+                          }`}
+                          title={lunarInfo.holiday ? lunarInfo.holiday : `Âm: ${lunarInfo.shortText}`}
+                        >
+                          {lunarInfo.shortText}
+                        </span>
+                      );
+                    })()}
+                  </div>
                 </div>
                 <button
                   onClick={() => handleSlotClick(day.dateStr, 9)}

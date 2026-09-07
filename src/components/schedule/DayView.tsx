@@ -6,6 +6,7 @@
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
 import { todayDate } from '../../utils';
+import { formatLunarDateFull } from '../../utils/lunarCalendar';
 import type { ScheduleBlock } from '../../types';
 
 const HOUR_HEIGHT = 64; // 64px per hour (approx 1px per minute)
@@ -116,11 +117,17 @@ export function DayView() {
       <div className="max-w-4xl mx-auto w-full space-y-4">
         {/* Header Summary Toolbar */}
         <div className="flex items-center justify-between p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm">
-          <div className="flex items-center gap-2">
-            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping" />
-            <span className="text-xs font-bold text-slate-200">
-              📅 Dòng thời gian ngày: <span className="text-purple-400 font-mono">{selectedDate}</span> ({dayBlocks.length} lịch)
-            </span>
+          <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
+            <div className="flex items-center gap-2">
+              <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping" />
+              <span className="text-xs font-bold text-slate-200">
+                📅 Dòng thời gian ngày: <span className="text-purple-400 font-mono">{selectedDate}</span> ({dayBlocks.length} lịch)
+              </span>
+            </div>
+            <div className="text-[11px] font-medium text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-xl border border-amber-500/20 flex items-center gap-1.5">
+              <span>🌙 Âm lịch:</span>
+              <span>{formatLunarDateFull(selectedDate)}</span>
+            </div>
           </div>
           <button
             onClick={() => setAddModalOpen(true, null, { date: selectedDate, startTime: '09:00' })}

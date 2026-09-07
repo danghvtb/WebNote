@@ -5,6 +5,7 @@
 
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { todayDate } from '../../utils';
+import { formatLunarDateShort } from '../../utils/lunarCalendar';
 
 export function MonthView() {
   const { selectedDate, getFilteredBlocks, setSelectedDate, setViewMode } = useScheduleStore();
@@ -85,32 +86,53 @@ export function MonthView() {
       <div className="flex-1 grid grid-cols-7 overflow-y-auto">
         {daysMatrix.map((cell, idx) => {
           const dayBlocks = blocks.filter((b) => b.date === cell.dateStr);
+          const lunarInfo = formatLunarDateShort(cell.dateStr);
 
           return (
             <div
               key={idx}
               onClick={() => handleCellClick(cell.dateStr)}
-              className={`min-h-[100px] border-r border-b border-slate-800/40 p-2 transition-colors hover:bg-purple-950/20 cursor-pointer ${
+              className={`min-h-[100px] border-r border-b border-slate-800/40 p-2 transition-colors hover:bg-purple-950/20 cursor-pointer flex flex-col justify-between ${
                 !cell.isCurrentMonth ? 'opacity-30 bg-slate-950' : 'bg-slate-900/20'
               } ${cell.isToday ? 'bg-purple-950/30' : ''}`}
             >
-              <div className="flex items-center justify-between mb-1.5">
-                <span
-                  className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
-                    cell.isToday
-                      ? 'bg-purple-600 text-white shadow-md'
-                      : 'text-slate-300'
-                  }`}
-                >
-                  {cell.dayNum}
-                </span>
+              <div>
+                <div className="flex items-center justify-between mb-1.5">
+                  <div className="flex items-center gap-1.5">
+                    <span
+                      className={`inline-flex items-center justify-center w-6 h-6 rounded-full text-xs font-bold ${
+                        cell.isToday
+                          ? 'bg-purple-600 text-white shadow-md'
+                          : 'text-slate-300'
+                      }`}
+                    >
+                      {cell.dayNum}
+                    </span>
+                    <span
+                      className={`text-[10px] font-medium leading-none ${
+                        lunarInfo.isSpecial
+                          ? 'text-amber-400 font-bold bg-amber-500/15 px-1 py-0.5 rounded border border-amber-500/20'
+                          : 'text-slate-400/80'
+                      }`}
+                      title={lunarInfo.holiday ? `Lễ âm lịch: ${lunarInfo.holiday}` : `Ngày âm: ${lunarInfo.shortText}`}
+                    >
+                      {lunarInfo.shortText}
+                    </span>
+                  </div>
 
-                {dayBlocks.length > 0 && (
-                  <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
-                    {dayBlocks.length} lịch
-                  </span>
+                  {dayBlocks.length > 0 && (
+                    <span className="text-[10px] font-bold text-purple-400 bg-purple-500/10 px-1.5 py-0.2 rounded border border-purple-500/20">
+                      {dayBlocks.length} lịch
+                    </span>
+                  )}
+                </div>
+
+                {/* Holiday Badge if present */}
+                {lunarInfo.holiday && (
+                  <div className="mb-1 text-[9.5px] font-bold text-amber-300 bg-amber-500/10 px-1.5 py-0.5 rounded-lg border border-amber-500/20 truncate">
+                    {lunarInfo.holiday}
+                  </div>
                 )}
-              </div>
 
               {/* Preview Blocks */}
               <div className="space-y-1">
@@ -129,6 +151,7 @@ export function MonthView() {
                   </span>
                 )}
               </div>
+            </div>
             </div>
           );
         })}
