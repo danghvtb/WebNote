@@ -109,12 +109,12 @@ export function MonthView() {
                       {cell.dayNum}
                     </span>
                     <span
-                      className={`text-[10px] font-medium leading-none ${
+                      className={`text-[10.5px] font-semibold leading-none ${
                         lunarInfo.isSpecial
-                          ? 'text-amber-400 font-bold bg-amber-500/15 px-1 py-0.5 rounded border border-amber-500/20'
-                          : 'text-slate-400/80'
+                          ? 'text-amber-300 font-bold bg-amber-500/20 px-1.5 py-0.5 rounded-md border border-amber-500/30 shadow-sm'
+                          : 'text-amber-400/90 font-medium'
                       }`}
-                      title={lunarInfo.holiday ? `Lễ âm lịch: ${lunarInfo.holiday}` : `Ngày âm: ${lunarInfo.shortText}`}
+                      title={lunarInfo.holiday ? `Lễ âm lịch: ${lunarInfo.holiday}` : `Ngày âm lịch: ${lunarInfo.shortText}`}
                     >
                       {lunarInfo.shortText}
                     </span>

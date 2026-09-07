@@ -235,18 +235,9 @@ export function formatLunarDateShort(dateStr: string): {
   const lunar = getLunarDateFromStr(dateStr);
   const holiday = getLunarHoliday(lunar.day, lunar.month);
 
-  let dayText = `${lunar.day}`;
-  let isSpecial = false;
-
-  if (lunar.day === 1) {
-    dayText = `1/${lunar.month}`;
-    isSpecial = true;
-  } else if (lunar.day === 15) {
-    dayText = `15/${lunar.month}`;
-    isSpecial = true;
-  }
-
-  const shortText = `${dayText}${lunar.isLeap ? ' (Nhuận)' : ''}`;
+  const isSpecial = lunar.day === 1 || lunar.day === 15 || !!holiday;
+  const dayText = `${lunar.day}/${lunar.month}`;
+  const shortText = `${dayText}${lunar.isLeap ? ' Nhuận' : ''} ÂL`;
 
   return { shortText, dayText, isSpecial, holiday, lunar };
 }
