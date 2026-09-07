@@ -5,7 +5,7 @@
 // ============================================================
 
 import { db } from './db';
-import type { Day, Notebook, Page, SearchEntry, ScheduleBlock } from '../../types';
+import type { Day, Notebook, Page, SearchEntry, ScheduleBlock, CustomUserTask, WorkCategory } from '../../types';
 import {
   generateId,
   dayIdFromDate,
@@ -440,8 +440,10 @@ export async function loadFromDatabase(data: {
   notebooks: Notebook[];
   pages?: Page[];
   scheduleBlocks?: ScheduleBlock[];
+  customTasks?: CustomUserTask[];
+  workCategories?: WorkCategory[];
 }): Promise<void> {
-  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.searchIndex], async () => {
+  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.searchIndex], async () => {
     // Clear existing data
     await db.days.clear();
     await db.notebooks.clear();
@@ -466,6 +468,18 @@ export async function loadFromDatabase(data: {
     if (data.scheduleBlocks?.length) {
       await db.scheduleBlocks.clear();
       await db.scheduleBlocks.bulkPut(data.scheduleBlocks);
+    }
+
+    // Load customTasks if included
+    if (data.customTasks?.length) {
+      await db.customTasks.clear();
+      await db.customTasks.bulkPut(data.customTasks);
+    }
+
+    // Load workCategories if included
+    if (data.workCategories?.length) {
+      await db.workCategories.clear();
+      await db.workCategories.bulkPut(data.workCategories);
     }
 
     // Rebuild search index
@@ -494,11 +508,15 @@ export async function exportDatabase(): Promise<{
   notebooks: Notebook[];
   pages: Page[];
   scheduleBlocks: ScheduleBlock[];
+  customTasks: CustomUserTask[];
+  workCategories: WorkCategory[];
 }> {
   const days = await db.days.toArray();
   const notebooks = await db.notebooks.filter((nb) => !nb.deleted).toArray();
   const pages = await db.pages.filter((p) => !p.deleted).toArray();
   const scheduleBlocks = await db.scheduleBlocks.toArray();
+  const customTasks = await db.customTasks.toArray();
+  const workCategories = await db.workCategories.toArray();
 
   return {
     version: 1,
@@ -507,6 +525,8 @@ export async function exportDatabase(): Promise<{
     notebooks,
     pages,
     scheduleBlocks,
+    customTasks,
+    workCategories,
   };
 }
 

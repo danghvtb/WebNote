@@ -301,6 +301,8 @@ export async function syncFromCloud(): Promise<void> {
       notebooks: dbData.notebooks || [],
       pages: Array.from(pagesMap.values()),
       scheduleBlocks: dbData.scheduleBlocks || [],
+      customTasks: dbData.customTasks || [],
+      workCategories: dbData.workCategories || [],
     });
 
     // Refresh UI immediately so user isn't stuck waiting
@@ -311,6 +313,7 @@ export async function syncFromCloud(): Promise<void> {
       await notesStore.loadDays();
       await notesStore.loadRecentNotebooks();
       await useScheduleStore.getState().loadAllBlocks();
+      await useScheduleStore.getState().loadTasksAndCategories();
     } catch (err) {
       console.warn('[Sync] Fast refresh warning:', err);
     }
@@ -353,6 +356,8 @@ export async function syncFromCloud(): Promise<void> {
           notebooks: dbData.notebooks || [],
           pages: finalPages,
           scheduleBlocks: dbData.scheduleBlocks || [],
+          customTasks: dbData.customTasks || [],
+          workCategories: dbData.workCategories || [],
         });
 
         // Final UI refresh
@@ -363,6 +368,7 @@ export async function syncFromCloud(): Promise<void> {
           await notesStore.loadDays();
           await notesStore.loadRecentNotebooks();
           await useScheduleStore.getState().loadAllBlocks();
+          await useScheduleStore.getState().loadTasksAndCategories();
         } catch (err) {
           console.warn('[Sync] Final refresh warning:', err);
         }

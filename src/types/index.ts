@@ -164,6 +164,28 @@ export interface DriveFileList {
   nextPageToken?: string;
 }
 
+// --- Custom User Task & Work Category Types ---
+
+export interface WorkCategory {
+  id: string;               // Format: "cat_<uuid>"
+  name: string;             // e.g. "Dự án WebNote", "Học tập", "Cá nhân"
+  color: string;            // Hex color code
+  icon?: string;            // Lucide icon name
+  createdAt: string;
+}
+
+export interface CustomUserTask {
+  id: string;               // Format: "utask_<uuid>"
+  title: string;
+  description?: string;
+  categoryId?: string;      // Reference to WorkCategory.id
+  categoryName?: string;
+  status: 'todo' | 'in_progress' | 'completed';
+  dueDate?: string;         // YYYY-MM-DD
+  createdAt: string;
+  updatedAt: string;
+}
+
 // --- Schedule & Time Blocking Types ---
 
 export type RecurrenceFrequency = 'daily' | 'weekly' | 'monthly' | 'weekdays';
@@ -178,6 +200,8 @@ export interface RecurrenceRule {
 export interface ScheduleBlock {
   id: string;               // Format: "sched_<uuid>"
   taskId?: string;          // Direct link to ParsedTask ID (if linked to a note task)
+  customTaskId?: string;    // Direct link to CustomUserTask ID
+  categoryId?: string;      // Direct link to WorkCategory ID
   pageId?: string;          // Reference to Page.id
   notebookId?: string;      // Reference to Notebook.id
   title: string;
@@ -201,4 +225,5 @@ export interface DaySchedule {
   totalEstimatedMinutes: number;
   aiSummary?: string;
 }
+
 

@@ -13,16 +13,18 @@ import { MonthView } from './MonthView';
 import { AddScheduleModal } from './AddScheduleModal';
 import { DailyBriefingModal } from './DailyBriefingModal';
 import { AISchedulePanel } from './AISchedulePanel';
+import { CustomTaskManagerModal } from './CustomTaskManagerModal';
 import { CheckSquare, X } from 'lucide-react';
 
 export function SchedulePage() {
-  const { viewMode, loadAllBlocks } = useScheduleStore();
+  const { viewMode, loadAllBlocks, loadTasksAndCategories } = useScheduleStore();
   const [aiPanelOpen, setAiPanelOpen] = useState(false);
   const [mobileTasksOpen, setMobileTasksOpen] = useState(false);
 
   useEffect(() => {
     loadAllBlocks();
-  }, [loadAllBlocks]);
+    loadTasksAndCategories();
+  }, [loadAllBlocks, loadTasksAndCategories]);
 
   return (
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950">
@@ -81,6 +83,7 @@ export function SchedulePage() {
       {/* Modals & AI Drawer Panels */}
       <AddScheduleModal />
       <DailyBriefingModal />
+      <CustomTaskManagerModal />
       <AISchedulePanel isOpen={aiPanelOpen} onClose={() => setAiPanelOpen(false)} />
     </div>
   );

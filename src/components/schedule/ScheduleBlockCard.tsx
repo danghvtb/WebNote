@@ -13,7 +13,8 @@ interface ScheduleBlockCardProps {
 }
 
 export function ScheduleBlockCard({ block }: ScheduleBlockCardProps) {
-  const { toggleBlock, removeBlock, setAddModalOpen } = useScheduleStore();
+  const { toggleBlock, removeBlock, setAddModalOpen, categories } = useScheduleStore();
+  const category = categories.find((c) => c.id === block.categoryId);
 
   const handleToggle = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -46,25 +47,36 @@ export function ScheduleBlockCard({ block }: ScheduleBlockCardProps) {
       }`}
       style={{
         borderLeftWidth: '4px',
-        borderLeftColor: block.color || '#3b82f6',
+        borderLeftColor: block.color || category?.color || '#3b82f6',
       }}
     >
       <div className="flex items-start justify-between gap-1.5">
-        <div className="flex items-center gap-2 min-w-0">
-          <button
-            onClick={handleToggle}
-            className="text-slate-400 hover:text-purple-400 transition-colors shrink-0"
-          >
-            {block.completed ? (
-              <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-            ) : (
-              <Circle className="w-4 h-4" />
-            )}
-          </button>
+        <div className="flex flex-col min-w-0">
+          <div className="flex items-center gap-2 min-w-0">
+            <button
+              onClick={handleToggle}
+              className="text-slate-400 hover:text-purple-400 transition-colors shrink-0"
+            >
+              {block.completed ? (
+                <CheckCircle2 className="w-4 h-4 text-emerald-400" />
+              ) : (
+                <Circle className="w-4 h-4" />
+              )}
+            </button>
 
-          <span className="text-xs font-semibold text-slate-100 truncate">
-            {block.title}
-          </span>
+            <span className="text-xs font-semibold text-slate-100 truncate">
+              {block.title}
+            </span>
+          </div>
+
+          {category && (
+            <span
+              className="inline-block text-[9px] font-bold px-1.5 py-0.2 rounded mt-1 max-w-[120px] truncate"
+              style={{ backgroundColor: `${category.color}25`, color: category.color }}
+            >
+              {category.name}
+            </span>
+          )}
         </div>
 
         {/* Action icons on hover */}
