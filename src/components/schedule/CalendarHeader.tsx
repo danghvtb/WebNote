@@ -117,12 +117,14 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
 
           {/* Quick Date Picker Popover */}
           {datePickerOpen && (
-            <div className="absolute left-0 top-10 z-50 p-3 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-2 animate-in fade-in zoom-in-95 duration-150 w-64">
+            <div className="absolute left-0 top-11 z-[100] p-3 bg-slate-900 border border-slate-700 rounded-2xl shadow-2xl space-y-2 animate-in fade-in zoom-in-95 duration-150 w-64 text-slate-100">
               <div className="flex items-center justify-between border-b border-slate-800 pb-2">
-                <span className="text-xs font-bold text-purple-300">Chọn Ngày Làm Việc</span>
+                <span className="text-xs font-bold text-purple-300 flex items-center gap-1.5">
+                  <CalendarIcon className="w-3.5 h-3.5 text-purple-400" /> Chọn Ngày Làm Việc
+                </span>
                 <button
                   onClick={() => setDatePickerOpen(false)}
-                  className="text-slate-400 hover:text-white text-xs"
+                  className="text-slate-400 hover:text-white text-xs p-1 rounded hover:bg-slate-800"
                 >
                   ✕
                 </button>
@@ -130,6 +132,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
 
               <input
                 type="date"
+                autoFocus
                 value={selectedDate}
                 onChange={(e) => {
                   if (e.target.value) {
@@ -137,7 +140,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
                     setDatePickerOpen(false);
                   }
                 }}
-                className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
+                className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-700 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500 font-mono cursor-pointer"
               />
             </div>
           )}
