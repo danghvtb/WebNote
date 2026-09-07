@@ -89,7 +89,8 @@ export type SyncStatus =
   | 'offline'
   | 'syncing'
   | 'error'
-  | 'conflict';
+  | 'conflict'
+  | 'auth_required';
 
 export interface SyncOperation {
   id: string;

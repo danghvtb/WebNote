@@ -101,9 +101,10 @@ function AppContent() {
     });
 
     const handleAuthRequired = () => {
+      setSyncStatus('auth_required', 'Phiên đăng nhập đã hết hạn. Vui lòng bấm Kết nối lại.');
       addNotification(
         'warning',
-        'Phiên đồng bộ Google Drive đã hết hạn. Vui lòng nhấn vào avatar/nút đăng nhập để kết nối lại.'
+        'Phiên đồng bộ Google Drive đã hết hạn. Vui lòng bấm "Kết nối lại Drive" ở thanh trên cùng.'
       );
     };
 

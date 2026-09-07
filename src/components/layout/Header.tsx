@@ -37,18 +37,43 @@ export function Header() {
     setUserMenuOpen(false);
   };
 
-  const handleSync = () => {
-    forceSync();
+  const handleSync = async () => {
+    try {
+      if (syncStatus === 'auth_required' || syncStatus === 'error') {
+        const { signIn, fetchUserProfile } = await import('../../services/google/auth');
+        const token = await signIn();
+        const profile = await fetchUserProfile(token);
+        const { setAuth } = useAppStore.getState();
+        setAuth(profile, token);
+      }
+      forceSync();
+    } catch (err) {
+      console.warn('[Header] Re-auth failed:', err);
+    }
   };
 
   const renderSyncStatus = () => {
+    if (syncStatus === 'auth_required') {
+      return (
+        <button
+          onClick={handleSync}
+          className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-semibold bg-amber-500/20 hover:bg-amber-500/30 text-amber-300 border border-amber-500/40 transition-all cursor-pointer animate-pulse"
+          title="Phiên đăng nhập đã hết hạn. Bấm để kết nối lại Google Drive"
+          aria-label="Cần kết nối lại Google Drive"
+        >
+          <AlertTriangle className="w-3.5 h-3.5 text-amber-400" />
+          <span>Kết nối lại Drive</span>
+        </button>
+      );
+    }
+
     const statusConfig: Record<string, { icon: React.ReactNode; text: string; color: string }> = {
       idle: { icon: <Cloud className="w-3.5 h-3.5" />, text: 'Ready', color: 'var(--color-text-tertiary)' },
       saving: { icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />, text: 'Saving...', color: 'var(--color-text-secondary)' },
       saved: { icon: <Check className="w-3.5 h-3.5" />, text: lastSyncTime ? `Saved ${formatTime(lastSyncTime)}` : 'Saved', color: 'var(--color-success)' },
       offline: { icon: <CloudOff className="w-3.5 h-3.5" />, text: 'Offline', color: 'var(--color-warning)' },
       syncing: { icon: <Loader2 className="w-3.5 h-3.5 animate-spin" />, text: 'Syncing...', color: 'var(--color-accent)' },
-      error: { icon: <AlertTriangle className="w-3.5 h-3.5" />, text: 'Sync Error', color: 'var(--color-error)' },
+      error: { icon: <AlertTriangle className="w-3.5 h-3.5" />, text: 'Lỗi đồng bộ', color: 'var(--color-error)' },
       conflict: { icon: <AlertTriangle className="w-3.5 h-3.5" />, text: 'Conflict', color: 'var(--color-warning)' },
     };
 

@@ -209,17 +209,28 @@ export function getAccessToken(): string | null {
 
 /**
  * Ensure we have a valid access token — refresh silently if needed.
+ * If silent refresh is blocked (e.g. Third-party cookie policy), fallback to active sign in.
  */
-export async function ensureAccessToken(): Promise<string> {
+export async function ensureAccessToken(interactiveFallback = false): Promise<string> {
   const token = getAccessToken();
   if (token) return token;
 
-  // Try silent refresh
+  // Try silent refresh first
   try {
     return await signInSilent();
   } catch (err) {
     console.warn('[Auth] Silent token refresh failed:', err);
-    // Notify app that user needs re-authorization if silent refresh is rejected/blocked
+    
+    if (interactiveFallback) {
+      try {
+        console.log('[Auth] Attempting interactive sign-in fallback...');
+        return await signIn();
+      } catch (interactiveErr) {
+        console.error('[Auth] Interactive sign-in failed/cancelled:', interactiveErr);
+      }
+    }
+
+    // Notify app that user needs re-authorization
     window.dispatchEvent(new CustomEvent('mynotes_auth_required'));
     throw new Error('AUTH_REQUIRED');
   }
