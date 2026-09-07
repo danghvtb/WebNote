@@ -43,9 +43,14 @@ const lowlight = createLowlight(common);
 function serializeSliceToPlainText(slice: Slice): string {
   const blocks: string[] = [];
   slice.content.forEach((node: PMNode) => {
-    blocks.push(serializeNodeToPlainText(node, 0));
+    const text = serializeNodeToPlainText(node, 0).trimEnd();
+    if (text) {
+      blocks.push(text);
+    }
   });
-  return blocks.join('\n');
+  // Collapse any 3+ consecutive newlines down to \n\n (max 1 empty line between blocks)
+  const rawText = blocks.join('\n');
+  return rawText.replace(/\n{3,}/g, '\n\n').trim();
 }
 
 function serializeNodeToPlainText(node: PMNode, depth = 0): string {
@@ -61,37 +66,19 @@ function serializeNodeToPlainText(node: PMNode, depth = 0): string {
 
   if (nodeType === 'bulletList' || nodeType === 'orderedList' || nodeType === 'taskList') {
     const items: string[] = [];
+    let listIdx = 1;
     node.forEach((child: PMNode) => {
-      items.push(serializeNodeToPlainText(child, depth));
+      const itemText = serializeListItemNode(child, depth, nodeType, listIdx).trim();
+      if (itemText) {
+        items.push(itemText);
+        listIdx++;
+      }
     });
     return items.join('\n');
   }
 
   if (nodeType === 'listItem' || nodeType === 'taskItem') {
-    const indent = '\t'.repeat(depth);
-    let prefix = '';
-    if (nodeType === 'taskItem') {
-      prefix = node.attrs?.checked ? '[x] ' : '[ ] ';
-    }
-
-    const childLines: string[] = [];
-    node.forEach((child: PMNode) => {
-      if (child.type.name === 'bulletList' || child.type.name === 'orderedList' || child.type.name === 'taskList') {
-        childLines.push(serializeNodeToPlainText(child, depth + 1));
-      } else {
-        childLines.push(serializeNodeToPlainText(child, depth));
-      }
-    });
-
-    const bodyText = childLines.join('\n');
-    return bodyText
-      .split('\n')
-      .map((line, idx) => {
-        if (line.length === 0) return '';
-        if (idx === 0) return `${indent}${prefix}${line}`;
-        return `${indent}${line}`;
-      })
-      .join('\n');
+    return serializeListItemNode(node, depth, 'bulletList', 1);
   }
 
   if (node.isBlock) {
@@ -107,6 +94,40 @@ function serializeNodeToPlainText(node: PMNode, depth = 0): string {
     parts.push(serializeNodeToPlainText(child, depth));
   });
   return parts.join('');
+}
+
+function serializeListItemNode(node: PMNode, depth: number, parentType: string, index: number): string {
+  const indent = '\t'.repeat(depth);
+  let prefix = '';
+
+  if (parentType === 'taskList' || node.type.name === 'taskItem') {
+    prefix = node.attrs?.checked ? '[x] ' : '[ ] ';
+  } else if (parentType === 'orderedList') {
+    prefix = `${index}. `;
+  } else {
+    prefix = '• ';
+  }
+
+  const childParts: string[] = [];
+  node.forEach((child: PMNode) => {
+    if (child.type.name === 'bulletList' || child.type.name === 'orderedList' || child.type.name === 'taskList') {
+      childParts.push(serializeNodeToPlainText(child, depth + 1));
+    } else {
+      childParts.push(serializeNodeToPlainText(child, depth));
+    }
+  });
+
+  const bodyText = childParts.join('\n').trim();
+  if (!bodyText) return '';
+
+  return bodyText
+    .split('\n')
+    .map((line, idx) => {
+      if (line.length === 0) return '';
+      if (idx === 0) return `${indent}${prefix}${line}`;
+      return `${indent}${line}`;
+    })
+    .join('\n');
 }
 
 export function Editor() {
