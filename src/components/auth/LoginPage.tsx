@@ -42,18 +42,12 @@ export function LoginPage() {
 
       if (result.status === 'found') {
         setRootFolderId(result.folderId);
-        setStep('Loading your notes...');
-        await syncFromCloud();
-        const notesStore = useNotesStore.getState();
-        await notesStore.loadDays();
-        await notesStore.loadRecentNotebooks();
-        await notesStore.selectToday();
+        setStep('Clearing local cache...');
+        const { clearAllLocalData } = await import('../../services/database/repository');
+        await clearAllLocalData();
 
-        const { useScheduleStore } = await import('../../stores/scheduleStore');
-        const scheduleStore = useScheduleStore.getState();
-        await scheduleStore.loadAllBlocks();
-        await scheduleStore.loadTasksAndCategories();
-
+        setStep('Downloading your notes from Google Drive...');
+        await syncFromCloud({ isConnectOrLogin: true });
         setInitialized(true);
       } else if (result.status === 'not_found') {
         // Need to ask user to create folder
@@ -63,18 +57,13 @@ export function LoginPage() {
         // Multiple folders — use the first one with database
         const best = result.folders.find((f) => f.hasDatabase) || result.folders[0];
         setRootFolderId(best.id);
-        setStep('Loading your notes...');
-        await syncFromCloud();
-        const notesStore = useNotesStore.getState();
-        await notesStore.loadDays();
-        await notesStore.loadRecentNotebooks();
-        await notesStore.selectToday();
 
-        const { useScheduleStore } = await import('../../stores/scheduleStore');
-        const scheduleStore = useScheduleStore.getState();
-        await scheduleStore.loadAllBlocks();
-        await scheduleStore.loadTasksAndCategories();
+        setStep('Clearing local cache...');
+        const { clearAllLocalData } = await import('../../services/database/repository');
+        await clearAllLocalData();
 
+        setStep('Downloading your notes from Google Drive...');
+        await syncFromCloud({ isConnectOrLogin: true });
         setInitialized(true);
       } else if (result.status === 'error') {
         setError(result.error);

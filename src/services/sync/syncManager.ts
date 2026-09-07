@@ -369,19 +369,29 @@ async function syncPagesFolderIncremental(
 
 /**
  * Full sync from Google Drive to local.
- * Called on login and manual "Sync Now".
+ * Called on login, connect, and manual "Sync Now".
  */
-export async function syncFromCloud(): Promise<void> {
+export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): Promise<void> {
   if (syncInProgress) return;
 
-  // Process pending local sync operations before downloading to prevent overwriting local deletions
-  try {
-    const pendingCount = await db.syncQueue.where('status').equals('pending').count();
-    if (pendingCount > 0) {
-      await triggerSync();
+  // On login or connect: wipe local cache first so no stale local data is pushed up
+  if (options?.isConnectOrLogin) {
+    try {
+      const { clearAllLocalData } = await import('../database/repository');
+      await clearAllLocalData();
+    } catch (err) {
+      console.warn('[Sync] Failed to clear local cache before connect pull:', err);
     }
-  } catch (err) {
-    console.warn('[Sync] Failed to process pending queue before pull:', err);
+  } else {
+    // During active session: process pending local sync queue first
+    try {
+      const pendingCount = await db.syncQueue.where('status').equals('pending').count();
+      if (pendingCount > 0) {
+        await triggerSync();
+      }
+    } catch (err) {
+      console.warn('[Sync] Failed to process pending queue before pull:', err);
+    }
   }
 
   syncInProgress = true;

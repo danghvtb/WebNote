@@ -540,3 +540,33 @@ export async function getAllVaultPages(): Promise<Page[]> {
 export async function getAllVaultNotebooks(): Promise<Notebook[]> {
   return db.notebooks.filter((nb) => !nb.deleted).toArray();
 }
+
+/**
+ * Completely clear all local IndexedDB tables and sync queue.
+ * Used on login, connection, and account switch to prevent stale local cache from overwriting cloud data.
+ */
+export async function clearAllLocalData(): Promise<void> {
+  await db.transaction(
+    'rw',
+    [
+      db.days,
+      db.notebooks,
+      db.pages,
+      db.scheduleBlocks,
+      db.customTasks,
+      db.workCategories,
+      db.searchIndex,
+      db.syncQueue,
+    ],
+    async () => {
+      await db.days.clear();
+      await db.notebooks.clear();
+      await db.pages.clear();
+      await db.scheduleBlocks.clear();
+      await db.customTasks.clear();
+      await db.workCategories.clear();
+      await db.searchIndex.clear();
+      await db.syncQueue.clear();
+    }
+  );
+}

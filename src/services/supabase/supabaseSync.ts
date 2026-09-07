@@ -94,17 +94,26 @@ export async function pushToSupabase(): Promise<void> {
 }
 
 // Pull latest Vault data from Supabase Storage to local Dexie IndexedDB
-export async function syncFromSupabase(): Promise<void> {
+export async function syncFromSupabase(options?: { isConnectOrLogin?: boolean }): Promise<void> {
   if (syncInProgress) return;
 
-  // Process pending local sync operations before downloading to prevent overwriting local deletions
-  try {
-    const pendingCount = await db.syncQueue.where('status').equals('pending').count();
-    if (pendingCount > 0) {
-      await pushToSupabase();
+  if (options?.isConnectOrLogin) {
+    try {
+      const { clearAllLocalData } = await import('../database/repository');
+      await clearAllLocalData();
+    } catch (err) {
+      console.warn('[Supabase Sync] Failed to clear local cache before pull:', err);
     }
-  } catch (err) {
-    console.warn('[Supabase Sync] Failed to push pending queue before pull:', err);
+  } else {
+    // Process pending local sync operations before downloading to prevent overwriting local deletions
+    try {
+      const pendingCount = await db.syncQueue.where('status').equals('pending').count();
+      if (pendingCount > 0) {
+        await pushToSupabase();
+      }
+    } catch (err) {
+      console.warn('[Supabase Sync] Failed to push pending queue before pull:', err);
+    }
   }
 
   if (!isSupabaseConfigured() || !supabase) {

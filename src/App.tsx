@@ -48,7 +48,7 @@ function AppContent() {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
               const { syncFromSupabase } = await import('./services/supabase/supabaseSync');
-              syncFromSupabase();
+              syncFromSupabase({ isConnectOrLogin: true });
             }
           }
         });
@@ -65,9 +65,9 @@ function AppContent() {
             const res = await ensureRootFolder();
             if (res.status === 'found') {
               setRootFolderId(res.folderId);
-              // Perform cloud sync on session restore
+              // Perform cloud sync on session restore (pull-only download from Drive first)
               const { syncFromCloud } = await import('./services/sync/syncManager');
-              await syncFromCloud().catch((err) => console.warn('[App] Cloud sync error:', err));
+              await syncFromCloud({ isConnectOrLogin: true }).catch((err) => console.warn('[App] Cloud sync error:', err));
             }
           } catch (err) {
             console.warn('[App] Background auth/folder init warning:', err);
