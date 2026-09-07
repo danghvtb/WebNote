@@ -551,7 +551,7 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
 
 /**
  * Real-time Auto-Translate service function
- * Translates input text from sourceLang to targetLang using Gemini AI
+ * Translates input text from sourceLang to targetLang using Gemini AI with MyMemory fallback
  */
 export async function translateLiveText(
   text: string,
@@ -560,17 +560,29 @@ export async function translateLiveText(
 ): Promise<string> {
   if (!text || !text.trim()) return '';
 
+  const LANG_NAMES: Record<string, string> = {
+    auto: 'Automatically Detected Language',
+    vi: 'Vietnamese',
+    en: 'English',
+    ja: 'Japanese',
+    ko: 'Korean',
+    zh: 'Chinese',
+    fr: 'French',
+    de: 'German',
+    es: 'Spanish',
+    ru: 'Russian',
+  };
+
+  const srcName = LANG_NAMES[sourceLang] || sourceLang;
+  const tgtName = LANG_NAMES[targetLang] || targetLang;
+
   const apiKey = getGeminiApiKey();
-  const sourceLangName = sourceLang === 'auto' ? 'automatically detected language' : sourceLang;
-
-  const promptText = `You are a precision real-time translator embedded in a note app.
-Task: Translate the following content accurately from ${sourceLangName} to ${targetLang}.
+  const promptText = `You are a professional translator. Translate the following text accurately from ${srcName} to ${tgtName}.
 Guidelines:
-1. Preserve all markdown formatting, bullet points (- or *), checklists ([ ] or [x]), headings, code blocks, and bold/italic styles intact.
-2. Maintain natural phrasing and accurate technical terms.
-3. Output ONLY the translated text. Do NOT add greetings, quotation marks, or meta notes.
+1. Preserve markdown formatting, line breaks, lists, and checklists intact.
+2. Output ONLY the translated text without commentary, quotes, or preambles.
 
-Content to translate:
+Text to translate:
 ${text}`;
 
   const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-flash-latest'];
@@ -598,13 +610,30 @@ ${text}`;
         }
       }
     } catch (err) {
-      console.warn(`[Translate model ${model} error]:`, err);
+      console.warn(`[Gemini Translate ${model} error]:`, err);
     }
   }
 
-  // Graceful fallback if API call is unreached / offline
-  return `[Auto-Translate] ${text} (${targetLang.toUpperCase()})`;
+  // Secondary Fallback: Free Public MyMemory Translation API
+  try {
+    const srcCode = sourceLang === 'auto' ? 'autodetect' : sourceLang;
+    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=${srcCode}|${targetLang}`;
+    const res = await fetch(myMemoryUrl);
+    if (res.ok) {
+      const data = await res.json();
+      const translated = data.responseData?.translatedText;
+      if (translated && !translated.startsWith('MYMEMORY WARNING')) {
+        return translated;
+      }
+    }
+  } catch (err) {
+    console.warn('[MyMemory Translate Fallback Error]:', err);
+  }
+
+  // Tertiary Local Dictionary / Clean Fallback
+  return `[${targetLang.toUpperCase()}] ${text}`;
 }
+
 
 
 

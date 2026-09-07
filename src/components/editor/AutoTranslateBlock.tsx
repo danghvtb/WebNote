@@ -76,10 +76,7 @@ export function AutoTranslateBlock({
 
     debounceTimerRef.current = setTimeout(async () => {
       try {
-        const sourceLabel = LANGUAGE_OPTIONS.find((l) => l.code === sourceLang)?.name || sourceLang;
-        const targetLabel = TARGET_LANGUAGE_OPTIONS.find((l) => l.code === targetLang)?.name || targetLang;
-
-        const result = await translateLiveText(plainText, sourceLabel, targetLabel);
+        const result = await translateLiveText(plainText, sourceLang, targetLang);
         setTranslatedText(result);
       } catch (err) {
         console.error('[AutoTranslateBlock] Translation failed:', err);
