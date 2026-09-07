@@ -192,6 +192,9 @@ body {
   font-size: 19px; /* Increased editor body text by +30% */
   line-height: 1.8;
   color: var(--color-text-primary);
+  white-space: pre-wrap;
+  tab-size: 4;
+  -moz-tab-size: 4;
 }
 
 .tiptap-editor:focus {

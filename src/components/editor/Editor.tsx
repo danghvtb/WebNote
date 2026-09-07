@@ -5,6 +5,7 @@
 
 import { useState, useCallback, useEffect, useRef, memo } from 'react';
 import { useEditor, EditorContent, ReactNodeViewRenderer } from '@tiptap/react';
+import type { Slice, Node as PMNode } from '@tiptap/pm/model';
 import StarterKit from '@tiptap/starter-kit';
 import Underline from '@tiptap/extension-underline';
 import Link from '@tiptap/extension-link';
@@ -34,6 +35,79 @@ import { getPageOverdueCount } from '../../utils/taskUtils';
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
+
+/**
+ * Custom clipboard text serializer to prevent extra blank lines (\n\n)
+ * when pasting into plain text apps (like Notepad) and preserve tab indentations (\t).
+ */
+function serializeSliceToPlainText(slice: Slice): string {
+  const blocks: string[] = [];
+  slice.content.forEach((node: PMNode) => {
+    blocks.push(serializeNodeToPlainText(node, 0));
+  });
+  return blocks.join('\n');
+}
+
+function serializeNodeToPlainText(node: PMNode, depth = 0): string {
+  if (node.isText) {
+    return node.text || '';
+  }
+
+  const nodeType = node.type.name;
+
+  if (nodeType === 'hardBreak') {
+    return '\n';
+  }
+
+  if (nodeType === 'bulletList' || nodeType === 'orderedList' || nodeType === 'taskList') {
+    const items: string[] = [];
+    node.forEach((child: PMNode) => {
+      items.push(serializeNodeToPlainText(child, depth));
+    });
+    return items.join('\n');
+  }
+
+  if (nodeType === 'listItem' || nodeType === 'taskItem') {
+    const indent = '\t'.repeat(depth);
+    let prefix = '';
+    if (nodeType === 'taskItem') {
+      prefix = node.attrs?.checked ? '[x] ' : '[ ] ';
+    }
+
+    const childLines: string[] = [];
+    node.forEach((child: PMNode) => {
+      if (child.type.name === 'bulletList' || child.type.name === 'orderedList' || child.type.name === 'taskList') {
+        childLines.push(serializeNodeToPlainText(child, depth + 1));
+      } else {
+        childLines.push(serializeNodeToPlainText(child, depth));
+      }
+    });
+
+    const bodyText = childLines.join('\n');
+    return bodyText
+      .split('\n')
+      .map((line, idx) => {
+        if (line.length === 0) return '';
+        if (idx === 0) return `${indent}${prefix}${line}`;
+        return `${indent}${line}`;
+      })
+      .join('\n');
+  }
+
+  if (node.isBlock) {
+    const parts: string[] = [];
+    node.forEach((child: PMNode) => {
+      parts.push(serializeNodeToPlainText(child, depth));
+    });
+    return parts.join('');
+  }
+
+  const parts: string[] = [];
+  node.forEach((child: PMNode) => {
+    parts.push(serializeNodeToPlainText(child, depth));
+  });
+  return parts.join('');
+}
 
 export function Editor() {
   const { selectedPageId, pages, updatePageContent, updatePageTitle, selectPage, deletePage } = useNotesStore();
@@ -135,9 +209,53 @@ export function Editor() {
       attributes: {
         class: 'tiptap-editor',
       },
-      handleKeyDown: (_, event) => {
+      clipboardTextSerializer: (slice) => {
+        return serializeSliceToPlainText(slice);
+      },
+      handleKeyDown: (view, event) => {
         if (event.key === '/') {
           setSlashMenuOpen(true);
+        }
+        if (event.key === 'Tab') {
+          event.preventDefault();
+
+          if (event.shiftKey) {
+            if (editor?.can().liftListItem('taskItem')) {
+              editor.chain().focus().liftListItem('taskItem').run();
+              return true;
+            }
+            if (editor?.can().liftListItem('listItem')) {
+              editor.chain().focus().liftListItem('listItem').run();
+              return true;
+            }
+
+            const { state, dispatch } = view;
+            const { selection } = state;
+            const { $from } = selection;
+            const lineStart = $from.start();
+            const lineText = state.doc.textBetween(lineStart, $from.pos);
+
+            if (lineText.startsWith('\t')) {
+              dispatch(state.tr.delete(lineStart, lineStart + 1));
+              return true;
+            } else if (lineText.startsWith('    ')) {
+              dispatch(state.tr.delete(lineStart, lineStart + 4));
+              return true;
+            }
+            return true;
+          } else {
+            if (editor?.can().sinkListItem('taskItem')) {
+              editor.chain().focus().sinkListItem('taskItem').run();
+              return true;
+            }
+            if (editor?.can().sinkListItem('listItem')) {
+              editor.chain().focus().sinkListItem('listItem').run();
+              return true;
+            }
+
+            editor?.chain().focus().insertContent('\t').run();
+            return true;
+          }
         }
         return false;
       },
