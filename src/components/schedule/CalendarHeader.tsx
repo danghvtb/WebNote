@@ -4,6 +4,7 @@
 // ============================================================
 
 // ============================================================
+import { useState } from 'react';
 import {
   ChevronLeft,
   ChevronRight,
@@ -61,7 +62,9 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
     setSelectedDate(todayDate());
   };
 
-  // Format date display
+  const [datePickerOpen, setDatePickerOpen] = useState(false);
+
+  // Helper to format date display
   const formatDateDisplay = () => {
     const d = new Date(selectedDate);
     const dateStr = d.toLocaleDateString('vi-VN', {
@@ -76,7 +79,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
   return (
     <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm gap-2.5">
       {/* Date Navigation Left */}
-      <div className="flex items-center justify-between sm:justify-start gap-2">
+      <div className="flex items-center justify-between sm:justify-start gap-2 relative">
         <div className="flex items-center gap-1.5">
           <button
             onClick={handleToday}
@@ -101,10 +104,44 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
           </div>
         </div>
 
-        <h2 className="text-xs sm:text-sm font-bold text-slate-100 capitalize flex items-center gap-1.5 truncate">
-          <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 shrink-0" />
-          <span className="truncate">{formatDateDisplay()}</span>
-        </h2>
+        {/* Date Title with Interactive Calendar Picker Popup */}
+        <div className="relative">
+          <button
+            onClick={() => setDatePickerOpen(!datePickerOpen)}
+            className="text-xs sm:text-sm font-bold text-slate-100 capitalize flex items-center gap-1.5 hover:bg-slate-800/80 px-2 py-1 rounded-xl border border-transparent hover:border-slate-700 transition-all cursor-pointer truncate"
+            title="Nhấp để mở bộ chọn ngày theo tháng"
+          >
+            <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 shrink-0" />
+            <span className="truncate">{formatDateDisplay()}</span>
+          </button>
+
+          {/* Quick Date Picker Popover */}
+          {datePickerOpen && (
+            <div className="absolute left-0 top-10 z-50 p-3 bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl space-y-2 animate-in fade-in zoom-in-95 duration-150 w-64">
+              <div className="flex items-center justify-between border-b border-slate-800 pb-2">
+                <span className="text-xs font-bold text-purple-300">Chọn Ngày Làm Việc</span>
+                <button
+                  onClick={() => setDatePickerOpen(false)}
+                  className="text-slate-400 hover:text-white text-xs"
+                >
+                  ✕
+                </button>
+              </div>
+
+              <input
+                type="date"
+                value={selectedDate}
+                onChange={(e) => {
+                  if (e.target.value) {
+                    setSelectedDate(e.target.value);
+                    setDatePickerOpen(false);
+                  }
+                }}
+                className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-100 focus:outline-none focus:border-purple-500 font-mono"
+              />
+            </div>
+          )}
+        </div>
       </div>
 
       {/* Right Controls: View Mode Switcher + Action Buttons */}

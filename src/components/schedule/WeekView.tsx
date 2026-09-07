@@ -148,7 +148,7 @@ export function WeekView() {
             ))}
           </div>
 
-          {/* Grid Content */}
+          {/* Grid Content: Simple Vertical List for Each Day */}
           <div className="flex-1">
             <div className="grid grid-cols-7 min-h-full">
               {weekDays.map((day) => {
@@ -157,18 +157,24 @@ export function WeekView() {
                 return (
                   <div
                     key={day.dateStr}
-                    className={`border-r border-slate-800/40 p-1.5 sm:p-2 space-y-1.5 sm:space-y-2 min-h-[500px] flex flex-col justify-between transition-colors hover:bg-slate-900/20 ${
+                    className={`border-r border-slate-800/40 p-2 space-y-2 min-h-[450px] flex flex-col justify-between transition-colors hover:bg-slate-900/20 ${
                       day.isToday ? 'bg-purple-950/10' : ''
                     }`}
                   >
-                    {/* Unsourced or All-Day Blocks */}
-                    <div className="space-y-1.5 sm:space-y-2 flex-1">
-                      {dayBlocks.map((block) => (
-                        <ScheduleBlockCard key={block.id} block={block} />
-                      ))}
+                    {/* List of Events */}
+                    <div className="space-y-2 flex-1">
+                      {dayBlocks.length > 0 ? (
+                        dayBlocks.map((block) => (
+                          <ScheduleBlockCard key={block.id} block={block} />
+                        ))
+                      ) : (
+                        <div className="py-8 text-center text-[10px] text-slate-600 font-semibold italic">
+                          Chưa có lịch
+                        </div>
+                      )}
                     </div>
 
-                    {/* Always visible Quick Add Button at bottom of column */}
+                    {/* Quick Add Button at bottom of column */}
                     <button
                       onClick={() => handleSlotClick(day.dateStr, 9)}
                       className="w-full py-1.5 rounded-xl border border-dashed border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/10 text-slate-500 hover:text-purple-300 transition-all flex items-center justify-center text-[11px] font-semibold cursor-pointer group mt-2"
