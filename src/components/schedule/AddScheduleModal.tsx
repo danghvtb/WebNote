@@ -47,12 +47,22 @@ export function AddScheduleModal() {
       setCompleted(editingBlock.completed || false);
       setSelectedCustomTaskId(editingBlock.customTaskId || '');
       setSelectedCategoryId(editingBlock.categoryId || '');
-    } else if (selectedTimeSlot) {
+    } else {
+      const targetDate = selectedTimeSlot?.date || todayDate();
+      const existingSameDayBlocks = useScheduleStore.getState().blocks.filter((b) => b.date === targetDate);
+      const usedColors = new Set(existingSameDayBlocks.map((b) => b.color).filter(Boolean));
+      
+      const PALETTE = ['#3b82f6', '#a855f7', '#f59e0b', '#10b981', '#f43f5e', '#06b6d4', '#ec4899', '#8b5cf6', '#6366f1'];
+      const availableColors = PALETTE.filter((c) => !usedColors.has(c));
+      const autoColor = availableColors.length > 0
+        ? availableColors[Math.floor(Math.random() * availableColors.length)]
+        : PALETTE[Math.floor(Math.random() * PALETTE.length)];
+
       setTitle('');
       setDescription('');
-      setDate(selectedTimeSlot.date || todayDate());
-      setStartTime(selectedTimeSlot.startTime || '09:00');
-      if (selectedTimeSlot.startTime) {
+      setDate(targetDate);
+      setStartTime(selectedTimeSlot?.startTime || '09:00');
+      if (selectedTimeSlot?.startTime) {
         const [h, m] = selectedTimeSlot.startTime.split(':').map(Number);
         const endH = (h + 1) % 24;
         setEndTime(`${endH.toString().padStart(2, '0')}:${m.toString().padStart(2, '0')}`);
@@ -60,19 +70,7 @@ export function AddScheduleModal() {
         setEndTime('10:00');
       }
       setPriority('medium');
-      setColor('#3b82f6');
-      setRecurrence('none');
-      setCompleted(false);
-      setSelectedCustomTaskId('');
-      setSelectedCategoryId('');
-    } else {
-      setTitle('');
-      setDescription('');
-      setDate(todayDate());
-      setStartTime('09:00');
-      setEndTime('10:00');
-      setPriority('medium');
-      setColor('#3b82f6');
+      setColor(autoColor);
       setRecurrence('none');
       setCompleted(false);
       setSelectedCustomTaskId('');

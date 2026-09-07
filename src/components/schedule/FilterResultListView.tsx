@@ -7,7 +7,7 @@ import { Calendar, Tag, CheckCircle2, RotateCcw, AlertCircle } from 'lucide-reac
 import { useScheduleStore } from '../../stores/scheduleStore';
 
 export function FilterResultListView() {
-  const { getFilteredBlocks, categories, customTasks, resetSearchFilter } = useScheduleStore();
+  const { getFilteredBlocks, categories, customTasks, resetSearchFilter, setAddModalOpen } = useScheduleStore();
   const filteredBlocks = getFilteredBlocks();
 
   return (
@@ -62,7 +62,8 @@ export function FilterResultListView() {
               return (
                 <div
                   key={block.id}
-                  className="p-4 bg-slate-900 border border-slate-800/80 rounded-2xl space-y-3 hover:border-purple-500/40 transition-all shadow-md group relative overflow-hidden"
+                  onClick={() => setAddModalOpen(true, block)}
+                  className="p-4 bg-slate-900 border border-slate-800/80 rounded-2xl space-y-3 hover:border-purple-500/50 hover:bg-slate-850 cursor-pointer transition-all shadow-md group relative overflow-hidden"
                   style={{ borderLeft: `4px solid ${block.color || '#3b82f6'}` }}
                 >
                   <div className="flex items-start justify-between gap-2">
