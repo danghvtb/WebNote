@@ -1,129 +1,215 @@
 // ============================================================
-// MyNotes — DayView Single-Day Timeline Component
-// Detailed hourly time slots for a single selected date
+// MyNotes — DayView Premium Continuous Timeline Component
+// Google Calendar / Outlook style absolute positioning canvas
 // ============================================================
 
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
+import { todayDate } from '../../utils';
+import type { ScheduleBlock } from '../../types';
+
+const HOUR_HEIGHT = 64; // 64px per hour (approx 1px per minute)
+const START_HOUR = 6;  // Timeline starts at 06:00
+const END_HOUR = 23;   // Timeline ends at 23:00
+const TOTAL_HOURS = END_HOUR - START_HOUR + 1;
 
 export function DayView() {
   const { selectedDate, getFilteredBlocks, setAddModalOpen } = useScheduleStore();
   const dayBlocks = getFilteredBlocks().filter((b) => b.date === selectedDate);
-  const hours = Array.from({ length: 16 }, (_, i) => i + 7); // 07:00 to 22:00
+  const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 
-  const handleSlotClick = (hour: number) => {
-    const startTime = `${hour.toString().padStart(2, '0')}:00`;
+  // Helper to convert "HH:mm" to minutes from START_HOUR
+  const getMinutesFromStart = (timeStr?: string, defaultHour = 9): number => {
+    if (!timeStr) return (defaultHour - START_HOUR) * 60;
+    const [h, m] = timeStr.split(':').map(Number);
+    const hourVal = isNaN(h) ? defaultHour : h;
+    const minVal = isNaN(m) ? 0 : m;
+    return Math.max(0, (hourVal - START_HOUR) * 60 + minVal);
+  };
+
+  // Helper to calculate overlap groups and column positions
+  const computePositionedBlocks = (blocks: ScheduleBlock[]) => {
+    const parsed = blocks.map((block) => {
+      const startMin = getMinutesFromStart(block.startTime, 9);
+      let endMin = getMinutesFromStart(block.endTime, 10);
+      if (endMin <= startMin) endMin = startMin + 60; // minimum 60 mins if invalid
+      return {
+        block,
+        startMin,
+        endMin,
+        durationMins: endMin - startMin,
+        colIndex: 0,
+        totalCols: 1,
+      };
+    });
+
+    // Sort by startMin asc, duration desc
+    parsed.sort((a, b) => a.startMin - b.startMin || b.durationMins - a.durationMins);
+
+    // Group overlapping blocks
+    const clusters: typeof parsed[] = [];
+    let currentCluster: typeof parsed = [];
+    let clusterEnd = -1;
+
+    for (const item of parsed) {
+      if (currentCluster.length === 0) {
+        currentCluster.push(item);
+        clusterEnd = item.endMin;
+      } else if (item.startMin < clusterEnd) {
+        currentCluster.push(item);
+        clusterEnd = Math.max(clusterEnd, item.endMin);
+      } else {
+        clusters.push(currentCluster);
+        currentCluster = [item];
+        clusterEnd = item.endMin;
+      }
+    }
+    if (currentCluster.length > 0) {
+      clusters.push(currentCluster);
+    }
+
+    // Assign column indices per cluster
+    for (const cluster of clusters) {
+      const columns: typeof parsed = [];
+
+      for (const item of cluster) {
+        let col = 0;
+        while (columns[col] && columns[col].endMin > item.startMin) {
+          col++;
+        }
+        item.colIndex = col;
+        columns[col] = item;
+      }
+
+      const totalCols = Math.max(...cluster.map((i) => i.colIndex)) + 1;
+      for (const item of cluster) {
+        item.totalCols = totalCols;
+      }
+    }
+
+    return parsed;
+  };
+
+  const positionedBlocks = computePositionedBlocks(dayBlocks);
+
+  const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
+    // Prevent trigger if clicking on an event card
+    if ((e.target as HTMLElement).closest('.event-card-container')) return;
+
+    const rect = e.currentTarget.getBoundingClientRect();
+    const offsetY = e.clientY - rect.top;
+    const clickedHour = Math.floor(offsetY / HOUR_HEIGHT) + START_HOUR;
+    const clampedHour = Math.min(Math.max(clickedHour, START_HOUR), END_HOUR);
+    const startTime = `${clampedHour.toString().padStart(2, '0')}:00`;
     setAddModalOpen(true, null, { date: selectedDate, startTime });
   };
 
-  // Helper to parse HH:mm into floating hour number (e.g. "08:30" => 8.5)
-  const parseHourNum = (timeStr?: string, defaultHour = 9) => {
-    if (!timeStr) return defaultHour;
-    const [h, m] = timeStr.split(':').map(Number);
-    return (h || 0) + (m || 0) / 60;
-  };
+  // Current time line calculation
+  const now = new Date();
+  const isTodaySelected = selectedDate === todayDate();
+  const currentHour = now.getHours();
+  const currentMin = now.getMinutes();
+  const nowTop = (currentHour - START_HOUR) * HOUR_HEIGHT + (currentMin / 60) * HOUR_HEIGHT;
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-4 sm:p-6">
-      <div className="max-w-4xl mx-auto w-full space-y-3">
-        {/* Quick Add Button Header for DayView */}
-        <div className="flex items-center justify-between p-3.5 bg-slate-900/80 border border-slate-800 rounded-2xl mb-4">
-          <span className="text-xs font-bold text-slate-300">
-            📅 Lịch trình ngày: <span className="text-purple-400 font-mono">{selectedDate}</span> ({dayBlocks.length} lịch)
-          </span>
+    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-4 sm:p-6 select-none">
+      <div className="max-w-4xl mx-auto w-full space-y-4">
+        {/* Header Summary Toolbar */}
+        <div className="flex items-center justify-between p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm">
+          <div className="flex items-center gap-2">
+            <span className="w-2.5 h-2.5 rounded-full bg-purple-500 animate-ping" />
+            <span className="text-xs font-bold text-slate-200">
+              📅 Dòng thời gian ngày: <span className="text-purple-400 font-mono">{selectedDate}</span> ({dayBlocks.length} lịch)
+            </span>
+          </div>
           <button
-            onClick={() => handleSlotClick(9)}
-            className="px-3.5 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-md cursor-pointer flex items-center gap-1"
+            onClick={() => setAddModalOpen(true, null, { date: selectedDate, startTime: '09:00' })}
+            className="px-4 py-2 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl transition-all shadow-md shadow-purple-600/25 cursor-pointer flex items-center gap-1.5"
           >
-            + Thêm Lịch Ngày Này
+            + Thêm Lịch Mới
           </button>
         </div>
 
-        {hours.map((hour) => {
-          const hourStr = `${hour.toString().padStart(2, '0')}:00`;
-          
-          // Blocks starting in this hour
-          const startingBlocks = dayBlocks.filter((b) => {
-            const start = parseHourNum(b.startTime, 9);
-            return Math.floor(start) === hour;
-          });
+        {/* Timeline Canvas Container */}
+        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-6 relative shadow-inner overflow-hidden">
+          {/* Background Hourly Grid Lines & Labels */}
+          <div
+            className="relative cursor-pointer"
+            style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}
+            onClick={handleCanvasClick}
+          >
+            {hours.map((hour) => {
+              const topPos = (hour - START_HOUR) * HOUR_HEIGHT;
+              const hourStr = `${hour.toString().padStart(2, '0')}:00`;
 
-          // Blocks spanning over this hour (started earlier, ending after this hour)
-          const spanningBlocks = dayBlocks.filter((b) => {
-            const start = parseHourNum(b.startTime, 9);
-            const end = b.endTime ? parseHourNum(b.endTime, start + 1) : start + 1;
-            return Math.floor(start) < hour && end > hour;
-          });
+              return (
+                <div
+                  key={hour}
+                  className="absolute left-0 right-0 border-t border-slate-800/50 flex items-start group"
+                  style={{ top: topPos, height: HOUR_HEIGHT }}
+                >
+                  {/* Hour Label */}
+                  <span className="text-[11px] font-mono font-bold text-slate-500 -mt-2.5 w-12 sm:w-14 shrink-0 bg-slate-950/40 px-1 rounded">
+                    {hourStr}
+                  </span>
 
-          return (
-            <div key={hour} className="flex gap-3 sm:gap-4 group">
-              {/* Hour Label */}
-              <div className="w-14 sm:w-16 pt-1 text-right text-xs font-mono font-bold text-slate-500 shrink-0">
-                {hourStr}
-              </div>
+                  {/* Half-hour dashed line */}
+                  <div
+                    className="absolute left-14 right-0 border-t border-dashed border-slate-800/30"
+                    style={{ top: HOUR_HEIGHT / 2 }}
+                  />
 
-              {/* Slot Container */}
+                  {/* Click Hover Helper Text */}
+                  <div className="ml-14 flex-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center text-[10px] font-semibold text-purple-400/80 pt-1">
+                    + Click để tạo lịch lúc {hourStr}
+                  </div>
+                </div>
+              );
+            })}
+
+            {/* Red Indicator Line for Current Time */}
+            {isTodaySelected && currentHour >= START_HOUR && currentHour <= END_HOUR && (
               <div
-                onClick={(e) => {
-                  // Only click slot if not clicking a card
-                  if ((e.target as HTMLElement).closest('.schedule-card')) return;
-                  handleSlotClick(hour);
-                }}
-                className="flex-1 min-h-[68px] p-2 bg-slate-900/40 border border-slate-800/60 hover:border-purple-500/40 rounded-2xl transition-all cursor-pointer relative flex flex-col justify-center"
+                className="absolute left-12 right-0 border-t-2 border-rose-500 z-30 flex items-center pointer-events-none"
+                style={{ top: nowTop }}
               >
-                {/* Overlapping Multi-Column Grid */}
-                {startingBlocks.length + spanningBlocks.length > 0 ? (
-                  <div className={`grid gap-2 w-full ${
-                    startingBlocks.length + spanningBlocks.length > 1
-                      ? 'grid-cols-1 sm:grid-cols-2 lg:grid-cols-3'
-                      : 'grid-cols-1'
-                  }`}>
-                    {/* Starting Blocks */}
-                    {startingBlocks.map((block) => {
-                      const start = parseHourNum(block.startTime, hour);
-                      const end = block.endTime ? parseHourNum(block.endTime, start + 1) : start + 1;
-                      const durationHours = Math.max(1, Math.round(end - start));
-
-                      return (
-                        <div key={block.id} className="schedule-card flex-1 min-w-0">
-                          <div className="flex items-center justify-between mb-1">
-                            <span className="text-[10px] font-bold text-purple-300 font-mono bg-purple-950/60 px-2 py-0.5 rounded border border-purple-500/30 truncate">
-                              ⏱️ {block.startTime || '09:00'} - {block.endTime || '10:00'} ({durationHours}h)
-                            </span>
-                          </div>
-                          <ScheduleBlockCard block={block} />
-                        </div>
-                      );
-                    })}
-
-                    {/* Spanning Indicator */}
-                    {spanningBlocks.map((block) => (
-                      <div
-                        key={`span_${block.id}`}
-                        className="p-2.5 rounded-xl border border-dashed border-purple-500/30 bg-purple-950/20 flex flex-col justify-between text-xs text-purple-300 schedule-card flex-1 min-w-0 shadow-sm"
-                      >
-                        <div className="flex items-center justify-between text-[10px] font-bold text-purple-400 font-mono mb-1">
-                          <span className="flex items-center gap-1">
-                            <span className="w-2 h-2 rounded-full bg-purple-400 animate-pulse shrink-0" />
-                            Đang diễn ra ({block.startTime} - {block.endTime})
-                          </span>
-                        </div>
-                        <p className="font-bold text-xs text-slate-200 truncate">{block.title}</p>
-                      </div>
-                    ))}
-                  </div>
-                ) : (
-                  /* Empty Slot Hover Hint */
-                  <div className="h-full flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                    <span className="text-[11px] font-semibold text-purple-400">
-                      + Thêm lịch lúc {hourStr}
-                    </span>
-                  </div>
-                )}
+                <div className="w-2.5 h-2.5 rounded-full bg-rose-500 -ml-1.25 shadow-md shadow-rose-500/50 animate-pulse" />
+                <span className="text-[9px] font-mono font-bold text-rose-300 bg-rose-950 px-1.5 py-0.5 rounded border border-rose-500/40 ml-2">
+                  Hiện tại {now.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                </span>
               </div>
+            )}
+
+            {/* Absolute Positioned Events Layer */}
+            <div className="absolute left-14 sm:left-16 right-0 top-0 bottom-0 pointer-events-none">
+              {positionedBlocks.map(({ block, startMin, durationMins, colIndex, totalCols }) => {
+                const topPx = (startMin / 60) * HOUR_HEIGHT;
+                const heightPx = Math.max(38, (durationMins / 60) * HOUR_HEIGHT - 4); // gap of 4px
+
+                // Calculate horizontal position & width percentage for overlapping blocks
+                const widthPercent = 100 / totalCols;
+                const leftPercent = colIndex * widthPercent;
+
+                return (
+                  <div
+                    key={block.id}
+                    className="absolute pointer-events-auto transition-all duration-200 event-card-container px-1 overflow-hidden"
+                    style={{
+                      top: topPx,
+                      height: heightPx,
+                      left: `${leftPercent}%`,
+                      width: `${widthPercent}%`,
+                    }}
+                  >
+                    <div className="h-full w-full overflow-hidden">
+                      <ScheduleBlockCard block={block} />
+                    </div>
+                  </div>
+                );
+              })}
             </div>
-          );
-        })}
+          </div>
+        </div>
       </div>
     </div>
   );
