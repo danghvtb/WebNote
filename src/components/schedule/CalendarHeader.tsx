@@ -62,76 +62,85 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
   };
 
   return (
-    <div className="flex items-center justify-between px-6 py-3.5 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm gap-2.5">
       {/* Date Navigation Left */}
-      <div className="flex items-center gap-3">
-        <button
-          onClick={handleToday}
-          className="px-3 py-1.5 text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-colors"
-        >
-          Hôm Nay
-        </button>
+      <div className="flex items-center justify-between sm:justify-start gap-2">
+        <div className="flex items-center gap-1.5">
+          <button
+            onClick={handleToday}
+            className="px-2.5 py-1 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold text-slate-200 bg-slate-800 hover:bg-slate-700 rounded-xl border border-slate-700 transition-colors"
+          >
+            Hôm Nay
+          </button>
 
-        <div className="flex items-center gap-1">
-          <button
-            onClick={handlePrev}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5" />
-          </button>
-          <button
-            onClick={handleNext}
-            className="p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
-          >
-            <ChevronRight className="w-5 h-5" />
-          </button>
+          <div className="flex items-center gap-0.5">
+            <button
+              onClick={handlePrev}
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+            <button
+              onClick={handleNext}
+              className="p-1 sm:p-1.5 text-slate-400 hover:text-slate-200 hover:bg-slate-800 rounded-lg transition-colors"
+            >
+              <ChevronRight className="w-4 h-4 sm:w-5 sm:h-5" />
+            </button>
+          </div>
         </div>
 
-        <h2 className="text-sm font-bold text-slate-100 capitalize flex items-center gap-2">
-          <CalendarIcon className="w-4 h-4 text-purple-400" />
-          {formatDateDisplay()}
+        <h2 className="text-xs sm:text-sm font-bold text-slate-100 capitalize flex items-center gap-1.5 truncate">
+          <CalendarIcon className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-purple-400 shrink-0" />
+          <span className="truncate">{formatDateDisplay()}</span>
         </h2>
       </div>
 
-      {/* Center View Mode Switcher */}
-      <div className="flex items-center p-1 bg-slate-950 border border-slate-800 rounded-xl">
-        {(['day', 'week', 'month'] as ScheduleViewMode[]).map((mode) => (
+      {/* Right Controls: View Mode Switcher + Action Buttons */}
+      <div className="flex items-center justify-between sm:justify-end gap-2">
+        {/* Center View Mode Switcher */}
+        <div className="flex items-center p-0.5 sm:p-1 bg-slate-950 border border-slate-800 rounded-xl">
+          {(['day', 'week', 'month'] as ScheduleViewMode[]).map((mode) => (
+            <button
+              key={mode}
+              onClick={() => setViewMode(mode)}
+              className={`px-2 py-1 sm:px-3 sm:py-1 text-[11px] sm:text-xs font-bold capitalize rounded-lg transition-all ${
+                viewMode === mode
+                  ? 'bg-purple-600 text-white shadow-md'
+                  : 'text-slate-400 hover:text-slate-200'
+              }`}
+            >
+              {mode === 'day' ? 'Ngày' : mode === 'week' ? 'Tuần' : 'Tháng'}
+            </button>
+          ))}
+        </div>
+
+        <div className="flex items-center gap-1.5">
           <button
-            key={mode}
-            onClick={() => setViewMode(mode)}
-            className={`px-3 py-1 text-xs font-bold capitalize rounded-lg transition-all ${
-              viewMode === mode
-                ? 'bg-purple-600 text-white shadow-md'
-                : 'text-slate-400 hover:text-slate-200'
-            }`}
+            onClick={() => setDailyBriefingOpen(true)}
+            className="p-1.5 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-all flex items-center gap-1"
+            title="Daily Briefing"
           >
-            {mode === 'day' ? 'Ngày' : mode === 'week' ? 'Tuần' : 'Tháng'}
+            <Sun className="w-4 h-4 text-amber-400" />
+            <span className="hidden md:inline">Briefing</span>
           </button>
-        ))}
-      </div>
 
-      {/* Right Action Buttons */}
-      <div className="flex items-center gap-2.5">
-        <button
-          onClick={() => setDailyBriefingOpen(true)}
-          className="px-3.5 py-1.5 text-xs font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-all flex items-center gap-1.5"
-        >
-          <Sun className="w-4 h-4 text-amber-400" /> Daily Briefing
-        </button>
+          <button
+            onClick={onOpenAIPanel}
+            className="p-1.5 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-bold text-purple-200 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 border border-purple-500/40 rounded-xl transition-all flex items-center gap-1"
+            title="AI Optimizer"
+          >
+            <Sparkles className="w-4 h-4 text-purple-400" />
+            <span className="hidden md:inline">AI Optimizer</span>
+          </button>
 
-        <button
-          onClick={onOpenAIPanel}
-          className="px-3.5 py-1.5 text-xs font-bold text-purple-200 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 hover:to-indigo-800/80 border border-purple-500/40 rounded-xl transition-all flex items-center gap-1.5 shadow-sm"
-        >
-          <Sparkles className="w-4 h-4 text-purple-400" /> AI Optimizer
-        </button>
-
-        <button
-          onClick={() => setAddModalOpen(true)}
-          className="px-4 py-1.5 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-lg shadow-purple-600/20 transition-all flex items-center gap-1.5"
-        >
-          <Plus className="w-4 h-4" /> Thêm Lịch
-        </button>
+          <button
+            onClick={() => setAddModalOpen(true)}
+            className="p-1.5 sm:px-4 sm:py-1.5 text-[11px] sm:text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-lg shadow-purple-600/20 transition-all flex items-center gap-1"
+          >
+            <Plus className="w-4 h-4" />
+            <span className="hidden sm:inline">Thêm Lịch</span>
+          </button>
+        </div>
       </div>
     </div>
   );
