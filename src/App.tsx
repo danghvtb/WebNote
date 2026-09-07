@@ -65,19 +65,29 @@ function AppContent() {
             const res = await ensureRootFolder();
             if (res.status === 'found') {
               setRootFolderId(res.folderId);
+              // Perform cloud sync on session restore
+              const { syncFromCloud } = await import('./services/sync/syncManager');
+              await syncFromCloud().catch((err) => console.warn('[App] Cloud sync error:', err));
             }
           } catch (err) {
             console.warn('[App] Background auth/folder init warning:', err);
           }
         });
 
-        // Auto load notes from IndexedDB
-        import('./stores/notesStore').then(({ useNotesStore }) => {
-          const notesStore = useNotesStore.getState();
-          notesStore.loadDays();
-          notesStore.loadRecentNotebooks();
-          notesStore.selectToday();
-        });
+        // Auto load notes and schedule from IndexedDB
+        Promise.all([
+          import('./stores/notesStore').then(({ useNotesStore }) => {
+            const notesStore = useNotesStore.getState();
+            notesStore.loadDays();
+            notesStore.loadRecentNotebooks();
+            notesStore.selectToday();
+          }),
+          import('./stores/scheduleStore').then(({ useScheduleStore }) => {
+            const scheduleStore = useScheduleStore.getState();
+            scheduleStore.loadAllBlocks();
+            scheduleStore.loadTasksAndCategories();
+          }),
+        ]);
 
         setInitialized(true);
       } catch (err) {

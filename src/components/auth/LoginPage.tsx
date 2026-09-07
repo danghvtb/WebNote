@@ -48,6 +48,12 @@ export function LoginPage() {
         await notesStore.loadDays();
         await notesStore.loadRecentNotebooks();
         await notesStore.selectToday();
+
+        const { useScheduleStore } = await import('../../stores/scheduleStore');
+        const scheduleStore = useScheduleStore.getState();
+        await scheduleStore.loadAllBlocks();
+        await scheduleStore.loadTasksAndCategories();
+
         setInitialized(true);
       } else if (result.status === 'not_found') {
         // Need to ask user to create folder
@@ -63,6 +69,12 @@ export function LoginPage() {
         await notesStore.loadDays();
         await notesStore.loadRecentNotebooks();
         await notesStore.selectToday();
+
+        const { useScheduleStore } = await import('../../stores/scheduleStore');
+        const scheduleStore = useScheduleStore.getState();
+        await scheduleStore.loadAllBlocks();
+        await scheduleStore.loadTasksAndCategories();
+
         setInitialized(true);
       } else if (result.status === 'error') {
         setError(result.error);
