@@ -549,4 +549,62 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
   };
 }
 
+/**
+ * Real-time Auto-Translate service function
+ * Translates input text from sourceLang to targetLang using Gemini AI
+ */
+export async function translateLiveText(
+  text: string,
+  sourceLang: string = 'auto',
+  targetLang: string = 'en'
+): Promise<string> {
+  if (!text || !text.trim()) return '';
+
+  const apiKey = getGeminiApiKey();
+  const sourceLangName = sourceLang === 'auto' ? 'automatically detected language' : sourceLang;
+
+  const promptText = `You are a precision real-time translator embedded in a note app.
+Task: Translate the following content accurately from ${sourceLangName} to ${targetLang}.
+Guidelines:
+1. Preserve all markdown formatting, bullet points (- or *), checklists ([ ] or [x]), headings, code blocks, and bold/italic styles intact.
+2. Maintain natural phrasing and accurate technical terms.
+3. Output ONLY the translated text. Do NOT add greetings, quotation marks, or meta notes.
+
+Content to translate:
+${text}`;
+
+  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-flash-latest'];
+
+  for (const model of modelsToTry) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: promptText }] }],
+          generationConfig: {
+            temperature: 0.1,
+            maxOutputTokens: 4096,
+          },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const output = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (output && output.trim()) {
+          return output.trim();
+        }
+      }
+    } catch (err) {
+      console.warn(`[Translate model ${model} error]:`, err);
+    }
+  }
+
+  // Graceful fallback if API call is unreached / offline
+  return `[Auto-Translate] ${text} (${targetLang.toUpperCase()})`;
+}
+
+
 

@@ -10,7 +10,7 @@ import {
   List, ListOrdered, CheckSquare,
   Quote, Code, Code2,
   Table, Image, Link, Minus,
-  Undo2, Redo2, Sparkles, Trash2,
+  Undo2, Redo2, Sparkles, Trash2, Languages,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
 
@@ -19,6 +19,8 @@ interface ToolbarProps {
   onOpenAI?: () => void;
   onToggleSlashMenu?: () => void;
   onDeletePage?: () => void;
+  onToggleTranslate?: () => void;
+  isTranslateOpen?: boolean;
 }
 
 interface ToolbarButton {
@@ -28,7 +30,7 @@ interface ToolbarButton {
   isActive?: () => boolean;
 }
 
-export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePage }: ToolbarProps) {
+export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePage, onToggleTranslate, isTranslateOpen }: ToolbarProps) {
   const [showLinkInput, setShowLinkInput] = useState(false);
   const [linkUrl, setLinkUrl] = useState('');
 
@@ -52,9 +54,10 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
   }, [editor]);
 
   const groups: ToolbarButton[][] = [
-    // AI & Slash Assistant
+    // AI & Slash Assistant & Auto Translate
     [
       { icon: <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />, title: 'AI Assistant (Summarize, Polish, Tasks)', action: () => onOpenAI?.() },
+      { icon: <Languages className={`w-5 h-5 ${isTranslateOpen ? 'text-purple-300 font-bold' : 'text-purple-400'}`} />, title: 'Block Auto Dịch Trực Tiếp (Live Auto-Translate)', action: () => onToggleTranslate?.(), isActive: () => !!isTranslateOpen },
       { icon: <span className="text-sm font-extrabold px-1 text-purple-400">/</span>, title: 'Slash Command Menu (Type /)', action: () => onToggleSlashMenu?.() },
     ],
     // Text formatting

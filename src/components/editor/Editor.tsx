@@ -30,6 +30,7 @@ import { EditorToolbar } from './EditorToolbar';
 import { SlashMenu } from './SlashMenu';
 import { AIModal } from '../modal/AIModal';
 import { CustomTaskItemComponent } from './CustomTaskItem';
+import { AutoTranslateBlock } from './AutoTranslateBlock';
 import { countWords, getReadingTime, extractWikiLinks } from '../../utils';
 import { getPageOverdueCount } from '../../utils/taskUtils';
 
@@ -135,8 +136,10 @@ export function Editor() {
   const { setSyncStatus, setConfirmModal, addNotification } = useAppStore();
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
+  const [translateBlockOpen, setTranslateBlockOpen] = useState(false);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   const currentPageRef = useRef<string | null>(null);
+  const selectedPage = pages.find((p) => p.id === selectedPageId);
 
   const handleDeleteCurrentPage = () => {
     if (!selectedPageId) return;
@@ -153,8 +156,6 @@ export function Editor() {
       },
     });
   };
-
-  const selectedPage = pages.find((p) => p.id === selectedPageId);
 
   // Debounced save handler
   const handleSave = useCallback(
@@ -286,6 +287,30 @@ export function Editor() {
     },
   });
 
+  const handleInsertTranslation = useCallback(
+    (text: string) => {
+      if (!editor) return;
+      const formatted = text
+        .split('\n')
+        .map((l) => `<p>${l}</p>`)
+        .join('');
+      editor.chain().focus('end').insertContent(formatted).run();
+    },
+    [editor]
+  );
+
+  const handleReplaceNote = useCallback(
+    (text: string) => {
+      if (!editor) return;
+      const formatted = text
+        .split('\n')
+        .map((l) => `<p>${l}</p>`)
+        .join('');
+      editor.commands.setContent(formatted);
+    },
+    [editor]
+  );
+
   // Update editor content when page changes
   useEffect(() => {
     if (!editor || !selectedPage) return;
@@ -331,6 +356,8 @@ export function Editor() {
           onOpenAI={() => setAiModalOpen(true)}
           onToggleSlashMenu={() => setSlashMenuOpen((prev) => !prev)}
           onDeletePage={handleDeleteCurrentPage}
+          onToggleTranslate={() => setTranslateBlockOpen((prev) => !prev)}
+          isTranslateOpen={translateBlockOpen}
         />
       )}
 
@@ -341,6 +368,7 @@ export function Editor() {
           isOpen={slashMenuOpen}
           onClose={() => setSlashMenuOpen(false)}
           onOpenAI={() => setAiModalOpen(true)}
+          onToggleTranslate={() => setTranslateBlockOpen(true)}
         />
       )}
 
@@ -358,6 +386,16 @@ export function Editor() {
                 🔴 QUÁ HẠN (OVERDUE)
               </span>
             </div>
+          )}
+
+          {/* Live Auto-Translate Block */}
+          {translateBlockOpen && selectedPage && (
+            <AutoTranslateBlock
+              noteContent={selectedPage.content || ''}
+              onInsertTranslation={handleInsertTranslation}
+              onReplaceNote={handleReplaceNote}
+              onClose={() => setTranslateBlockOpen(false)}
+            />
           )}
 
           {/* Page Title */}

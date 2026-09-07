@@ -12,6 +12,7 @@ import {
   Minus,
   Sparkles,
   Calendar,
+  Languages,
 } from 'lucide-react';
 
 interface SlashMenuProps {
@@ -19,6 +20,7 @@ interface SlashMenuProps {
   isOpen: boolean;
   onClose: () => void;
   onOpenAI: () => void;
+  onToggleTranslate?: () => void;
 }
 
 interface MenuItem {
@@ -28,7 +30,7 @@ interface MenuItem {
   command: (editor: Editor) => void;
 }
 
-export function SlashMenu({ editor, isOpen, onClose, onOpenAI }: SlashMenuProps) {
+export function SlashMenu({ editor, isOpen, onClose, onOpenAI, onToggleTranslate }: SlashMenuProps) {
   const [selectedIndex, setSelectedIndex] = useState(0);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -106,6 +108,12 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI }: SlashMenuProps)
       label: 'AI Copilot',
       description: 'Generate, summarize, or polish text',
       command: () => onOpenAI(),
+    },
+    {
+      icon: <Languages className="w-4 h-4 text-purple-400" />,
+      label: 'Auto Dịch (Live Translate)',
+      description: 'Bật/tắt block tự động dịch trực tiếp',
+      command: () => onToggleTranslate?.(),
     },
   ];
 
