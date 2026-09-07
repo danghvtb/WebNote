@@ -161,10 +161,30 @@ export function LoginPage() {
           <span>🚀 Explore in Offline Demo Mode</span>
         </button>
 
-        {/* Error Message */}
+        {/* Error Message & Friendly Offline Guidance */}
         {error && (
-          <div className="mt-4 p-3 rounded-lg text-sm animate-slide-up" style={{ background: 'rgba(248, 81, 73, 0.1)', color: 'var(--color-error)' }}>
-            {error}
+          <div className="mt-4 p-3.5 rounded-xl text-xs space-y-2 animate-slide-up bg-purple-950/90 border border-purple-500/40 text-purple-200 shadow-lg">
+            <p className="font-semibold text-amber-300">⚠️ {error}</p>
+            <p className="text-[11px] text-slate-300">
+              💡 Để sử dụng đầy đủ mọi tính năng ghi chú và AI Vault trên bản Web mà không cần cấu hình Google Client ID, bạn có thể chuyển ngay sang Chế độ Ngoại tuyến (Offline Mode):
+            </p>
+            <button
+              type="button"
+              onClick={async () => {
+                setAuth(
+                  { name: 'Demo User', email: 'demo@mynotes.local' },
+                  'demo-token'
+                );
+                setRootFolderId('demo-folder-id');
+                setInitialized(true);
+                const notesStore = useNotesStore.getState();
+                await notesStore.loadDays();
+                await notesStore.selectToday();
+              }}
+              className="w-full py-2 px-3 rounded-lg bg-purple-600 hover:bg-purple-500 text-white font-bold text-xs transition-all cursor-pointer shadow-md flex items-center justify-center gap-1.5"
+            >
+              🚀 Đăng nhập nhanh Chế độ Ngoại tuyến (Offline Mode)
+            </button>
           </div>
         )}
 
