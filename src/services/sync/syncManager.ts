@@ -300,14 +300,17 @@ export async function syncFromCloud(): Promise<void> {
       days: dbData.days || [],
       notebooks: dbData.notebooks || [],
       pages: Array.from(pagesMap.values()),
+      scheduleBlocks: dbData.scheduleBlocks || [],
     });
 
     // Refresh UI immediately so user isn't stuck waiting
     try {
       const { useNotesStore } = await import('../../stores/notesStore');
+      const { useScheduleStore } = await import('../../stores/scheduleStore');
       const notesStore = useNotesStore.getState();
       await notesStore.loadDays();
       await notesStore.loadRecentNotebooks();
+      await useScheduleStore.getState().loadAllBlocks();
     } catch (err) {
       console.warn('[Sync] Fast refresh warning:', err);
     }
@@ -349,14 +352,17 @@ export async function syncFromCloud(): Promise<void> {
           days: dbData.days || [],
           notebooks: dbData.notebooks || [],
           pages: finalPages,
+          scheduleBlocks: dbData.scheduleBlocks || [],
         });
 
         // Final UI refresh
         try {
           const { useNotesStore } = await import('../../stores/notesStore');
+          const { useScheduleStore } = await import('../../stores/scheduleStore');
           const notesStore = useNotesStore.getState();
           await notesStore.loadDays();
           await notesStore.loadRecentNotebooks();
+          await useScheduleStore.getState().loadAllBlocks();
         } catch (err) {
           console.warn('[Sync] Final refresh warning:', err);
         }

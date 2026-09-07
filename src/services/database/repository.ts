@@ -5,7 +5,7 @@
 // ============================================================
 
 import { db } from './db';
-import type { Day, Notebook, Page, SearchEntry } from '../../types';
+import type { Day, Notebook, Page, SearchEntry, ScheduleBlock } from '../../types';
 import {
   generateId,
   dayIdFromDate,
@@ -439,8 +439,9 @@ export async function loadFromDatabase(data: {
   days: Day[];
   notebooks: Notebook[];
   pages?: Page[];
+  scheduleBlocks?: ScheduleBlock[];
 }): Promise<void> {
-  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.searchIndex], async () => {
+  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.searchIndex], async () => {
     // Clear existing data
     await db.days.clear();
     await db.notebooks.clear();
@@ -459,6 +460,12 @@ export async function loadFromDatabase(data: {
     if (data.pages?.length) {
       await db.pages.clear();
       await db.pages.bulkPut(data.pages);
+    }
+
+    // Load scheduleBlocks if included
+    if (data.scheduleBlocks?.length) {
+      await db.scheduleBlocks.clear();
+      await db.scheduleBlocks.bulkPut(data.scheduleBlocks);
     }
 
     // Rebuild search index
@@ -486,10 +493,12 @@ export async function exportDatabase(): Promise<{
   days: Day[];
   notebooks: Notebook[];
   pages: Page[];
+  scheduleBlocks: ScheduleBlock[];
 }> {
   const days = await db.days.toArray();
   const notebooks = await db.notebooks.filter((nb) => !nb.deleted).toArray();
   const pages = await db.pages.filter((p) => !p.deleted).toArray();
+  const scheduleBlocks = await db.scheduleBlocks.toArray();
 
   return {
     version: 1,
@@ -497,6 +506,7 @@ export async function exportDatabase(): Promise<{
     days,
     notebooks,
     pages,
+    scheduleBlocks,
   };
 }
 

@@ -95,7 +95,7 @@ export type SyncStatus =
 export interface SyncOperation {
   id: string;
   type: 'create' | 'update' | 'delete';
-  entity: 'notebook' | 'page' | 'database' | 'attachment';
+  entity: 'notebook' | 'page' | 'database' | 'attachment' | 'schedule';
   entityId: string;
   data: string; // JSON stringified payload
   timestamp: string;

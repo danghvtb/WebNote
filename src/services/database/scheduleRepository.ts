@@ -6,6 +6,7 @@
 import { db } from './db';
 import type { ScheduleBlock } from '../../types';
 import { generateId, nowISO } from '../../utils';
+import { queueSync } from '../sync/syncManager';
 
 /**
  * Save or update a schedule block in IndexedDB
@@ -15,6 +16,7 @@ export async function saveScheduleBlock(
 ): Promise<ScheduleBlock> {
   const now = nowISO();
   const id = block.id || generateId('sched');
+  const isUpdate = !!block.id;
   
   const scheduleBlock: ScheduleBlock = {
     ...block,
@@ -25,6 +27,7 @@ export async function saveScheduleBlock(
   };
 
   await db.scheduleBlocks.put(scheduleBlock);
+  await queueSync(isUpdate ? 'update' : 'create', 'schedule', id, scheduleBlock);
   return scheduleBlock;
 }
 
@@ -72,6 +75,7 @@ export async function getAllScheduleBlocks(): Promise<ScheduleBlock[]> {
  */
 export async function deleteScheduleBlock(id: string): Promise<void> {
   await db.scheduleBlocks.delete(id);
+  await queueSync('delete', 'schedule', id);
 }
 
 /**
@@ -88,5 +92,6 @@ export async function toggleScheduleBlockCompleted(id: string): Promise<Schedule
   };
 
   await db.scheduleBlocks.put(updated);
+  await queueSync('update', 'schedule', id, updated);
   return updated;
 }
