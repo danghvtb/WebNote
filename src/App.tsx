@@ -76,11 +76,8 @@ function AppContent() {
 
         // Auto load notes and schedule from IndexedDB
         Promise.all([
-          import('./stores/notesStore').then(({ useNotesStore }) => {
-            const notesStore = useNotesStore.getState();
-            notesStore.loadDays();
-            notesStore.loadRecentNotebooks();
-            notesStore.selectToday();
+          import('./services/sync/syncManager').then(({ refreshActiveNotesStore }) => {
+            refreshActiveNotesStore();
           }),
           import('./stores/scheduleStore').then(({ useScheduleStore }) => {
             const scheduleStore = useScheduleStore.getState();

@@ -153,14 +153,11 @@ export async function deleteNotebook(notebookId: string): Promise<void> {
   const notebook = await db.notebooks.get(notebookId);
   if (!notebook) return;
 
-  // Soft-delete all pages
   const pages = await db.pages.where('notebookId').equals(notebookId).toArray();
-  for (const page of pages) {
-    await db.pages.update(page.id, { deleted: true, updatedAt: nowISO() });
-  }
 
-  // Soft-delete notebook
-  await db.notebooks.update(notebookId, { deleted: true, updatedAt: nowISO() });
+  // Delete notebook and pages from IndexedDB
+  await db.notebooks.delete(notebookId);
+  await db.pages.where('notebookId').equals(notebookId).delete();
 
   // Remove from search index
   await db.searchIndex.where('entityId').equals(notebookId).delete();
@@ -339,8 +336,8 @@ export async function deletePage(pageId: string): Promise<void> {
   const page = await db.pages.get(pageId);
   if (!page) return;
 
-  // Soft-delete
-  await db.pages.update(pageId, { deleted: true, updatedAt: nowISO() });
+  // Delete from IndexedDB
+  await db.pages.delete(pageId);
 
   // Remove from notebook's pageIds
   const notebook = await db.notebooks.get(page.notebookId);

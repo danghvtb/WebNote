@@ -96,6 +96,17 @@ export async function pushToSupabase(): Promise<void> {
 // Pull latest Vault data from Supabase Storage to local Dexie IndexedDB
 export async function syncFromSupabase(): Promise<void> {
   if (syncInProgress) return;
+
+  // Process pending local sync operations before downloading to prevent overwriting local deletions
+  try {
+    const pendingCount = await db.syncQueue.where('status').equals('pending').count();
+    if (pendingCount > 0) {
+      await pushToSupabase();
+    }
+  } catch (err) {
+    console.warn('[Supabase Sync] Failed to push pending queue before pull:', err);
+  }
+
   if (!isSupabaseConfigured() || !supabase) {
     const { syncFromCloud: syncFromGoogle } = await import('../sync/syncManager');
     return syncFromGoogle();
@@ -135,10 +146,8 @@ export async function syncFromSupabase(): Promise<void> {
       });
 
       // Refresh active Zustand Store
-      const { useNotesStore } = await import('../../stores/notesStore');
-      const notesStore = useNotesStore.getState();
-      await notesStore.loadDays();
-      await notesStore.loadRecentNotebooks();
+      const { refreshActiveNotesStore } = await import('../sync/syncManager');
+      await refreshActiveNotesStore();
     }
 
     lastSyncTime = nowISO();

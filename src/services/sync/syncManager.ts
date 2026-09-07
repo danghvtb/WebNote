@@ -1,6 +1,6 @@
 // ============================================================
 // MyNotes — Sync Manager
-// Orchestrates local IndexedDB ↔ Google Drive synchronization.
+// Orchestrates local IndexedDB ↔ Google Drive ↔ Supabase synchronization.
 // ============================================================
 
 import { db } from '../database/db';
@@ -12,6 +12,7 @@ import {
   downloadFile,
   createFolder,
   listFiles,
+  trashFile,
 } from '../google/drive';
 import { getRootFolderId } from '../google/rootFolderManager';
 import type { SyncOperation, SyncStatus, Page } from '../../types';
@@ -73,6 +74,46 @@ async function getCachedFileId(parentFolderId: string, fileName: string): Promis
   return null;
 }
 
+// ===================== STORE REFRESH HELPER =====================
+
+/**
+ * Refresh active Zustand stores (notesStore & scheduleStore)
+ * and auto-select active or recent notebook/day after data changes/sync.
+ */
+export async function refreshActiveNotesStore(): Promise<void> {
+  try {
+    const { useNotesStore } = await import('../../stores/notesStore');
+    const { useScheduleStore } = await import('../../stores/scheduleStore');
+    const notesStore = useNotesStore.getState();
+
+    await notesStore.loadDays();
+    await notesStore.loadRecentNotebooks();
+    await useScheduleStore.getState().loadAllBlocks();
+    await useScheduleStore.getState().loadTasksAndCategories();
+
+    const { selectedDayId, selectedNotebookId, recentNotebooks, days } = notesStore;
+
+    // Refresh active day's notebooks list
+    if (selectedDayId) {
+      await notesStore.loadNotebooksByDay(selectedDayId);
+    }
+
+    // Refresh active notebook's pages list
+    if (selectedNotebookId) {
+      await notesStore.loadPagesByNotebook(selectedNotebookId);
+    }
+
+    // If no notebook is currently selected, select the most recent notebook
+    if (!selectedNotebookId && recentNotebooks.length > 0) {
+      await notesStore.selectNotebook(recentNotebooks[0].id);
+    } else if (!selectedDayId && days.length > 0) {
+      notesStore.selectDay(days[0].id);
+    }
+  } catch (err) {
+    console.warn('[Sync] Active notes store refresh error:', err);
+  }
+}
+
 // ===================== SYNC TO CLOUD =====================
 
 /**
@@ -99,8 +140,14 @@ export async function queueSync(
 
   await db.syncQueue.put(op);
 
-  // Debounce the actual sync (reduced from 2s to 1s for fast feel)
-  debouncedSync();
+  if (type === 'delete') {
+    // Immediate async sync for deletions (non-blocking)
+    if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
+    setStatus('saving');
+    triggerSync().catch((err) => console.warn('[Sync] Delete trigger error:', err));
+  } else {
+    debouncedSync();
+  }
 }
 
 /**
@@ -112,9 +159,56 @@ function debouncedSync(): void {
   }
   setStatus('saving');
 
-  syncDebounceTimer = setTimeout(async () => {
-    await processGoogleSyncQueue();
+  syncDebounceTimer = setTimeout(() => {
+    triggerSync().catch((err) => console.warn('[Sync] Debounced sync error:', err));
   }, 1000);
+}
+
+/**
+ * Unified trigger for active cloud sync provider or local fallback.
+ */
+export async function triggerSync(): Promise<void> {
+  if (!isOnline()) {
+    setStatus('offline');
+    return;
+  }
+
+  // 1. Try Supabase Sync first if configured
+  try {
+    const { isSupabaseConfigured, supabase } = await import('../supabase/supabaseClient');
+    if (isSupabaseConfigured() && supabase) {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (session) {
+        const { pushToSupabase } = await import('../supabase/supabaseSync');
+        await pushToSupabase();
+        return;
+      }
+    }
+  } catch (err) {
+    console.warn('[Sync] Supabase trigger check:', err);
+  }
+
+  // 2. Try Google Drive Sync if configured
+  try {
+    const rootFolderId = await getRootFolderId();
+    if (rootFolderId) {
+      await processGoogleSyncQueue();
+      return;
+    }
+    const { ensureRootFolder } = await import('../google/rootFolderManager');
+    const folderRes = await ensureRootFolder();
+    if (folderRes.status === 'found') {
+      await processGoogleSyncQueue();
+      return;
+    }
+  } catch (err) {
+    console.warn('[Sync] Google Drive trigger check:', err);
+  }
+
+  // 3. Fallback: Local offline mode (Data saved in IndexedDB)
+  await db.syncQueue.clear();
+  lastSyncTime = nowISO();
+  setStatus('saved');
 }
 
 /**
@@ -138,7 +232,9 @@ export async function processGoogleSyncQueue(): Promise<void> {
       if (folderRes.status === 'found') {
         rootFolderId = folderRes.folderId;
       } else {
-        setStatus('error', 'No root folder configured');
+        await db.syncQueue.clear();
+        lastSyncTime = nowISO();
+        setStatus('saved');
         syncInProgress = false;
         return;
       }
@@ -147,11 +243,15 @@ export async function processGoogleSyncQueue(): Promise<void> {
     // Check pending operations to optimize sync
     const pendingOps = await db.syncQueue.where('status').equals('pending').toArray();
     const updatedPageIds = new Set<string>();
+    const deletedPageIds: string[] = [];
     let structureChanged = false;
 
     for (const op of pendingOps) {
       if (op.entity === 'page' && op.type === 'update') {
         updatedPageIds.add(op.entityId);
+      } else if (op.entity === 'page' && op.type === 'delete') {
+        deletedPageIds.push(op.entityId);
+        structureChanged = true;
       } else {
         structureChanged = true;
       }
@@ -168,6 +268,20 @@ export async function processGoogleSyncQueue(): Promise<void> {
     } else {
       const created = await createFile('database.json', dbJson, rootFolderId);
       fileIdCache.set(`${rootFolderId}/database.json`, created.id);
+    }
+
+    // Trash deleted pages from Google Drive pages/ folder
+    if (deletedPageIds.length > 0) {
+      const pagesFolderId = await getCachedFileId(rootFolderId, 'pages');
+      if (pagesFolderId) {
+        for (const pId of deletedPageIds) {
+          const fileId = await getCachedFileId(pagesFolderId, `${pId}.json`);
+          if (fileId) {
+            await trashFile(fileId).catch((err) => console.warn(`[Sync] Could not trash deleted page ${pId}:`, err));
+            fileIdCache.delete(`${pagesFolderId}/${pId}.json`);
+          }
+        }
+      }
     }
 
     // Incremental page sync: Only sync pages that changed if structure didn't radically change,
@@ -260,6 +374,16 @@ async function syncPagesFolderIncremental(
 export async function syncFromCloud(): Promise<void> {
   if (syncInProgress) return;
 
+  // Process pending local sync operations before downloading to prevent overwriting local deletions
+  try {
+    const pendingCount = await db.syncQueue.where('status').equals('pending').count();
+    if (pendingCount > 0) {
+      await triggerSync();
+    }
+  } catch (err) {
+    console.warn('[Sync] Failed to process pending queue before pull:', err);
+  }
+
   syncInProgress = true;
   setStatus('syncing');
 
@@ -306,23 +430,14 @@ export async function syncFromCloud(): Promise<void> {
     });
 
     // Refresh UI immediately so user isn't stuck waiting
-    try {
-      const { useNotesStore } = await import('../../stores/notesStore');
-      const { useScheduleStore } = await import('../../stores/scheduleStore');
-      const notesStore = useNotesStore.getState();
-      await notesStore.loadDays();
-      await notesStore.loadRecentNotebooks();
-      await useScheduleStore.getState().loadAllBlocks();
-      await useScheduleStore.getState().loadTasksAndCategories();
-    } catch (err) {
-      console.warn('[Sync] Fast refresh warning:', err);
-    }
+    await refreshActiveNotesStore();
 
     // 2. PARALLEL BACKGROUND PATH: Check pages/ folder for any extra/newer page files in parallel batches
     const pagesFolder = await getCachedFileId(rootFolderId, 'pages');
     if (pagesFolder) {
       const pageFiles = await listFiles(pagesFolder);
-      
+      const activePageIds = new Set(dbData.pages?.map((p: Page) => p.id) || []);
+
       // Download page files in parallel batches of 5
       const BATCH_SIZE = 5;
       let hasUpdates = false;
@@ -332,9 +447,21 @@ export async function syncFromCloud(): Promise<void> {
         await Promise.all(
           batch.map(async (pf) => {
             try {
+              const pageIdFromFilename = pf.name.replace('.json', '');
+              // If database.json had pages defined, but this file is NOT in activePageIds, it was deleted!
+              if (dbData.pages && !activePageIds.has(pageIdFromFilename)) {
+                // Silently trash orphaned deleted page from Drive
+                trashFile(pf.id).catch(() => {});
+                return;
+              }
+
               const pageContent = await downloadFile(pf.id);
               const pageData = JSON.parse(pageContent);
               if (pageData && pageData.id) {
+                if (dbData.pages && !activePageIds.has(pageData.id)) {
+                  trashFile(pf.id).catch(() => {});
+                  return;
+                }
                 const existing = pagesMap.get(pageData.id);
                 pagesMap.set(pageData.id, {
                   ...existing,
@@ -361,17 +488,7 @@ export async function syncFromCloud(): Promise<void> {
         });
 
         // Final UI refresh
-        try {
-          const { useNotesStore } = await import('../../stores/notesStore');
-          const { useScheduleStore } = await import('../../stores/scheduleStore');
-          const notesStore = useNotesStore.getState();
-          await notesStore.loadDays();
-          await notesStore.loadRecentNotebooks();
-          await useScheduleStore.getState().loadAllBlocks();
-          await useScheduleStore.getState().loadTasksAndCategories();
-        } catch (err) {
-          console.warn('[Sync] Final refresh warning:', err);
-        }
+        await refreshActiveNotesStore();
       }
     }
 
@@ -379,17 +496,7 @@ export async function syncFromCloud(): Promise<void> {
     setStatus('saved');
 
     // Refresh active notesStore state after cloud sync
-    try {
-      const { useNotesStore } = await import('../../stores/notesStore');
-      const notesStore = useNotesStore.getState();
-      await notesStore.loadDays();
-      await notesStore.loadRecentNotebooks();
-    } catch (err) {
-      console.warn('[Sync] Failed to refresh notes store after cloud sync:', err);
-    }
-
-    lastSyncTime = nowISO();
-    setStatus('saved');
+    await refreshActiveNotesStore();
   } catch (error) {
     console.error('[Sync] Error syncing from cloud:', error);
     setStatus('error', error instanceof Error ? error.message : 'Sync failed');
@@ -408,7 +515,7 @@ export async function forceSync(): Promise<void> {
   }
 
   // First push local changes
-  await processGoogleSyncQueue();
+  await triggerSync();
 
   // Then pull cloud changes
   await syncFromCloud();
@@ -423,7 +530,7 @@ export function initNetworkListeners(): void {
   window.addEventListener('online', () => {
     console.log('[Sync] Network restored');
     setStatus('syncing');
-    processGoogleSyncQueue();
+    triggerSync();
   });
 
   window.addEventListener('offline', () => {

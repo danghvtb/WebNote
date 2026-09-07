@@ -133,7 +133,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   // ── Selection ──
 
-  selectDay: (dayId) => {
+  selectDay: async (dayId) => {
     set({
       selectedDayId: dayId,
       selectedNotebookId: null,
@@ -141,7 +141,11 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       notebooks: [],
       pages: [],
     });
-    get().loadNotebooksByDay(dayId);
+    await get().loadNotebooksByDay(dayId);
+    const { notebooks, selectedNotebookId } = get();
+    if (notebooks.length > 0 && !selectedNotebookId) {
+      await get().selectNotebook(notebooks[0].id);
+    }
   },
 
   selectNotebook: async (notebookId) => {
