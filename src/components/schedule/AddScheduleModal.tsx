@@ -220,7 +220,7 @@ export function AddScheduleModal() {
             />
           </div>
 
-          {/* Date & Time Row */}
+          {/* Date & Time Row (24-Hour Format HH:mm) */}
           <div className="grid grid-cols-3 gap-3">
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Ngày</label>
@@ -231,23 +231,43 @@ export function AddScheduleModal() {
                 className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60"
               />
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Bắt Đầu</label>
-              <input
-                type="time"
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Bắt Đầu (24h)</label>
+              <select
                 value={startTime}
                 onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60"
-              />
+                className="w-full px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60 font-mono"
+              >
+                {Array.from({ length: 24 }, (_, i) => {
+                  const h = i.toString().padStart(2, '0');
+                  return (
+                    <React.Fragment key={h}>
+                      <option value={`${h}:00`}>{h}:00</option>
+                      <option value={`${h}:30`}>{h}:30</option>
+                    </React.Fragment>
+                  );
+                })}
+              </select>
             </div>
+
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Kết Thúc</label>
-              <input
-                type="time"
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Kết Thúc (24h)</label>
+              <select
                 value={endTime}
                 onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-3 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60"
-              />
+                className="w-full px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60 font-mono"
+              >
+                {Array.from({ length: 24 }, (_, i) => {
+                  const h = i.toString().padStart(2, '0');
+                  return (
+                    <React.Fragment key={h}>
+                      <option value={`${h}:00`}>{h}:00</option>
+                      <option value={`${h}:30`}>{h}:30</option>
+                    </React.Fragment>
+                  );
+                })}
+              </select>
             </div>
           </div>
 

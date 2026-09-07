@@ -8,8 +8,47 @@ import { ScheduleBlockCard } from './ScheduleBlockCard';
 import { todayDate } from '../../utils';
 
 export function WeekView() {
-  const { selectedDate, getFilteredBlocks, setAddModalOpen } = useScheduleStore();
+  const { selectedDate, getFilteredBlocks, setAddModalOpen, setSelectedDate } = useScheduleStore();
   const blocks = getFilteredBlocks();
+
+  // Navigation handlers for swipe
+  const handlePrevWeek = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() - 7);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  const handleNextWeek = () => {
+    const d = new Date(selectedDate);
+    d.setDate(d.getDate() + 7);
+    setSelectedDate(d.toISOString().split('T')[0]);
+  };
+
+  // Swipe / Drag handling
+  let touchStartX = 0;
+  let touchEndX = 0;
+
+  const handleTouchStart = (e: React.TouchEvent) => {
+    touchStartX = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchMove = (e: React.TouchEvent) => {
+    touchEndX = e.targetTouches[0].clientX;
+  };
+
+  const handleTouchEnd = () => {
+    if (!touchStartX || !touchEndX) return;
+    const diff = touchStartX - touchEndX;
+    if (diff > 60) {
+      // Swiped left -> Next week
+      handleNextWeek();
+    } else if (diff < -60) {
+      // Swiped right -> Prev week
+      handlePrevWeek();
+    }
+    touchStartX = 0;
+    touchEndX = 0;
+  };
 
   // Compute 7 days of the current week based on selectedDate (Mon - Sun)
   const getWeekDays = () => {
@@ -45,7 +84,33 @@ export function WeekView() {
   };
 
   return (
-    <div className="flex-1 flex flex-col overflow-hidden bg-slate-950">
+    <div
+      onTouchStart={handleTouchStart}
+      onTouchMove={handleTouchMove}
+      onTouchEnd={handleTouchEnd}
+      className="flex-1 flex flex-col overflow-hidden bg-slate-950 select-none relative"
+    >
+      {/* Floating Prev/Next Week Quick Navigation Buttons for Desktop Mouse Drag / Quick Click */}
+      <div className="absolute top-16 left-2 z-30 hidden sm:flex">
+        <button
+          onClick={handlePrevWeek}
+          className="p-2 rounded-full bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white hover:bg-purple-600 transition-all shadow-lg cursor-pointer"
+          title="Kéo/Bấm lùi sang Tuần Trước"
+        >
+          ‹
+        </button>
+      </div>
+
+      <div className="absolute top-16 right-2 z-30 hidden sm:flex">
+        <button
+          onClick={handleNextWeek}
+          className="p-2 rounded-full bg-slate-900/90 border border-slate-800 text-slate-300 hover:text-white hover:bg-purple-600 transition-all shadow-lg cursor-pointer"
+          title="Kéo/Bấm chuyển sang Tuần Kế Tiếp"
+        >
+          ›
+        </button>
+      </div>
+
       {/* Scrollable Container for Mobile Horizontal Swipe */}
       <div className="flex-1 overflow-x-auto overflow-y-auto flex flex-col min-w-full">
         <div className="min-w-[650px] sm:min-w-full flex-1 flex flex-col">
@@ -54,22 +119,31 @@ export function WeekView() {
             {weekDays.map((day) => (
               <div
                 key={day.dateStr}
-                className={`py-2.5 px-1.5 sm:py-3 sm:px-2 text-center border-r border-slate-800/60 ${
+                className={`py-2 px-1 sm:py-2.5 sm:px-2 text-center border-r border-slate-800/60 flex items-center justify-between group ${
                   day.isToday ? 'bg-purple-950/20' : ''
                 }`}
               >
-                <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block uppercase truncate">
-                  {day.dayName}
-                </span>
-                <span
-                  className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[11px] sm:text-xs font-bold mt-0.5 ${
-                    day.isToday
-                      ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
-                      : 'text-slate-200'
-                  }`}
+                <div className="flex-1 text-center">
+                  <span className="text-[10px] sm:text-[11px] font-semibold text-slate-400 block uppercase truncate">
+                    {day.dayName}
+                  </span>
+                  <span
+                    className={`inline-flex items-center justify-center w-6 h-6 sm:w-7 sm:h-7 rounded-full text-[11px] sm:text-xs font-bold mt-0.5 ${
+                      day.isToday
+                        ? 'bg-purple-600 text-white shadow-md shadow-purple-600/30'
+                        : 'text-slate-200'
+                    }`}
+                  >
+                    {day.dayNum}
+                  </span>
+                </div>
+                <button
+                  onClick={() => handleSlotClick(day.dateStr, 9)}
+                  className="p-1 rounded-lg text-slate-500 hover:text-purple-300 hover:bg-purple-500/20 transition-all cursor-pointer opacity-60 hover:opacity-100"
+                  title={`Thêm lịch cho ${day.dayName} (${day.dateStr})`}
                 >
-                  {day.dayNum}
-                </span>
+                  +
+                </button>
               </div>
             ))}
           </div>
@@ -83,26 +157,24 @@ export function WeekView() {
                 return (
                   <div
                     key={day.dateStr}
-                    className={`border-r border-slate-800/40 p-1.5 sm:p-2 space-y-1.5 sm:space-y-2 min-h-[500px] transition-colors hover:bg-slate-900/20 ${
+                    className={`border-r border-slate-800/40 p-1.5 sm:p-2 space-y-1.5 sm:space-y-2 min-h-[500px] flex flex-col justify-between transition-colors hover:bg-slate-900/20 ${
                       day.isToday ? 'bg-purple-950/10' : ''
                     }`}
                   >
                     {/* Unsourced or All-Day Blocks */}
-                    {dayBlocks.map((block) => (
-                      <ScheduleBlockCard key={block.id} block={block} />
-                    ))}
+                    <div className="space-y-1.5 sm:space-y-2 flex-1">
+                      {dayBlocks.map((block) => (
+                        <ScheduleBlockCard key={block.id} block={block} />
+                      ))}
+                    </div>
 
-                    {/* Empty Click Slot Placeholder */}
-                    {dayBlocks.length === 0 && (
-                      <div
-                        onClick={() => handleSlotClick(day.dateStr, 9)}
-                        className="h-full min-h-[100px] rounded-xl border border-dashed border-slate-800/60 hover:border-purple-500/40 hover:bg-purple-500/5 transition-all flex flex-col items-center justify-center text-slate-600 hover:text-purple-400 cursor-pointer group"
-                      >
-                        <span className="text-[10px] sm:text-[11px] font-semibold opacity-60 sm:opacity-0 group-hover:opacity-100 transition-opacity">
-                          + Thêm
-                        </span>
-                      </div>
-                    )}
+                    {/* Always visible Quick Add Button at bottom of column */}
+                    <button
+                      onClick={() => handleSlotClick(day.dateStr, 9)}
+                      className="w-full py-1.5 rounded-xl border border-dashed border-slate-800 hover:border-purple-500/40 hover:bg-purple-500/10 text-slate-500 hover:text-purple-300 transition-all flex items-center justify-center text-[11px] font-semibold cursor-pointer group mt-2"
+                    >
+                      <span>+ Thêm lịch</span>
+                    </button>
                   </div>
                 );
               })}
