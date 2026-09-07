@@ -1,5 +1,5 @@
 import { create } from 'zustand';
-import type { ScheduleBlock, CustomUserTask, WorkCategory } from '../types';
+import type { ScheduleBlock, CustomUserTask, WorkCategory, ScheduleSearchFilter } from '../types';
 import { todayDate } from '../utils';
 import {
   getAllScheduleBlocks,
@@ -7,6 +7,7 @@ import {
   saveScheduleBlock,
   deleteScheduleBlock,
   toggleScheduleBlockCompleted,
+  filterScheduleBlocks,
 } from '../services/database/scheduleRepository';
 import {
   getAllCategories,
@@ -20,6 +21,15 @@ import {
 
 export type ScheduleViewMode = 'day' | 'week' | 'month';
 
+export const DEFAULT_SEARCH_FILTER: ScheduleSearchFilter = {
+  keyword: '',
+  categoryId: 'all',
+  taskSource: 'all',
+  datePreset: 'all',
+  status: 'all',
+  priority: 'all',
+};
+
 interface ScheduleState {
   // State
   blocks: ScheduleBlock[];
@@ -32,6 +42,9 @@ interface ScheduleState {
   dailyBriefingOpen: boolean;
   addModalOpen: boolean;
   taskManagerModalOpen: boolean;
+  filterBarOpen: boolean;
+  searchFilter: ScheduleSearchFilter;
+  aiExplanation?: string;
   editingBlock: ScheduleBlock | null;
   selectedTimeSlot: { date: string; startTime?: string } | null;
 
@@ -41,6 +54,10 @@ interface ScheduleState {
   setViewMode: (mode: ScheduleViewMode) => void;
   setDailyBriefingOpen: (open: boolean) => void;
   setTaskManagerModalOpen: (open: boolean) => void;
+  setFilterBarOpen: (open: boolean) => void;
+  setSearchFilter: (filterUpdate: Partial<ScheduleSearchFilter>, aiExp?: string) => void;
+  resetSearchFilter: () => void;
+  getFilteredBlocks: () => ScheduleBlock[];
   setAddModalOpen: (open: boolean, editingBlock?: ScheduleBlock | null, timeSlot?: { date: string; startTime?: string } | null) => void;
 
   // Async CRUD
@@ -59,7 +76,7 @@ interface ScheduleState {
   removeCategory: (id: string) => Promise<void>;
 }
 
-export const useScheduleStore = create<ScheduleState>((set) => ({
+export const useScheduleStore = create<ScheduleState>((set, get) => ({
   blocks: [],
   customTasks: [],
   categories: [],
@@ -70,6 +87,9 @@ export const useScheduleStore = create<ScheduleState>((set) => ({
   dailyBriefingOpen: false,
   addModalOpen: false,
   taskManagerModalOpen: false,
+  filterBarOpen: false,
+  searchFilter: DEFAULT_SEARCH_FILTER,
+  aiExplanation: undefined,
   editingBlock: null,
   selectedTimeSlot: null,
 
@@ -78,6 +98,20 @@ export const useScheduleStore = create<ScheduleState>((set) => ({
   setViewMode: (mode) => set({ viewMode: mode }),
   setDailyBriefingOpen: (open) => set({ dailyBriefingOpen: open }),
   setTaskManagerModalOpen: (open) => set({ taskManagerModalOpen: open }),
+  setFilterBarOpen: (open) => set({ filterBarOpen: open }),
+  setSearchFilter: (filterUpdate, aiExp) =>
+    set((state) => ({
+      searchFilter: { ...state.searchFilter, ...filterUpdate },
+      ...(aiExp !== undefined ? { aiExplanation: aiExp } : {}),
+    })),
+  resetSearchFilter: () =>
+    set({
+      searchFilter: DEFAULT_SEARCH_FILTER,
+      aiExplanation: undefined,
+    }),
+  getFilteredBlocks: () => {
+    return filterScheduleBlocks(get().blocks, get().searchFilter);
+  },
   setAddModalOpen: (open, editingBlock = null, timeSlot = null) =>
     set({
       addModalOpen: open,

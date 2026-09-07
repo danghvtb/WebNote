@@ -7,7 +7,8 @@ import { useScheduleStore } from '../../stores/scheduleStore';
 import { todayDate } from '../../utils';
 
 export function MonthView() {
-  const { selectedDate, blocks, setSelectedDate, setViewMode } = useScheduleStore();
+  const { selectedDate, getFilteredBlocks, setSelectedDate, setViewMode } = useScheduleStore();
+  const blocks = getFilteredBlocks();
 
   const getMonthMatrix = () => {
     const current = new Date(selectedDate);

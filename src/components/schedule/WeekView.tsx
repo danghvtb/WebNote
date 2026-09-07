@@ -8,7 +8,8 @@ import { ScheduleBlockCard } from './ScheduleBlockCard';
 import { todayDate } from '../../utils';
 
 export function WeekView() {
-  const { selectedDate, blocks, setAddModalOpen } = useScheduleStore();
+  const { selectedDate, getFilteredBlocks, setAddModalOpen } = useScheduleStore();
+  const blocks = getFilteredBlocks();
 
   // Compute 7 days of the current week based on selectedDate (Mon - Sun)
   const getWeekDays = () => {

@@ -226,4 +226,18 @@ export interface DaySchedule {
   aiSummary?: string;
 }
 
+export type DatePresetOption = 'all' | 'today' | 'this_week' | 'this_month' | 'next_7_days' | 'custom';
+
+export interface ScheduleSearchFilter {
+  keyword?: string;
+  categoryId?: string;
+  taskSource?: 'all' | 'work' | 'note';
+  startDate?: string;   // YYYY-MM-DD
+  endDate?: string;     // YYYY-MM-DD
+  datePreset?: DatePresetOption;
+  status?: 'all' | 'pending' | 'completed' | 'overdue';
+  priority?: 'all' | 'high' | 'medium' | 'low';
+}
+
+
 

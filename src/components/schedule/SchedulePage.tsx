@@ -6,6 +6,7 @@
 import { useEffect, useState } from 'react';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { CalendarHeader } from './CalendarHeader';
+import { ScheduleFilterBar } from './ScheduleFilterBar';
 import { TaskSidebar } from './TaskSidebar';
 import { WeekView } from './WeekView';
 import { DayView } from './DayView';
@@ -30,6 +31,9 @@ export function SchedulePage() {
     <div className="flex-1 flex flex-col h-full overflow-hidden bg-slate-950">
       {/* Top Calendar Navigation Toolbar */}
       <CalendarHeader onOpenAIPanel={() => setAiPanelOpen(true)} />
+
+      {/* Filter Bar Toolbar */}
+      <ScheduleFilterBar />
 
       {/* Main Workspace Area */}
       <div className="flex-1 flex overflow-hidden relative">

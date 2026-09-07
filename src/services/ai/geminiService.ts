@@ -820,6 +820,78 @@ YÊU CẦU ĐỊNH DẠNG:
   `;
 }
 
+/**
+ * AI Natural Search Query Parser: Converts natural Vietnamese search prompt into structured ScheduleSearchFilter
+ */
+export async function parseNaturalScheduleQuery(
+  userPrompt: string,
+  categories: { id: string; name: string }[]
+): Promise<{ filter: any; explanation: string }> {
+  const apiKey = getGeminiApiKey();
+
+  const prompt = `Bạn là Trợ lý Phân Tích Truy Vấn Tìm Kiếm Lịch Biểu (AI Natural Search Parser).
+Hãy phân tích câu truy vấn sau đây của người dùng và chuyển đổi thành cấu trúc bộ lọc JSON.
+
+CÂU TRUY VẤN NGƯỜI DÙNG: "${userPrompt}"
+
+DANH SÁCH NHÓM CÔNG VIỆC HIỆN CÓ:
+${categories.map((c) => `- ID: "${c.id}", Name: "${c.name}"`).join('\n')}
+
+QUY TẮC PHÂN TÍCH:
+1. "keyword": Từ khóa tìm kiếm chính (ví dụ "họp", "review", "báo cáo"), để trống nếu không đề cập.
+2. "categoryId": ID của nhóm công việc phù hợp nhất trong danh sách (nếu có đề cập), mặc định "all".
+3. "datePreset": Chọn 1 trong các giá trị: "today", "this_week", "this_month", "next_7_days", "all".
+4. "status": Chọn 1 trong các giá trị: "pending" (chưa xong), "completed" (đã xong), "overdue" (quá hạn), "all".
+5. "priority": Chọn 1 trong các giá trị: "high", "medium", "low", "all".
+
+Trả về JSON duy nhất (không bọc trong markdown codeblocks):
+{
+  "explanation": "Tóm tắt ngắn gọn tiêu chí AI đã hiểu (1 câu bằng tiếng Việt)",
+  "filter": {
+    "keyword": "",
+    "categoryId": "all",
+    "datePreset": "all",
+    "status": "all",
+    "priority": "all"
+  }
+}`;
+
+  if (apiKey) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.1, maxOutputTokens: 512 },
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const rawText = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return {
+            filter: parsed.filter || {},
+            explanation: parsed.explanation || 'Đã phân tích bộ lọc AI thành công.',
+          };
+        }
+      }
+    } catch (err) {
+      console.warn('[Gemini] AI Search query parse error:', err);
+    }
+  }
+
+  // Fallback keyword search
+  return {
+    filter: { keyword: userPrompt },
+    explanation: `Đã lọc theo từ khóa: "${userPrompt}"`,
+  };
+}
+
+
 
 
 

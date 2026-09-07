@@ -11,6 +11,7 @@ import {
   Sparkles,
   Sun,
   Plus,
+  Filter,
 } from 'lucide-react';
 import { useScheduleStore, type ScheduleViewMode } from '../../stores/scheduleStore';
 import { todayDate } from '../../utils';
@@ -23,11 +24,22 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
   const {
     selectedDate,
     viewMode,
+    filterBarOpen,
+    searchFilter,
     setSelectedDate,
     setViewMode,
     setDailyBriefingOpen,
     setAddModalOpen,
+    setFilterBarOpen,
   } = useScheduleStore();
+
+  const isFilterActive =
+    !!searchFilter.keyword ||
+    searchFilter.categoryId !== 'all' ||
+    searchFilter.taskSource !== 'all' ||
+    searchFilter.datePreset !== 'all' ||
+    searchFilter.status !== 'all' ||
+    searchFilter.priority !== 'all';
 
   const handlePrev = () => {
     const d = new Date(selectedDate);
@@ -115,6 +127,19 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
         </div>
 
         <div className="flex items-center gap-1.5">
+          <button
+            onClick={() => setFilterBarOpen(!filterBarOpen)}
+            className={`p-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
+              filterBarOpen || isFilterActive
+                ? 'bg-purple-600 text-white shadow-md'
+                : 'text-slate-300 bg-slate-800 hover:bg-slate-700 border border-slate-700'
+            }`}
+            title="Bật/Tắt Bộ Lọc Tìm Kiếm Thông Minh"
+          >
+            <Filter className="w-4 h-4" />
+            <span className="hidden md:inline">Bộ Lọc</span>
+          </button>
+
           <button
             onClick={() => setDailyBriefingOpen(true)}
             className="p-1.5 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-all flex items-center gap-1"

@@ -7,9 +7,8 @@ import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
 
 export function DayView() {
-  const { selectedDate, blocks, setAddModalOpen } = useScheduleStore();
-
-  const dayBlocks = blocks.filter((b) => b.date === selectedDate);
+  const { selectedDate, getFilteredBlocks, setAddModalOpen } = useScheduleStore();
+  const dayBlocks = getFilteredBlocks().filter((b) => b.date === selectedDate);
   const hours = Array.from({ length: 16 }, (_, i) => i + 7); // 07:00 to 22:00
 
   const handleSlotClick = (hour: number) => {
