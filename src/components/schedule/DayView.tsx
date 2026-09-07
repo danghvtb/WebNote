@@ -183,8 +183,11 @@ export function DayView() {
             {/* Absolute Positioned Events Layer */}
             <div className="absolute left-14 sm:left-16 right-0 top-0 bottom-0 pointer-events-none">
               {positionedBlocks.map(({ block, startMin, durationMins, colIndex, totalCols }) => {
+                // Top position: 64px per hour -> (startMin / 60) * 64
                 const topPx = (startMin / 60) * HOUR_HEIGHT;
-                const heightPx = Math.max(38, (durationMins / 60) * HOUR_HEIGHT - 4); // gap of 4px
+
+                // Height: (durationMins / 60) * 64px (e.g. 9 hours = 9 * 64 = 576px)
+                const heightPx = Math.max(48, (durationMins / 60) * HOUR_HEIGHT - 4); // gap of 4px
 
                 // Calculate horizontal position & width percentage for overlapping blocks
                 const widthPercent = 100 / totalCols;
@@ -201,7 +204,7 @@ export function DayView() {
                       width: `${widthPercent}%`,
                     }}
                   >
-                    <div className="h-full w-full overflow-hidden">
+                    <div className="h-full w-full overflow-hidden flex flex-col">
                       <ScheduleBlockCard block={block} />
                     </div>
                   </div>
