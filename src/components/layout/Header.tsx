@@ -3,8 +3,9 @@
 // Top bar: logo, search, sync status, user avatar.
 // ============================================================
 
-import { Search, Cloud, CloudOff, Loader2, AlertTriangle, Check, Menu, Network, CheckSquare, Download } from 'lucide-react';
+import { Search, Cloud, CloudOff, Loader2, AlertTriangle, Check, Menu, Network, CheckSquare, Download, Calendar } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
+import { useScheduleStore } from '../../stores/scheduleStore';
 import { formatTime } from '../../utils';
 import { forceSync } from '../../services/sync/syncManager';
 import { signOut } from '../../services/google/auth';
@@ -149,6 +150,18 @@ export function Header() {
         >
           <CheckSquare className="w-5 h-5 text-purple-400" />
           <span className="hidden lg:inline">Tasks</span>
+        </button>
+
+        <button
+          onClick={() => {
+            const { activeTab, setActiveTab } = useScheduleStore.getState();
+            setActiveTab(activeTab === 'schedule' ? 'notes' : 'schedule');
+          }}
+          className="p-2 rounded-xl text-slate-300 hover:text-white hover:bg-slate-800/60 transition-all cursor-pointer flex items-center gap-1.5 text-sm font-semibold border border-transparent hover:border-amber-500/30"
+          title="Open Smart Schedule & Time Blocking"
+        >
+          <Calendar className="w-5 h-5 text-amber-400" />
+          <span className="hidden lg:inline">Lịch Biểu</span>
         </button>
 
         <button

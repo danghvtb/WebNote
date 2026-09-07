@@ -637,6 +637,190 @@ ${chunk}`;
   return translated.join('\n');
 }
 
+// ============================================================
+// SMART SCHEDULE & AI OPTIMIZER FUNCTIONS
+// ============================================================
+
+/**
+ * Interface for AI Smart Schedule Recommendation
+ */
+export interface AIScheduleRecommendation {
+  title: string;
+  date: string; // YYYY-MM-DD
+  startTime: string; // HH:mm
+  endTime: string; // HH:mm
+  estimatedMinutes: number;
+  reasoning: string;
+  priority: 'high' | 'medium' | 'low';
+  taskId?: string;
+  pageId?: string;
+}
+
+/**
+ * AI Optimizer: Generates intelligent schedule recommendations based on unscheduled tasks and existing blocks.
+ */
+export async function generateSmartSchedule(
+  targetDate: string,
+  unscheduledTasks: { id: string; text: string; pageTitle?: string; dueDate?: string; pageId?: string }[],
+  existingBlocks: { startTime?: string; endTime?: string; title: string }[]
+): Promise<{ recommendations: AIScheduleRecommendation[]; summaryHtml: string }> {
+  const apiKey = getGeminiApiKey();
+
+  if (!unscheduledTasks || unscheduledTasks.length === 0) {
+    return {
+      recommendations: [],
+      summaryHtml: '<p class="text-xs text-slate-400">Không có công việc nào chưa lên lịch để xếp.</p>',
+    };
+  }
+
+  const prompt = `Bạn là Chuyên gia Tối ưu Lịch làm việc Thông minh (AI Schedule Optimizer).
+Hãy phân tích các công việc chưa được xếp lịch sau đây và xếp thời gian hợp lý cho ngày ${targetDate}.
+
+CÁC KHUNG GIỜ ĐÃ BỊ CHIẾM TRONG NGÀY:
+${existingBlocks.map((b) => `- ${b.startTime || '??'} - ${b.endTime || '??'}: ${b.title}`).join('\n') || '(Chưa có lịch nào trong ngày)'}
+
+DANH SÁCH CÔNG VIỆC CẦN XẾP LỊCH:
+${unscheduledTasks.map((t) => `- [ID: ${t.id}] ${t.text} (Nguồn: ${t.pageTitle || 'Ghi chú'}, Hạn: ${t.dueDate || 'Không'})`).join('\n')}
+
+QUY TẮC XẾP LỊCH:
+1. Giờ làm việc ưu tiên từ 08:00 đến 18:00, nghỉ trưa 12:00 - 13:30.
+2. Mỗi block tối đa 90 phút, tối thiểu 30 phút. Giữ khoảng nghỉ 15 phút giữa các task.
+3. Task có deadline gần hơn hoặc quan trọng xếp lên buổi sáng (Eat the Frog).
+
+Trả về kết quả chuẩn định dạng JSON duy nhất (không bọc trong triple backticks markdown) theo cấu trúc:
+{
+  "summary": "Mô tả ngắn gọn lý do phân bổ lịch (2-3 câu bằng tiếng Việt HTML)",
+  "recommendations": [
+    {
+      "taskId": "ID công việc tương ứng",
+      "title": "Tên công việc",
+      "date": "${targetDate}",
+      "startTime": "HH:mm",
+      "endTime": "HH:mm",
+      "estimatedMinutes": 60,
+      "priority": "high/medium/low",
+      "reasoning": "Lý do chọn khung giờ này"
+    }
+  ]
+}`;
+
+  try {
+    for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest']) {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.2, maxOutputTokens: 2048 },
+        }),
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        const rawText: string = data.candidates?.[0]?.content?.parts?.[0]?.text || '';
+        const jsonMatch = rawText.match(/\{[\s\S]*\}/);
+        if (jsonMatch) {
+          const parsed = JSON.parse(jsonMatch[0]);
+          return {
+            recommendations: parsed.recommendations || [],
+            summaryHtml: parsed.summary || '<p class="text-xs text-slate-300">Đã tối ưu hóa lịch biểu thành công.</p>',
+          };
+        }
+      }
+    }
+  } catch (err) {
+    console.warn('[Gemini] AI Optimizer error:', err);
+  }
+
+  // Fallback if AI call fails or no API key
+  const fallbackRecs: AIScheduleRecommendation[] = unscheduledTasks.map((t, idx) => {
+    const startHour = 9 + idx;
+    const startTime = `${startHour.toString().padStart(2, '0')}:00`;
+    const endTime = `${(startHour + 1).toString().padStart(2, '0')}:00`;
+    return {
+      taskId: t.id,
+      pageId: t.pageId,
+      title: t.text,
+      date: targetDate,
+      startTime,
+      endTime,
+      estimatedMinutes: 60,
+      priority: 'medium',
+      reasoning: 'Sắp xếp tự động theo thứ tự',
+    };
+  });
+
+  return {
+    recommendations: fallbackRecs,
+    summaryHtml: `<p class="text-xs text-amber-300">Đã tạo lịch đề xuất tự động (Fallback mode). Bạn có thể chỉnh sửa khung giờ tùy thích.</p>`,
+  };
+}
+
+/**
+ * AI Daily Briefing: Generates an inspiring morning overview based on scheduled tasks & full vault context.
+ */
+export async function generateDailyBriefing(
+  todayStr: string,
+  scheduledBlocks: { title: string; startTime?: string; endTime?: string; completed: boolean }[],
+  vaultTaskCount: number
+): Promise<string> {
+  const apiKey = getGeminiApiKey();
+
+  const prompt = `Bạn là Trợ lý AI Cá nhân Thân thiện & Năng lượng cao (Daily Briefing Assistant).
+Hãy tạo một thông điệp Chào Buổi Sáng và Tóm Tắt Kế Hoạch Ngày (${todayStr}) cho người dùng.
+
+THÔNG TIN LỊCH TRÌNH HÔM NAY:
+- Tổng số task trong toàn kho ghi chú: ${vaultTaskCount}
+- Số lịch biểu đã xếp hôm nay: ${scheduledBlocks.length}
+- Các lịch trình chi tiết:
+${scheduledBlocks.map((b) => `  + [${b.completed ? '✅ Đã xong' : '⏳ Chưa làm'}] ${b.startTime || '--:--'} - ${b.endTime || '--:--'}: ${b.title}`).join('\n') || '  (Chưa có lịch biểu nào)'}
+
+YÊU CẦU ĐỊNH DẠNG:
+- Trả về dạng HTML đẹp mắt, hiện đại (dùng CSS Tailwind inline classes như text-cyan-300, text-slate-200, font-bold, space-y-2).
+- Có 3 phần:
+  1. ☀️ Lời Chào & Câu nói truyền cảm hứng (1-2 câu ngắn).
+  2. 🎯 Tóm tắt 2-3 việc trọng tâm nhất trong ngày.
+  3. 💡 Lời khuyên phân bổ năng lượng (Eat the Frog, Pomodoro, hoặc thời gian nghỉ ngơi).
+- Không bọc trong code block markdown (\`\`\`html). Trả về HTML trực tiếp.`;
+
+  if (apiKey) {
+    try {
+      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${apiKey}`;
+      const response = await fetch(endpoint, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          contents: [{ role: 'user', parts: [{ text: prompt }] }],
+          generationConfig: { temperature: 0.7, maxOutputTokens: 1024 },
+        }),
+      });
+      if (response.ok) {
+        const data = await response.json();
+        const html = data.candidates?.[0]?.content?.parts?.[0]?.text;
+        if (html && html.trim()) return html.trim().replace(/^```html|```$/g, '');
+      }
+    } catch (err) {
+      console.warn('[Gemini] Daily Briefing error:', err);
+    }
+  }
+
+  // Fallback Daily Briefing HTML
+  return `
+    <div class="space-y-3 text-xs leading-relaxed text-slate-200">
+      <p class="text-sm font-bold text-amber-300 flex items-center gap-1.5">
+        ☀️ Chào ngày mới! Chúc bạn một ngày làm việc tràn đầy năng lượng và hiệu quả.
+      </p>
+      <div class="p-2.5 bg-slate-800/80 rounded-lg border border-slate-700/60">
+        <p class="font-semibold text-cyan-300 mb-1">🎯 Trọng tâm hôm nay (${todayStr}):</p>
+        <p>Bạn đang có <strong>${scheduledBlocks.length} lịch biểu</strong> đã xếp và <strong>${vaultTaskCount} task</strong> trong toàn bộ kho ghi chú.</p>
+      </div>
+      <p class="text-slate-300">💡 <em>Mẹo nhỏ:</em> Hãy giải quyết công việc quan trọng nhất ngay đầu buổi sáng khi tinh thần minh mẫn nhất (Eat the Frog)!</p>
+    </div>
+  `;
+}
+
+
 
 
 

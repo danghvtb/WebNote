@@ -12,6 +12,7 @@ import type {
   SyncOperation,
   AppStateRecord,
   SearchEntry,
+  ScheduleBlock,
 } from '../../types';
 
 export class MyNotesDB extends Dexie {
@@ -22,6 +23,7 @@ export class MyNotesDB extends Dexie {
   syncQueue!: Table<SyncOperation, string>;
   appState!: Table<AppStateRecord, string>;
   searchIndex!: Table<SearchEntry, string>;
+  scheduleBlocks!: Table<ScheduleBlock, string>;
 
   constructor() {
     super('MyNotesDB');
@@ -35,6 +37,10 @@ export class MyNotesDB extends Dexie {
       appState: 'key',
       searchIndex: 'id, entityId, type, title',
     });
+
+    this.version(2).stores({
+      scheduleBlocks: 'id, date, taskId, pageId, completed, updatedAt',
+    });
   }
 }
 
@@ -47,7 +53,7 @@ export const db = new MyNotesDB();
 export async function clearDatabase(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex],
+    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex, db.scheduleBlocks],
     async () => {
       await db.days.clear();
       await db.notebooks.clear();
@@ -55,6 +61,7 @@ export async function clearDatabase(): Promise<void> {
       await db.revisions.clear();
       await db.syncQueue.clear();
       await db.searchIndex.clear();
+      await db.scheduleBlocks.clear();
     }
   );
 }
