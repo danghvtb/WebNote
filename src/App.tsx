@@ -42,11 +42,21 @@ function AppContent() {
           setRootFolderId(savedFolder);
         }
 
+        // Supabase / Google background session restore
+        import('./services/supabase/supabaseClient').then(async ({ supabase, isSupabaseConfigured }) => {
+          if (isSupabaseConfigured() && supabase) {
+            const { data: { session } } = await supabase.auth.getSession();
+            if (session) {
+              const { syncFromSupabase } = await import('./services/supabase/supabaseSync');
+              syncFromSupabase();
+            }
+          }
+        });
+
         // Initialize Google Auth script & root folder in background
         import('./services/google/auth').then(async ({ initGoogleAuth, ensureAccessToken }) => {
           try {
             await initGoogleAuth();
-            // Attempt auto refresh token if expired
             await ensureAccessToken().catch((err) => {
               console.warn('[App] Silent token restore attempt failed:', err);
             });

@@ -113,14 +113,14 @@ function debouncedSync(): void {
   setStatus('saving');
 
   syncDebounceTimer = setTimeout(async () => {
-    await processSyncQueue();
+    await processGoogleSyncQueue();
   }, 1000);
 }
 
 /**
- * Process all pending sync operations.
+ * Process all pending sync operations (Google Drive).
  */
-async function processSyncQueue(): Promise<void> {
+export async function processGoogleSyncQueue(): Promise<void> {
   if (syncInProgress) return;
   if (!isOnline()) {
     setStatus('offline');
@@ -204,7 +204,7 @@ async function processSyncQueue(): Promise<void> {
 
     // Schedule retry
     const retryDelay = RETRY_DELAY_BASE * Math.pow(2, Math.min(pending[0]?.retries || 0, 5));
-    setTimeout(() => processSyncQueue(), retryDelay);
+    setTimeout(() => processGoogleSyncQueue(), retryDelay);
   } finally {
     syncInProgress = false;
   }
@@ -396,7 +396,7 @@ export async function forceSync(): Promise<void> {
   }
 
   // First push local changes
-  await processSyncQueue();
+  await processGoogleSyncQueue();
 
   // Then pull cloud changes
   await syncFromCloud();
@@ -411,7 +411,7 @@ export function initNetworkListeners(): void {
   window.addEventListener('online', () => {
     console.log('[Sync] Network restored');
     setStatus('syncing');
-    processSyncQueue();
+    processGoogleSyncQueue();
   });
 
   window.addEventListener('offline', () => {
