@@ -1,0 +1,1 @@
+var e=null;function t(){return!1}export{t as isSupabaseConfigured,e as supabase};
