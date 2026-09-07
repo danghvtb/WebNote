@@ -7,6 +7,8 @@ import type { GoogleUser } from '../../types';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
+const DEFAULT_CLIENT_ID = '211817470852-h18qb3h9n9iebd8i0ihaqq9qj2im4947.apps.googleusercontent.com';
+
 // Dynamically get the client ID — allows build-time or runtime config
 function getClientId(): string {
   // Try environment variable first (Vite build-time)
@@ -14,9 +16,7 @@ function getClientId(): string {
   if (envClientId && envClientId !== 'YOUR_GOOGLE_CLIENT_ID') {
     return envClientId;
   }
-  // Fallback for development — must be configured
-  console.warn('[Auth] No VITE_GOOGLE_CLIENT_ID configured. Google login will not work.');
-  return '';
+  return DEFAULT_CLIENT_ID;
 }
 
 interface TokenResponse {
