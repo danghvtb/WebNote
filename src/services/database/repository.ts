@@ -464,21 +464,21 @@ export async function loadFromDatabase(data: {
       await db.pages.bulkPut(data.pages);
     }
 
-    // Load scheduleBlocks if included
+    // Load scheduleBlocks
+    await db.scheduleBlocks.clear();
     if (data.scheduleBlocks?.length) {
-      await db.scheduleBlocks.clear();
       await db.scheduleBlocks.bulkPut(data.scheduleBlocks);
     }
 
-    // Load customTasks if included
+    // Load customTasks
+    await db.customTasks.clear();
     if (data.customTasks?.length) {
-      await db.customTasks.clear();
       await db.customTasks.bulkPut(data.customTasks);
     }
 
-    // Load workCategories if included
+    // Load workCategories
+    await db.workCategories.clear();
     if (data.workCategories?.length) {
-      await db.workCategories.clear();
       await db.workCategories.bulkPut(data.workCategories);
     }
 
