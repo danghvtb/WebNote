@@ -546,7 +546,9 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
 
 /**
  * Real-time Auto-Translate service function
- * Translates input text from sourceLang to targetLang using Gemini AI with MyMemory fallback
+ * Strategy: split by line → translate in parallel via MyMemory (fast ~300ms)
+ * Fallback to Gemini for lines >500 chars or when MyMemory fails.
+ * Preserves line break structure.
  */
 export async function translateLiveText(
   text: string,
@@ -570,63 +572,69 @@ export async function translateLiveText(
 
   const srcName = LANG_NAMES[sourceLang] || sourceLang;
   const tgtName = LANG_NAMES[targetLang] || targetLang;
+  const srcCode = sourceLang === 'auto' ? 'autodetect' : sourceLang;
 
-  const apiKey = getGeminiApiKey();
-  const promptText = `You are a professional translator. Translate the following text accurately from ${srcName} to ${tgtName}.
-Guidelines:
-1. Preserve markdown formatting, line breaks, lists, and checklists intact.
-2. Output ONLY the translated text without commentary, quotes, or preambles.
-
-Text to translate:
-${text}`;
-
-  const modelsToTry = ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-1.5-pro', 'gemini-flash-latest'];
-
-  for (const model of modelsToTry) {
+  /** Fast path: MyMemory API (~200-400ms per chunk) */
+  const translateChunkMyMemory = async (chunk: string): Promise<string | null> => {
     try {
-      const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
-      const response = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: promptText }] }],
-          generationConfig: {
-            temperature: 0.1,
-            maxOutputTokens: 4096,
-          },
-        }),
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        const output = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (output && output.trim()) {
-          return output.trim();
-        }
-      }
-    } catch (err) {
-      console.warn(`[Gemini Translate ${model} error]:`, err);
-    }
-  }
-
-  // Secondary Fallback: Free Public MyMemory Translation API
-  try {
-    const srcCode = sourceLang === 'auto' ? 'autodetect' : sourceLang;
-    const myMemoryUrl = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(text.slice(0, 500))}&langpair=${srcCode}|${targetLang}`;
-    const res = await fetch(myMemoryUrl);
-    if (res.ok) {
+      const url = `https://api.mymemory.translated.net/get?q=${encodeURIComponent(chunk.slice(0, 500))}&langpair=${srcCode}|${targetLang}`;
+      const res = await fetch(url);
+      if (!res.ok) return null;
       const data = await res.json();
-      const translated = data.responseData?.translatedText;
-      if (translated && !translated.startsWith('MYMEMORY WARNING')) {
-        return translated;
+      const translated: string = data.responseData?.translatedText;
+      if (translated && !translated.startsWith('MYMEMORY WARNING') && translated.trim()) {
+        return translated.trim();
+      }
+    } catch {
+      /* ignore */
+    }
+    return null;
+  };
+
+  /** Fallback: Gemini (handles long text and complex structure) */
+  const translateChunkGemini = async (chunk: string): Promise<string | null> => {
+    const apiKey = getGeminiApiKey();
+    const prompt = `Translate ONLY the text below from ${srcName} to ${tgtName}. Output ONLY the translated text, nothing else.
+
+${chunk}`;
+    for (const model of ['gemini-2.0-flash', 'gemini-1.5-flash', 'gemini-flash-latest']) {
+      try {
+        const endpoint = `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${apiKey}`;
+        const response = await fetch(endpoint, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            contents: [{ role: 'user', parts: [{ text: prompt }] }],
+            generationConfig: { temperature: 0.1, maxOutputTokens: 2048 },
+          }),
+        });
+        if (response.ok) {
+          const data = await response.json();
+          const output: string = data.candidates?.[0]?.content?.parts?.[0]?.text;
+          if (output && output.trim()) return output.trim();
+        }
+      } catch {
+        /* try next model */
       }
     }
-  } catch (err) {
-    console.warn('[MyMemory Translate Fallback Error]:', err);
-  }
+    return null;
+  };
 
-  // Tertiary Local Dictionary / Clean Fallback
-  return `[${targetLang.toUpperCase()}] ${text}`;
+  /** Translate one line: MyMemory first (fast), Gemini fallback */
+  const translateLine = async (line: string): Promise<string> => {
+    if (!line.trim()) return ''; // preserve blank lines
+    if (line.length <= 500) {
+      const fast = await translateChunkMyMemory(line);
+      if (fast) return fast;
+    }
+    const gemini = await translateChunkGemini(line);
+    return gemini ?? `[${targetLang.toUpperCase()}] ${line}`;
+  };
+
+  // Split by newlines, translate all lines in parallel, rejoin
+  const lines = text.split('\n');
+  const translated = await Promise.all(lines.map(translateLine));
+  return translated.join('\n');
 }
 
 

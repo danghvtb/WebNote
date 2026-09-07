@@ -46,13 +46,19 @@ export function AutoTranslateBlock({
 
   const debounceTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
-  // Helper to extract clean plain text from note HTML for accurate translation
+  // Helper to extract clean plain text preserving line breaks from note HTML
   const getCleanText = (html: string): string => {
     if (!html) return '';
     if (typeof document !== 'undefined') {
+      // Replace block-level tags with newlines to preserve paragraph structure
+      const withBreaks = html
+        .replace(/<\/(p|div|h[1-6]|li|br|blockquote|tr)>/gi, '\n')
+        .replace(/<br\s*\/?>/gi, '\n');
       const tempDiv = document.createElement('div');
-      tempDiv.innerHTML = html;
-      return tempDiv.innerText || tempDiv.textContent || '';
+      tempDiv.innerHTML = withBreaks;
+      const text = tempDiv.innerText || tempDiv.textContent || '';
+      // Collapse 3+ consecutive newlines to max 2
+      return text.replace(/\n{3,}/g, '\n\n').trim();
     }
     return html.replace(/<[^>]*>/g, ' ');
   };
@@ -83,7 +89,7 @@ export function AutoTranslateBlock({
       } finally {
         setIsLoading(false);
       }
-    }, 600); // 600ms debounce for smooth live typing
+    }, 250); // 250ms debounce — near-instant live translation
 
     return () => {
       if (debounceTimerRef.current) clearTimeout(debounceTimerRef.current);
@@ -238,8 +244,14 @@ export function AutoTranslateBlock({
         </div>
 
         {translatedText ? (
-          <div className="whitespace-pre-wrap leading-relaxed text-slate-200 font-normal">
-            {translatedText}
+          <div className="leading-relaxed text-slate-200 font-normal space-y-1.5">
+            {translatedText.split('\n').map((line, i) =>
+              line.trim() ? (
+                <p key={i} className="text-xs leading-relaxed">{line}</p>
+              ) : (
+                <div key={i} className="h-1" />
+              )
+            )}
           </div>
         ) : (
           <div className="text-slate-500 italic text-[11px] py-4 text-center">
