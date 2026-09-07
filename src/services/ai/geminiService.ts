@@ -7,13 +7,8 @@ import type { Page } from '../../types';
 
 const GEMINI_KEY_STORAGE_KEY = 'mynotes_gemini_api_key';
 
-function getDefaultKey(): string {
-  const chars = [65, 81, 46, 65, 98, 56, 82, 78, 54, 74, 105, 75, 72, 84, 55, 95, 107, 112, 90, 108, 50, 72, 119, 73, 75, 88, 105, 122, 87, 98, 49, 87, 121, 87, 71, 110, 50, 81, 113, 117, 112, 100, 119, 77, 103, 109, 104, 114, 113, 122, 104, 76, 81];
-  return String.fromCharCode(...chars);
-}
-
 /**
- * Get stored Gemini API key or fallback to default key
+ * Get stored Gemini API key or fallback to environment variable
  */
 export function getGeminiApiKey(): string {
   if (typeof localStorage !== 'undefined') {
@@ -22,7 +17,7 @@ export function getGeminiApiKey(): string {
       return customKey.trim();
     }
   }
-  return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || getDefaultKey();
+  return (typeof import.meta !== 'undefined' && import.meta.env?.VITE_GEMINI_API_KEY) || '';
 }
 
 /**
