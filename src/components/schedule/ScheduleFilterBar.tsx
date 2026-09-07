@@ -54,7 +54,7 @@ export function ScheduleFilterBar() {
     searchFilter.priority !== 'all';
 
   return (
-    <div className="bg-slate-900/90 border-b border-slate-800 p-3 sm:px-6 space-y-3 backdrop-blur-sm animate-in slide-in-from-top-2 duration-150">
+    <div className="bg-slate-900/90 border-b border-slate-800 p-3 sm:px-6 space-y-3 backdrop-blur-sm animate-in slide-in-from-top-2 duration-150 relative z-20">
       {/* Top Filter Controls Grid */}
       <div className="grid grid-cols-1 sm:grid-cols-2 md:grid-cols-5 gap-2.5">
         {/* Keyword Search */}

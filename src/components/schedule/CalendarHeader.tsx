@@ -77,7 +77,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
   };
 
   return (
-    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm gap-2.5">
+    <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between p-3 sm:px-6 sm:py-3.5 border-b border-slate-800 bg-slate-900/80 backdrop-blur-sm gap-2.5 relative z-30">
       {/* Date Navigation Left */}
       <div className="flex items-center justify-between sm:justify-start gap-2 relative">
         <div className="flex items-center gap-1.5">
