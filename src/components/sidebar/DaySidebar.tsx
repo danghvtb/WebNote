@@ -37,9 +37,14 @@ export function DaySidebar() {
     loadCounts();
   }, [days]);
 
-  // Group by month
+  // Keep days with notes and always keep today visible, even when it is empty.
+  const visibleDaysWithCounts = daysWithCounts.filter(
+    (day) => day.notebookCount > 0 || isToday(day.date),
+  );
+
+  // Group visible days by month
   const grouped = new Map<string, DayWithCount[]>();
-  for (const day of daysWithCounts) {
+  for (const day of visibleDaysWithCounts) {
     const label = getMonthLabel(day.date);
     if (!grouped.has(label)) grouped.set(label, []);
     grouped.get(label)!.push(day);
@@ -51,7 +56,7 @@ export function DaySidebar() {
 
   return (
     <aside
-      className="w-56 h-full flex flex-col flex-shrink-0 glass-sidebar hidden lg:flex"
+      className="w-56 h-full flex flex-col flex-shrink-0 glass-sidebar"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -74,7 +79,7 @@ export function DaySidebar() {
 
       {/* Day List */}
       <div className="flex-1 overflow-y-auto px-2 py-2">
-        {daysWithCounts.length === 0 ? (
+        {visibleDaysWithCounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <Calendar className="w-8 h-8 mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
             <p className="text-sm text-center" style={{ color: 'var(--color-text-tertiary)' }}>
