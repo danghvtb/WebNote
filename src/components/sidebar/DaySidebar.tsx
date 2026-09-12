@@ -6,6 +6,7 @@
 import { useEffect } from 'react';
 import { Calendar, Plus } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
+import { useAppStore } from '../../stores/appStore';
 import { formatDateDisplay, getMonthLabel, isToday } from '../../utils';
 import { getAllVaultNotebooks } from '../../services/database/repository';
 import { useState } from 'react';
@@ -22,6 +23,7 @@ interface DaySidebarProps {
 
 export function DaySidebar({ mobile = false }: DaySidebarProps) {
   const { days, selectedDayId, selectDay, selectToday, loadDays } = useNotesStore();
+  const { setMobileDaySidebarOpen } = useAppStore();
   const [daysWithCounts, setDaysWithCounts] = useState<DayWithCount[]>([]);
 
   useEffect(() => {
@@ -89,6 +91,12 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
 
   const handleToday = () => {
     selectToday();
+    if (mobile) setMobileDaySidebarOpen(false);
+  };
+
+  const handleDaySelect = (dayId: string) => {
+    selectDay(dayId);
+    if (mobile) setMobileDaySidebarOpen(false);
   };
 
   return (
@@ -145,7 +153,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                 return (
                   <button
                     key={day.id}
-                    onClick={() => selectDay(day.id)}
+                    onClick={() => handleDaySelect(day.id)}
                     className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg mb-0.5 transition-colors cursor-pointer"
                     style={{
                       background: selected ? 'var(--color-bg-active)' : 'transparent',
