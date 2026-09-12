@@ -181,7 +181,7 @@ export function WeekView() {
                     <div className="space-y-2 flex-1">
                       {dayBlocks.length > 0 ? (
                         dayBlocks.map((block) => (
-                          <ScheduleBlockCard key={block.id} block={block} />
+                          <ScheduleBlockCard key={block.id} block={block} variant="week" />
                         ))
                       ) : (
                         <div className="py-8 text-center text-[10px] text-slate-600 font-semibold italic">

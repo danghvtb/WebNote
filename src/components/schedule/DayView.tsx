@@ -7,7 +7,7 @@ import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
 import { todayDate } from '../../utils';
 import { formatLunarDateFull } from '../../utils/lunarCalendar';
-import type { ScheduleBlock } from '../../types';
+import { computeDayViewLayout } from './dayViewLayout';
 
 const HOUR_HEIGHT = 64; // 64px per hour (approx 1px per minute)
 const START_HOUR = 6;  // Timeline starts at 06:00
@@ -19,79 +19,7 @@ export function DayView() {
   const dayBlocks = getFilteredBlocks().filter((b) => b.date === selectedDate);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 
-  // Helper to convert "HH:mm" to minutes from START_HOUR
-  const getMinutesFromStart = (timeStr?: string, defaultHour = 9): number => {
-    if (!timeStr) return (defaultHour - START_HOUR) * 60;
-    const [h, m] = timeStr.split(':').map(Number);
-    const hourVal = isNaN(h) ? defaultHour : h;
-    const minVal = isNaN(m) ? 0 : m;
-    return Math.max(0, (hourVal - START_HOUR) * 60 + minVal);
-  };
-
-  // Helper to calculate overlap groups and column positions
-  const computePositionedBlocks = (blocks: ScheduleBlock[]) => {
-    const parsed = blocks.map((block) => {
-      const startMin = getMinutesFromStart(block.startTime, 9);
-      let endMin = getMinutesFromStart(block.endTime, 10);
-      if (endMin <= startMin) endMin = startMin + 60; // minimum 60 mins if invalid
-      return {
-        block,
-        startMin,
-        endMin,
-        durationMins: endMin - startMin,
-        colIndex: 0,
-        totalCols: 1,
-      };
-    });
-
-    // Sort by startMin asc, duration desc
-    parsed.sort((a, b) => a.startMin - b.startMin || b.durationMins - a.durationMins);
-
-    // Group overlapping blocks
-    const clusters: typeof parsed[] = [];
-    let currentCluster: typeof parsed = [];
-    let clusterEnd = -1;
-
-    for (const item of parsed) {
-      if (currentCluster.length === 0) {
-        currentCluster.push(item);
-        clusterEnd = item.endMin;
-      } else if (item.startMin < clusterEnd) {
-        currentCluster.push(item);
-        clusterEnd = Math.max(clusterEnd, item.endMin);
-      } else {
-        clusters.push(currentCluster);
-        currentCluster = [item];
-        clusterEnd = item.endMin;
-      }
-    }
-    if (currentCluster.length > 0) {
-      clusters.push(currentCluster);
-    }
-
-    // Assign column indices per cluster
-    for (const cluster of clusters) {
-      const columns: typeof parsed = [];
-
-      for (const item of cluster) {
-        let col = 0;
-        while (columns[col] && columns[col].endMin > item.startMin) {
-          col++;
-        }
-        item.colIndex = col;
-        columns[col] = item;
-      }
-
-      const totalCols = Math.max(...cluster.map((i) => i.colIndex)) + 1;
-      for (const item of cluster) {
-        item.totalCols = totalCols;
-      }
-    }
-
-    return parsed;
-  };
-
-  const positionedBlocks = computePositionedBlocks(dayBlocks);
+  const positionedBlocks = computeDayViewLayout(dayBlocks, START_HOUR);
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Prevent trigger if clicking on an event card
@@ -189,16 +117,12 @@ export function DayView() {
 
             {/* Absolute Positioned Events Layer */}
             <div className="absolute left-14 sm:left-16 right-0 top-0 bottom-0 pointer-events-none">
-              {positionedBlocks.map(({ block, startMin, durationMins, colIndex, totalCols }) => {
-                // Top position: 64px per hour -> (startMin / 60) * 64
+              {positionedBlocks.map(({ block, startMin, durationMins, columnIndex, columnCount, columnSpan }) => {
                 const topPx = (startMin / 60) * HOUR_HEIGHT;
-
-                // Height: (durationMins / 60) * 64px (e.g. 9 hours = 9 * 64 = 576px)
-                const heightPx = Math.max(48, (durationMins / 60) * HOUR_HEIGHT - 4); // gap of 4px
-
-                // Calculate horizontal position & width percentage for overlapping blocks
-                const widthPercent = 100 / totalCols;
-                const leftPercent = colIndex * widthPercent;
+                const heightPx = Math.max(1, (durationMins / 60) * HOUR_HEIGHT - 4);
+                const widthPercent = (columnSpan / columnCount) * 100;
+                const leftPercent = (columnIndex / columnCount) * 100;
+                const density = heightPx < 40 ? 'tiny' : heightPx < 64 ? 'compact' : 'default';
 
                 return (
                   <div
@@ -212,7 +136,7 @@ export function DayView() {
                     }}
                   >
                     <div className="h-full w-full overflow-hidden flex flex-col">
-                      <ScheduleBlockCard block={block} />
+                      <ScheduleBlockCard block={block} density={density} fillHeight />
                     </div>
                   </div>
                 );
