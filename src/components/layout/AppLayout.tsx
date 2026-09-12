@@ -67,7 +67,7 @@ export function AppLayout() {
 
                 {/* Drawer Content */}
                 <div className="flex-1 overflow-y-auto">
-                  {mobileDaySidebarOpen ? <DaySidebar /> : <NotebookSidebar />}
+                  {mobileDaySidebarOpen ? <DaySidebar mobile /> : <NotebookSidebar />}
                 </div>
               </div>
             </div>

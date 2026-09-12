@@ -16,7 +16,11 @@ interface DayWithCount {
   notebookCount: number;
 }
 
-export function DaySidebar() {
+interface DaySidebarProps {
+  mobile?: boolean;
+}
+
+export function DaySidebar({ mobile = false }: DaySidebarProps) {
   const { days, selectedDayId, selectDay, selectToday, loadDays } = useNotesStore();
   const [daysWithCounts, setDaysWithCounts] = useState<DayWithCount[]>([]);
 
@@ -56,7 +60,7 @@ export function DaySidebar() {
 
   return (
     <aside
-      className="w-56 h-full flex flex-col flex-shrink-0 glass-sidebar"
+      className={`${mobile ? 'w-full min-h-full' : 'w-56 h-full'} flex flex-col flex-shrink-0 glass-sidebar`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -78,7 +82,7 @@ export function DaySidebar() {
       </div>
 
       {/* Day List */}
-      <div className="flex-1 overflow-y-auto px-2 py-2">
+      <div className={`${mobile ? 'flex-none overflow-visible' : 'flex-1 overflow-y-auto'} px-2 py-2`}>
         {visibleDaysWithCounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <Calendar className="w-8 h-8 mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
