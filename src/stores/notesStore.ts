@@ -294,7 +294,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   deletePage: async (pageId) => {
-    const { selectedPageId, selectedNotebookId, pages } = get();
+    const { selectedPageId, pages } = get();
 
     // 1. Calculate smart adjacent page selection if active page is being deleted
     let nextSelectedPageId: string | null = selectedPageId;

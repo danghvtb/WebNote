@@ -290,7 +290,6 @@ export async function processGoogleSyncQueue(): Promise<void> {
     const pendingOps = await db.syncQueue.where('status').equals('pending').toArray();
     const updatedPageIds = new Set<string>();
     const deletedPageIds: string[] = [];
-    let structureChanged = false;
 
     for (const op of pendingOps) {
       if (op.entity === 'page' && op.type === 'update') {

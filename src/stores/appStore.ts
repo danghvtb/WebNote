@@ -4,7 +4,7 @@
 // ============================================================
 
 import { create } from 'zustand';
-import type { GoogleUser, SyncStatus, AppTheme } from '../types';
+import type { GoogleUser, SyncStatus, AppTheme, Notification } from '../types';
 
 interface AppState {
   // Auth
@@ -42,7 +42,7 @@ interface AppState {
   initialSyncMessage: string;
 
   // Notifications
-  notifications: { id: string; type: 'success' | 'error' | 'warning' | 'info'; message: string }[];
+  notifications: Notification[];
 
   // Actions
   setAuth: (user: GoogleUser | null, token: string | null) => void;
@@ -67,6 +67,7 @@ interface AppState {
   setRootFolderId: (folderId: string | null) => void;
   setNeedsFolderCreation: (needs: boolean) => void;
   setInitialSyncComplete: (done: boolean) => void;
+  setInitialSyncMessage: (msg: string) => void;
   trashModalOpen: boolean;
   setTrashModalOpen: (open: boolean) => void;
   addNotification: (
