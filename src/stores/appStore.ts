@@ -37,6 +37,10 @@ interface AppState {
   rootFolderId: string | null;
   needsFolderCreation: boolean;
 
+  // Sync guard — blocks UI & push until initial cloud pull finishes
+  initialSyncComplete: boolean;
+  initialSyncMessage: string;
+
   // Notifications
   notifications: { id: string; type: 'success' | 'error' | 'warning' | 'info'; message: string }[];
 
@@ -62,6 +66,8 @@ interface AppState {
   setInitialized: (initialized: boolean) => void;
   setRootFolderId: (folderId: string | null) => void;
   setNeedsFolderCreation: (needs: boolean) => void;
+  setInitialSyncComplete: (done: boolean) => void;
+  setInitialSyncMessage: (msg: string) => void;
   addNotification: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
   removeNotification: (id: string) => void;
 }
@@ -94,6 +100,9 @@ export const useAppStore = create<AppState>((set) => ({
   rootFolderId: null,
   needsFolderCreation: false,
 
+  initialSyncComplete: false,
+  initialSyncMessage: '',
+
   notifications: [],
 
   // Actions
@@ -119,12 +128,18 @@ export const useAppStore = create<AppState>((set) => ({
     localStorage.removeItem('mynotes_user');
     localStorage.removeItem('mynotes_token');
     localStorage.removeItem('mynotes_root_folder');
+    // Reset sync guard so next login does a fresh pull
+    import('../services/sync/syncManager').then(({ resetInitialPullState }) => {
+      resetInitialPullState();
+    });
     set({
       isLoggedIn: false,
       user: null,
       accessToken: null,
       initialized: false,
       rootFolderId: null,
+      initialSyncComplete: false,
+      initialSyncMessage: '',
     });
   },
 
@@ -167,6 +182,8 @@ export const useAppStore = create<AppState>((set) => ({
     set({ rootFolderId: folderId });
   },
   setNeedsFolderCreation: (needs) => set({ needsFolderCreation: needs }),
+  setInitialSyncComplete: (done) => set({ initialSyncComplete: done }),
+  setInitialSyncMessage: (msg) => set({ initialSyncMessage: msg }),
 
   addNotification: (type, message) => {
     const id = crypto.randomUUID();

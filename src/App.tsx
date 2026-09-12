@@ -1,12 +1,14 @@
 // ============================================================
 // MyNotes — Main App Component
 // Root component: handles auth state and renders appropriate view.
+// Pull-first sync guard ensures cloud data is loaded before UI.
 // ============================================================
 
 import { useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { LoginPage } from './components/auth/LoginPage';
 import { CreateFolderPrompt } from './components/auth/CreateFolderPrompt';
+import { SyncLoadingScreen } from './components/auth/SyncLoadingScreen';
 import { AppLayout } from './components/layout/AppLayout';
 import { SearchModal } from './components/search/SearchModal';
 import { CreateNotebookModal } from './components/modal/CreateNotebookModal';
@@ -21,19 +23,28 @@ import { GraphViewModal } from './components/modal/GraphViewModal';
 import { TaskManagerModal } from './components/modal/TaskManagerModal';
 import { ExportModal } from './components/modal/ExportModal';
 
+// Sync timeout — 30 seconds max wait before allowing user in
+const SYNC_TIMEOUT_MS = 30_000;
+
 function AppContent() {
   const {
     isLoggedIn, needsFolderCreation, setSyncStatus, setLastSyncTime, setTheme,
     setAuth, setRootFolderId, setInitialized, addNotification,
+    initialSyncComplete, initialSyncMessage,
+    setInitialSyncComplete, setInitialSyncMessage,
   } = useAppStore();
 
-  // Restore session from localStorage on reload
+  // ─── Session restore: sequential pull-first sync ───
   useEffect(() => {
     const savedUserStr = localStorage.getItem('mynotes_user');
     const savedToken = localStorage.getItem('mynotes_token');
     const savedFolder = localStorage.getItem('mynotes_root_folder');
 
-    if (savedUserStr) {
+    if (!savedUserStr) return;
+
+    let syncTimedOut = false;
+
+    const restoreSession = async () => {
       try {
         const savedUser = JSON.parse(savedUserStr);
         setAuth(savedUser, savedToken);
@@ -42,56 +53,99 @@ function AppContent() {
           setRootFolderId(savedFolder);
         }
 
-        // Supabase / Google background session restore
-        import('./services/supabase/supabaseClient').then(async ({ supabase, isSupabaseConfigured }) => {
+        // Mark as logged in but NOT sync complete yet — show loading screen
+        setInitialSyncComplete(false);
+        setInitialSyncMessage('Đang khôi phục phiên đăng nhập...');
+        setInitialized(true);
+
+        // Pre-import for use in sync timeout callback
+        const { markInitialPullComplete: unlockPull } = await import('./services/sync/syncManager');
+
+        // ── Safety timeout: auto-unlock after SYNC_TIMEOUT_MS ──
+        const timeoutId = setTimeout(() => {
+          syncTimedOut = true;
+          console.warn('[App] Sync timeout reached — unlocking UI with local data.');
+          unlockPull();
+          setInitialSyncComplete(true);
+          addNotification('warning', 'Đồng bộ mất quá lâu. Dữ liệu có thể chưa được cập nhật đầy đủ.');
+        }, SYNC_TIMEOUT_MS);
+
+        // ── Step 1: Try Supabase sync first ──
+        let supabaseSynced = false;
+        try {
+          const { supabase, isSupabaseConfigured } = await import('./services/supabase/supabaseClient');
           if (isSupabaseConfigured() && supabase) {
             const { data: { session } } = await supabase.auth.getSession();
             if (session) {
+              setInitialSyncMessage('Đang tải dữ liệu từ Supabase...');
               const { syncFromSupabase } = await import('./services/supabase/supabaseSync');
-              syncFromSupabase({ isConnectOrLogin: true });
+              await syncFromSupabase({ isConnectOrLogin: true });
+              supabaseSynced = true;
             }
           }
-        });
+        } catch (err) {
+          console.warn('[App] Supabase session restore:', err);
+        }
 
-        // Initialize Google Auth script & root folder in background
-        import('./services/google/auth').then(async ({ initGoogleAuth, ensureAccessToken }) => {
+        // ── Step 2: Google Drive sync (if Supabase didn't handle it) ──
+        if (!supabaseSynced && !syncTimedOut) {
           try {
+            setInitialSyncMessage('Đang kết nối Google Drive...');
+            const { initGoogleAuth, ensureAccessToken } = await import('./services/google/auth');
             await initGoogleAuth();
             await ensureAccessToken().catch((err) => {
-              console.warn('[App] Silent token restore attempt failed:', err);
+              console.warn('[App] Silent token restore failed:', err);
             });
 
+            setInitialSyncMessage('Đang kiểm tra thư mục MyNotes...');
             const { ensureRootFolder } = await import('./services/google/rootFolderManager');
             const res = await ensureRootFolder();
+
             if (res.status === 'found') {
               setRootFolderId(res.folderId);
-              // Perform cloud sync on session restore (pull-only download from Drive first)
+
+              setInitialSyncMessage('Đang tải dữ liệu từ Google Drive...');
               const { syncFromCloud } = await import('./services/sync/syncManager');
-              await syncFromCloud({ isConnectOrLogin: true }).catch((err) => console.warn('[App] Cloud sync error:', err));
+              await syncFromCloud({ isConnectOrLogin: true });
+            } else {
+              // No folder or error — enable push, user starts fresh
+              const { markInitialPullComplete } = await import('./services/sync/syncManager');
+              markInitialPullComplete();
             }
           } catch (err) {
-            console.warn('[App] Background auth/folder init warning:', err);
+            console.warn('[App] Google Drive session restore error:', err);
+            // Enable push on error so app doesn't deadlock
+            const { markInitialPullComplete } = await import('./services/sync/syncManager');
+            markInitialPullComplete();
           }
-        });
+        }
 
-        // Auto load notes and schedule from IndexedDB
-        Promise.all([
-          import('./services/sync/syncManager').then(({ refreshActiveNotesStore }) => {
-            refreshActiveNotesStore();
-          }),
-          import('./stores/scheduleStore').then(({ useScheduleStore }) => {
-            const scheduleStore = useScheduleStore.getState();
-            scheduleStore.loadAllBlocks();
-            scheduleStore.loadTasksAndCategories();
-          }),
-        ]);
+        // ── Clear timeout & finalize ──
+        clearTimeout(timeoutId);
 
-        setInitialized(true);
+        if (!syncTimedOut) {
+          setInitialSyncComplete(true);
+          setInitialSyncMessage('');
+        }
+
+        // Load schedule data into stores after sync
+        try {
+          const { useScheduleStore } = await import('./stores/scheduleStore');
+          const scheduleStore = useScheduleStore.getState();
+          await scheduleStore.loadAllBlocks();
+          await scheduleStore.loadTasksAndCategories();
+        } catch (err) {
+          console.warn('[App] Schedule store load error:', err);
+        }
       } catch (err) {
         console.warn('[App] Session restore error:', err);
+        setInitialSyncComplete(true);
+        setInitialSyncMessage('');
       }
-    }
-  }, [setAuth, setRootFolderId, setInitialized]);
+    };
+
+    restoreSession();
+  }, [setAuth, setRootFolderId, setInitialized, setInitialSyncComplete, setInitialSyncMessage, addNotification]);
 
   // Initialize theme
   useEffect(() => {
@@ -195,9 +249,14 @@ function AppContent() {
   // Keyboard shortcuts
   useKeyboardShortcuts();
 
-  // Auth flow routing
+  // ─── Auth flow routing with sync guard ───
   if (!isLoggedIn) {
     return <LoginPage />;
+  }
+
+  // Show loading screen while initial cloud pull is in progress
+  if (!initialSyncComplete) {
+    return <SyncLoadingScreen message={initialSyncMessage} />;
   }
 
   if (needsFolderCreation) {

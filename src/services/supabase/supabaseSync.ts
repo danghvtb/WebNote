@@ -59,6 +59,13 @@ export async function pushToSupabase(): Promise<void> {
     return processGoogleSyncQueue();
   }
 
+  // ── SYNC GUARD: Block push until initial pull completes ──
+  const { isInitialPullComplete } = await import('../sync/syncManager');
+  if (!isInitialPullComplete()) {
+    console.log('[Supabase Sync] Push blocked — initial pull not complete.');
+    return;
+  }
+
   const { data: { session } } = await supabase.auth.getSession();
   if (!session) {
     setStatus('auth_required', 'Cần đăng nhập lại Supabase');
@@ -161,9 +168,23 @@ export async function syncFromSupabase(options?: { isConnectOrLogin?: boolean })
 
     lastSyncTime = nowISO();
     setStatus('saved');
+
+    // ── Mark initial pull as complete — push operations now allowed ──
+    if (options?.isConnectOrLogin) {
+      const { markInitialPullComplete } = await import('../sync/syncManager');
+      markInitialPullComplete();
+      console.log('[Supabase Sync] Initial pull complete — push enabled.');
+    }
   } catch (err: any) {
     console.error('[Supabase Sync] Pull Error:', err);
     setStatus('error', err?.message || 'Download failed');
+
+    // Even on error, allow push after login attempt so app is usable
+    if (options?.isConnectOrLogin) {
+      const { markInitialPullComplete } = await import('../sync/syncManager');
+      markInitialPullComplete();
+      console.warn('[Supabase Sync] Pull failed but enabling push to avoid deadlock.');
+    }
   } finally {
     syncInProgress = false;
   }

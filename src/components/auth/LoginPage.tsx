@@ -16,13 +16,18 @@ export function LoginPage() {
   const [error, setError] = useState<string | null>(null);
   const [step, setStep] = useState<string>('');
 
-  const { setAuth, setRootFolderId, setInitialized, setNeedsFolderCreation } = useAppStore();
+  const { setAuth, setRootFolderId, setInitialized, setNeedsFolderCreation,
+    setInitialSyncComplete, setInitialSyncMessage } = useAppStore();
 
   const handleLogin = async () => {
     setLoading(true);
     setError(null);
 
     try {
+      // Reset sync guard for fresh login
+      const { resetInitialPullState } = await import('../../services/sync/syncManager');
+      resetInitialPullState();
+
       // Step 1: Initialize Google Auth
       setStep('Initializing...');
       await initGoogleAuth();
@@ -48,9 +53,16 @@ export function LoginPage() {
 
         setStep('Downloading your notes from Google Drive...');
         await syncFromCloud({ isConnectOrLogin: true });
+
+        // Sync complete — mark as ready
+        setInitialSyncComplete(true);
+        setInitialSyncMessage('');
         setInitialized(true);
       } else if (result.status === 'not_found') {
-        // Need to ask user to create folder
+        // Need to ask user to create folder — no cloud data to pull
+        const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+        markInitialPullComplete();
+        setInitialSyncComplete(true);
         setNeedsFolderCreation(true);
         setInitialized(true);
       } else if (result.status === 'multiple') {
@@ -64,14 +76,23 @@ export function LoginPage() {
 
         setStep('Downloading your notes from Google Drive...');
         await syncFromCloud({ isConnectOrLogin: true });
+
+        setInitialSyncComplete(true);
+        setInitialSyncMessage('');
         setInitialized(true);
       } else if (result.status === 'error') {
         setError(result.error);
+        // Allow push on error so app isn't stuck
+        const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+        markInitialPullComplete();
+        setInitialSyncComplete(true);
       }
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'Login failed';
       setError(msg);
       console.error('[Login]', err);
+      // Ensure app isn't stuck if login fails
+      setInitialSyncComplete(true);
     } finally {
       setLoading(false);
       setStep('');
@@ -142,6 +163,10 @@ export function LoginPage() {
         {/* Offline Demo Mode Button */}
         <button
           onClick={async () => {
+            // Offline mode — bypass sync guard entirely
+            const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+            markInitialPullComplete();
+            setInitialSyncComplete(true);
             setAuth(
               { name: 'Demo User', email: 'demo@mynotes.local' },
               'demo-token'
@@ -172,6 +197,10 @@ export function LoginPage() {
             <button
               type="button"
               onClick={async () => {
+                // Offline mode — bypass sync guard entirely
+                const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+                markInitialPullComplete();
+                setInitialSyncComplete(true);
                 setAuth(
                   { name: 'Demo User', email: 'demo@mynotes.local' },
                   'demo-token'

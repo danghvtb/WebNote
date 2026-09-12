@@ -25,6 +25,9 @@ const listeners: Set<SyncListener> = new Set();
 let currentStatus: SyncStatus = 'idle';
 let lastSyncTime: string | null = null;
 let syncInProgress = false;
+
+// ── Sync Guard: Block all push operations until initial pull is complete ──
+let initialPullComplete = false;
 let syncDebounceTimer: ReturnType<typeof setTimeout> | null = null;
 
 const MAX_RETRIES = 5;
@@ -58,6 +61,28 @@ export function getLastSyncTime(): string | null {
 function setStatus(status: SyncStatus, message?: string): void {
   currentStatus = status;
   listeners.forEach((l) => l(status, message));
+}
+
+/**
+ * Check if the initial cloud pull has completed.
+ * Returns false during login/session-restore until syncFromCloud finishes.
+ */
+export function isInitialPullComplete(): boolean {
+  return initialPullComplete;
+}
+
+/**
+ * Mark the initial pull as complete — enables push operations.
+ */
+export function markInitialPullComplete(): void {
+  initialPullComplete = true;
+}
+
+/**
+ * Reset pull state — call on logout or account switch.
+ */
+export function resetInitialPullState(): void {
+  initialPullComplete = false;
 }
 
 // Helper to get or find file ID with caching
@@ -140,6 +165,12 @@ export async function queueSync(
 
   await db.syncQueue.put(op);
 
+  // ── SYNC GUARD: Do NOT push to cloud until initial pull finishes ──
+  if (!initialPullComplete) {
+    console.log('[Sync] Initial pull not complete yet — queued locally, skipping push.');
+    return;
+  }
+
   if (type === 'delete') {
     // Immediate async sync for deletions (non-blocking)
     if (syncDebounceTimer) clearTimeout(syncDebounceTimer);
@@ -168,6 +199,12 @@ function debouncedSync(): void {
  * Unified trigger for active cloud sync provider or local fallback.
  */
 export async function triggerSync(): Promise<void> {
+  // ── SYNC GUARD: Block push until initial pull is done ──
+  if (!initialPullComplete) {
+    console.log('[Sync] triggerSync blocked — initial pull not complete.');
+    return;
+  }
+
   if (!isOnline()) {
     setStatus('offline');
     return;
@@ -507,9 +544,21 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
 
     // Refresh active notesStore state after cloud sync
     await refreshActiveNotesStore();
+
+    // ── Mark initial pull as complete — push operations are now allowed ──
+    if (options?.isConnectOrLogin) {
+      initialPullComplete = true;
+      console.log('[Sync] Initial pull complete — push operations enabled.');
+    }
   } catch (error) {
     console.error('[Sync] Error syncing from cloud:', error);
     setStatus('error', error instanceof Error ? error.message : 'Sync failed');
+
+    // Even on error, allow push after login attempt so app is usable
+    if (options?.isConnectOrLogin) {
+      initialPullComplete = true;
+      console.warn('[Sync] Initial pull failed but enabling push to avoid deadlock.');
+    }
   } finally {
     syncInProgress = false;
   }
