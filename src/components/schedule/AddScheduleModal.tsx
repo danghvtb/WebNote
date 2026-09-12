@@ -8,6 +8,7 @@ import { X, Calendar } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { todayDate } from '../../utils';
 import type { ScheduleBlock, RecurrenceFrequency } from '../../types';
+import { Time24Picker } from '../common/Time24Picker';
 
 export function AddScheduleModal() {
   const {
@@ -195,40 +196,24 @@ export function AddScheduleModal() {
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Bắt Đầu (24h)</label>
-              <select
+              <Time24Picker
                 value={startTime}
-                onChange={(e) => setStartTime(e.target.value)}
-                className="w-full px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60 font-mono"
-              >
-                {Array.from({ length: 24 }, (_, i) => {
-                  const h = i.toString().padStart(2, '0');
-                  return (
-                    <React.Fragment key={h}>
-                      <option value={`${h}:00`}>{h}:00</option>
-                      <option value={`${h}:30`}>{h}:30</option>
-                    </React.Fragment>
-                  );
-                })}
-              </select>
+                onChange={setStartTime}
+                className="w-full px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl focus-within:border-purple-500/60"
+                inputClassName="text-slate-200 font-mono"
+                ariaLabel="Giờ bắt đầu theo định dạng 24 giờ"
+              />
             </div>
 
             <div>
               <label className="block text-xs font-semibold text-slate-300 mb-1">Kết Thúc (24h)</label>
-              <select
+              <Time24Picker
                 value={endTime}
-                onChange={(e) => setEndTime(e.target.value)}
-                className="w-full px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl text-slate-200 focus:outline-none focus:border-purple-500/60 font-mono"
-              >
-                {Array.from({ length: 24 }, (_, i) => {
-                  const h = i.toString().padStart(2, '0');
-                  return (
-                    <React.Fragment key={h}>
-                      <option value={`${h}:00`}>{h}:00</option>
-                      <option value={`${h}:30`}>{h}:30</option>
-                    </React.Fragment>
-                  );
-                })}
-              </select>
+                onChange={setEndTime}
+                className="w-full px-2.5 py-2 text-xs bg-slate-950 border border-slate-800 rounded-xl focus-within:border-purple-500/60"
+                inputClassName="text-slate-200 font-mono"
+                ariaLabel="Giờ kết thúc theo định dạng 24 giờ"
+              />
             </div>
           </div>
 

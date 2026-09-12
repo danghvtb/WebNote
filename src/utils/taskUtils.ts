@@ -54,6 +54,31 @@ export function formatForDateTimeInput(dateStr?: string): string {
 }
 
 /**
+ * Split a deadline into values suitable for separate date and 24-hour time inputs.
+ */
+export function getDateTimeInputParts(dateStr?: string): { date: string; time: string } {
+  const normalized = formatForDateTimeInput(dateStr);
+  return {
+    date: normalized.slice(0, 10),
+    time: normalized.slice(11, 16),
+  };
+}
+
+/**
+ * Join separate date/time input values without changing the stored deadline format.
+ */
+export function combineDateTimeInputParts(
+  datePart: string,
+  timePart: string,
+  fallbackDate?: string,
+): string | null {
+  if (!datePart && !timePart) return null;
+
+  const resolvedDate = datePart || fallbackDate || formatDateTimeISO(new Date()).slice(0, 10);
+  return timePart ? `${resolvedDate}T${timePart}` : resolvedDate;
+}
+
+/**
  * Parse Natural Language Date phrases into exact YYYY-MM-DDTHH:mm string
  * Handles: @today, @homnay, @tomorrow, @ngaymai, @thuhai, @sau 3 gio, @in 2 hours, @YYYY-MM-DD HH:mm
  */

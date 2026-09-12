@@ -6,7 +6,13 @@
 import { NodeViewWrapper, NodeViewContent, type NodeViewProps } from '@tiptap/react';
 import { useState, useRef, useEffect } from 'react';
 import { Calendar, Zap, Trash2, Clock, AlertTriangle } from 'lucide-react';
-import { formatRelativeDeadline, getQuickPresetDate, formatForDateTimeInput } from '../../utils/taskUtils';
+import { Time24Picker } from '../common/Time24Picker';
+import {
+  formatRelativeDeadline,
+  getQuickPresetDate,
+  getDateTimeInputParts,
+  combineDateTimeInputParts,
+} from '../../utils/taskUtils';
 
 export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProps) {
   const [popoverOpen, setPopoverOpen] = useState(false);
@@ -14,6 +20,7 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
 
   const isChecked = node.attrs.checked;
   const dueDate = node.attrs.due as string | undefined;
+  const deadlineParts = getDateTimeInputParts(dueDate);
 
   const relativeTime = dueDate ? formatRelativeDeadline(dueDate) : null;
 
@@ -42,6 +49,14 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
   const handlePreset = (action: 'today' | 'tomorrow' | 'add_1h' | 'add_1d' | 'add_1w') => {
     const newDate = getQuickPresetDate(action, dueDate);
     handleSetDue(newDate);
+  };
+
+  const handleDeadlineDateChange = (datePart: string) => {
+    handleSetDue(datePart ? combineDateTimeInputParts(datePart, deadlineParts.time) : null);
+  };
+
+  const handleDeadlineTimeChange = (timePart: string) => {
+    handleSetDue(timePart ? combineDateTimeInputParts(deadlineParts.date, timePart) : null);
   };
 
   return (
@@ -149,14 +164,28 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
               </button>
             </div>
 
-            {/* Datetime-local picker */}
-            <div className="flex items-center gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 focus-within:border-purple-500/50">
-              <input
-                type="datetime-local"
-                value={formatForDateTimeInput(dueDate)}
-                onChange={(e) => handleSetDue(e.target.value)}
-                className="w-full text-xs bg-transparent outline-none cursor-pointer text-purple-300 font-semibold"
-              />
+            {/* Explicit date + 24-hour time picker */}
+            <div className="grid grid-cols-[1.15fr_0.85fr] gap-1 bg-slate-950 px-2 py-1.5 rounded-lg border border-slate-800 focus-within:border-purple-500/50">
+              <label className="min-w-0">
+                <span className="block text-[9px] text-slate-500 mb-0.5">Ngày</span>
+                <input
+                  type="date"
+                  lang="en-GB"
+                  value={deadlineParts.date}
+                  onChange={(e) => handleDeadlineDateChange(e.target.value)}
+                  className="w-full min-w-0 text-[11px] bg-transparent outline-none cursor-pointer text-purple-300 font-semibold"
+                  aria-label="Ngày deadline"
+                />
+              </label>
+              <label className="min-w-0">
+                <span className="block text-[9px] text-slate-500 mb-0.5">Giờ (24h)</span>
+                <Time24Picker
+                  value={deadlineParts.time}
+                  onChange={handleDeadlineTimeChange}
+                  inputClassName="text-[11px] text-purple-300 font-semibold"
+                  ariaLabel="Giờ deadline theo định dạng 24 giờ"
+                />
+              </label>
             </div>
 
             {dueDate && (

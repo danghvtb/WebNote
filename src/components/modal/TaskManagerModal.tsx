@@ -10,12 +10,14 @@ import { queueSync } from '../../services/sync/syncManager';
 import { getAllVaultPages, getAllVaultNotebooks } from '../../services/database/repository';
 import type { Page, Notebook } from '../../types';
 import { todayDate } from '../../utils';
+import { Time24Picker } from '../common/Time24Picker';
 import {
   parseAllTasks,
   updateTaskDueDateInHtml,
   formatRelativeDeadline,
   getQuickPresetDate,
-  formatForDateTimeInput,
+  getDateTimeInputParts,
+  combineDateTimeInputParts,
   isValidDueDate,
   type ParsedTask,
 } from '../../utils/taskUtils';
@@ -109,6 +111,22 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
   const handleApplyPreset = async (task: ParsedTask, action: 'today' | 'tomorrow' | 'add_1h' | 'add_1d' | 'add_1w') => {
     const newDateStr = getQuickPresetDate(action, task.dueDate);
     await handleDateChange(task, newDateStr);
+  };
+
+  const handleDeadlineDateChange = async (task: ParsedTask, datePart: string) => {
+    const current = getDateTimeInputParts(task.dueDate);
+    await handleDateChange(
+      task,
+      datePart ? combineDateTimeInputParts(datePart, current.time) || '' : '',
+    );
+  };
+
+  const handleDeadlineTimeChange = async (task: ParsedTask, timePart: string) => {
+    const current = getDateTimeInputParts(task.dueDate);
+    await handleDateChange(
+      task,
+      timePart ? combineDateTimeInputParts(current.date, timePart) || '' : current.date,
+    );
   };
 
   // Filter tasks based on selected tab and search term
@@ -448,22 +466,43 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
                       )}
                     </div>
 
-                    {/* Exact Date & Time Picker */}
+                    {/* Explicit date + 24-hour time picker */}
                     <div className="flex items-center gap-1 bg-slate-900 px-2 py-1 rounded-lg border border-slate-800 focus-within:border-purple-500/50">
-                      <Calendar className={`w-3.5 h-3.5 ${isOverdue ? 'text-rose-400' : 'text-slate-400'}`} />
-                      <input
-                        type="datetime-local"
-                        value={formatForDateTimeInput(task.dueDate)}
-                        onChange={(e) => handleDateChange(task, e.target.value)}
-                        className={`text-[11px] bg-transparent outline-none cursor-pointer ${
-                          isOverdue
-                            ? 'text-rose-300 font-bold'
-                            : task.dueDate
-                            ? 'text-purple-300 font-semibold'
-                            : 'text-slate-500'
-                        }`}
-                        title="Chọn ngày & giờ deadline cụ thể"
-                      />
+                      <Calendar className={`w-3.5 h-3.5 flex-shrink-0 ${isOverdue ? 'text-rose-400' : 'text-slate-400'}`} />
+                      <div className="grid grid-cols-[1.15fr_0.85fr] gap-1 min-w-0 flex-1">
+                        <label className="min-w-0">
+                          <span className="block text-[9px] text-slate-500 mb-0.5">Ngày</span>
+                          <input
+                            type="date"
+                            lang="en-GB"
+                            value={getDateTimeInputParts(task.dueDate).date}
+                            onChange={(e) => handleDeadlineDateChange(task, e.target.value)}
+                            className={`w-full min-w-0 text-[11px] bg-transparent outline-none cursor-pointer ${
+                              isOverdue
+                                ? 'text-rose-300 font-bold'
+                                : task.dueDate
+                                ? 'text-purple-300 font-semibold'
+                                : 'text-slate-500'
+                            }`}
+                            aria-label="Ngày deadline"
+                          />
+                        </label>
+                        <label className="min-w-0">
+                          <span className="block text-[9px] text-slate-500 mb-0.5">Giờ (24h)</span>
+                          <Time24Picker
+                            value={getDateTimeInputParts(task.dueDate).time}
+                            onChange={(time) => handleDeadlineTimeChange(task, time)}
+                            inputClassName={`text-[11px] ${
+                              isOverdue
+                                ? 'text-rose-300 font-bold'
+                                : task.dueDate
+                                ? 'text-purple-300 font-semibold'
+                                : 'text-slate-500'
+                            }`}
+                            ariaLabel="Giờ deadline theo định dạng 24 giờ"
+                          />
+                        </label>
+                      </div>
                     </div>
 
                     {/* Notebook Badge & Page Link */}
