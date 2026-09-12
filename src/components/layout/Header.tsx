@@ -16,7 +16,7 @@ export function Header() {
     user, syncStatus, lastSyncTime, syncMessage,
     toggleSearch, setSettingsOpen, logout, setGraphViewOpen,
     setTaskManagerOpen, setExportModalOpen, setTrashModalOpen,
-    mobileSidebarOpen, setMobileSidebarOpen,
+    mobileSidebarOpen, setMobileSidebarOpen, setMobileDaySidebarOpen,
   } = useAppStore();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
@@ -101,7 +101,11 @@ export function Header() {
       <div className="flex items-center gap-2">
         <button
           className="md:hidden p-1.5 rounded-lg cursor-pointer hover:bg-slate-800 text-slate-300 transition-colors"
-          onClick={() => setMobileSidebarOpen(!mobileSidebarOpen)}
+          onClick={() => {
+            const nextOpen = !mobileSidebarOpen;
+            setMobileSidebarOpen(nextOpen);
+            if (nextOpen) setMobileDaySidebarOpen(true);
+          }}
           aria-label="Toggle notebook sidebar"
           title="Notebooks & Pages"
         >
