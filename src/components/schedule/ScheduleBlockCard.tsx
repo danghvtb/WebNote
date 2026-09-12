@@ -64,8 +64,9 @@ export function ScheduleBlockCard({
   return (
     <div
       ref={cardRef}
+      data-no-period-drag
       onClick={handleCardClick}
-      className={`group relative ${fillHeight ? 'h-full min-h-0' : ''} ${cardPadding} rounded-xl border transition-all cursor-pointer select-none shadow-sm hover:shadow-md flex flex-col justify-between ${
+      className={`event-card-container group relative ${fillHeight ? 'h-full min-h-0' : ''} ${cardPadding} rounded-xl border transition-all cursor-pointer select-none shadow-sm hover:shadow-md flex flex-col justify-between ${
         block.completed
           ? 'bg-slate-900 border-emerald-500/40 hover:border-emerald-400'
           : 'bg-slate-900 border-slate-800 hover:border-purple-500/50 hover:bg-slate-850'

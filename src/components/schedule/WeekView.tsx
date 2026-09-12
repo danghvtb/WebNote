@@ -3,57 +3,43 @@
 // 7-day interactive time-slot grid with Drag & Slot Click creation
 // ============================================================
 
+import { useCallback, useRef } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
-import { todayDate } from '../../utils';
+import { formatDateISO, todayDate } from '../../utils';
 import { formatLunarDateShort } from '../../utils/lunarCalendar';
+import { usePeriodDragNavigation } from './usePeriodDragNavigation';
 
 export function WeekView() {
   const { selectedDate, getFilteredBlocks, setAddModalOpen, setSelectedDate } = useScheduleStore();
   const blocks = getFilteredBlocks();
+  const scrollRef = useRef<HTMLDivElement>(null);
 
-  // Navigation handlers for swipe
-  const handlePrevWeek = () => {
-    const d = new Date(selectedDate);
+  const handlePrevWeek = useCallback(() => {
+    const d = new Date(`${selectedDate}T00:00:00`);
     d.setDate(d.getDate() - 7);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
+    setSelectedDate(formatDateISO(d));
+  }, [selectedDate, setSelectedDate]);
 
-  const handleNextWeek = () => {
-    const d = new Date(selectedDate);
+  const handleNextWeek = useCallback(() => {
+    const d = new Date(`${selectedDate}T00:00:00`);
     d.setDate(d.getDate() + 7);
-    setSelectedDate(d.toISOString().split('T')[0]);
-  };
+    setSelectedDate(formatDateISO(d));
+  }, [selectedDate, setSelectedDate]);
 
-  // Swipe / Drag handling
-  let touchStartX = 0;
-  let touchEndX = 0;
-
-  const handleTouchStart = (e: React.TouchEvent) => {
-    touchStartX = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchMove = (e: React.TouchEvent) => {
-    touchEndX = e.targetTouches[0].clientX;
-  };
-
-  const handleTouchEnd = () => {
-    if (!touchStartX || !touchEndX) return;
-    const diff = touchStartX - touchEndX;
-    if (diff > 60) {
-      // Swiped left -> Next week
-      handleNextWeek();
-    } else if (diff < -60) {
-      // Swiped right -> Prev week
-      handlePrevWeek();
-    }
-    touchStartX = 0;
-    touchEndX = 0;
-  };
+  const periodDrag = usePeriodDragNavigation({
+    mode: 'scroll',
+    onPrevious: handlePrevWeek,
+    onNext: handleNextWeek,
+    scrollRef,
+    resetScrollKey: selectedDate,
+    snapColumns: 7,
+  });
 
   // Compute 7 days of the current week based on selectedDate (Mon - Sun)
   const getWeekDays = () => {
-    const current = new Date(selectedDate);
+    const current = new Date(`${selectedDate}T00:00:00`);
     const dayOfWeek = current.getDay();
     // Normalize Monday to index 0
     const distanceToMon = dayOfWeek === 0 ? -6 : 1 - dayOfWeek;
@@ -66,7 +52,7 @@ export function WeekView() {
     for (let i = 0; i < 7; i++) {
       const d = new Date(mon);
       d.setDate(mon.getDate() + i);
-      const dateStr = d.toISOString().split('T')[0];
+      const dateStr = formatDateISO(d);
       week.push({
         dateStr,
         dayName: DAY_NAMES[i],
@@ -85,12 +71,32 @@ export function WeekView() {
   };
 
   return (
-    <div
-      onTouchStart={handleTouchStart}
-      onTouchMove={handleTouchMove}
-      onTouchEnd={handleTouchEnd}
-      className="flex-1 flex flex-col overflow-hidden bg-slate-950 select-none relative"
-    >
+    <div className="flex-1 flex flex-col overflow-hidden bg-slate-950 select-none relative">
+      {periodDrag.feedback.direction && (
+        <div
+          className={`absolute inset-y-0 z-40 pointer-events-none flex items-center ${
+            periodDrag.feedback.direction === 'previous' ? 'left-3' : 'right-3'
+          }`}
+          style={{ opacity: 0.35 + periodDrag.feedback.progress * 0.65 }}
+        >
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-full border shadow-xl backdrop-blur-md text-xs font-bold ${
+              periodDrag.thresholdReached
+                ? 'bg-purple-600/90 border-purple-300/70 text-white'
+                : 'bg-slate-900/90 border-slate-700 text-slate-200'
+            }`}
+          >
+            {periodDrag.feedback.direction === 'previous' && <ChevronLeft className="w-4 h-4" />}
+            <span>
+              {periodDrag.thresholdReached
+                ? `Thả để sang tuần ${periodDrag.feedback.direction === 'previous' ? 'trước' : 'sau'}`
+                : 'Kéo thêm để chuyển tuần'}
+            </span>
+            {periodDrag.feedback.direction === 'next' && <ChevronRight className="w-4 h-4" />}
+          </div>
+        </div>
+      )}
+
       {/* Floating Prev/Next Week Quick Navigation Buttons for Desktop Mouse Drag / Quick Click */}
       <div className="absolute top-16 left-2 z-30 hidden sm:flex">
         <button
@@ -113,8 +119,16 @@ export function WeekView() {
       </div>
 
       {/* Scrollable Container for Mobile Horizontal Swipe */}
-      <div className="flex-1 overflow-x-auto overflow-y-auto flex flex-col min-w-full">
-        <div className="min-w-[650px] sm:min-w-full flex-1 flex flex-col">
+      <div
+        ref={scrollRef}
+        {...periodDrag.bind}
+        style={periodDrag.surfaceStyle}
+        className="flex-1 overflow-x-auto overflow-y-auto flex flex-col min-w-full overscroll-x-contain"
+      >
+        <div
+          className="min-w-[650px] sm:min-w-full flex-1 flex flex-col"
+          style={periodDrag.contentStyle}
+        >
           {/* 7 Column Header */}
           <div className="grid grid-cols-7 border-b border-slate-800 bg-slate-900/50 sticky top-0 z-10">
             {weekDays.map((day) => (

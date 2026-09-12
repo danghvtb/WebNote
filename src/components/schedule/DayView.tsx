@@ -3,11 +3,14 @@
 // Google Calendar / Outlook style absolute positioning canvas
 // ============================================================
 
+import { useCallback } from 'react';
+import { ChevronLeft, ChevronRight } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { ScheduleBlockCard } from './ScheduleBlockCard';
-import { todayDate } from '../../utils';
+import { formatDateISO, todayDate } from '../../utils';
 import { formatLunarDateFull } from '../../utils/lunarCalendar';
 import { computeDayViewLayout } from './dayViewLayout';
+import { usePeriodDragNavigation } from './usePeriodDragNavigation';
 
 const HOUR_HEIGHT = 64; // 64px per hour (approx 1px per minute)
 const START_HOUR = 6;  // Timeline starts at 06:00
@@ -15,11 +18,28 @@ const END_HOUR = 23;   // Timeline ends at 23:00
 const TOTAL_HOURS = END_HOUR - START_HOUR + 1;
 
 export function DayView() {
-  const { selectedDate, getFilteredBlocks, setAddModalOpen } = useScheduleStore();
+  const { selectedDate, getFilteredBlocks, setAddModalOpen, setSelectedDate } = useScheduleStore();
   const dayBlocks = getFilteredBlocks().filter((b) => b.date === selectedDate);
   const hours = Array.from({ length: TOTAL_HOURS }, (_, i) => i + START_HOUR);
 
   const positionedBlocks = computeDayViewLayout(dayBlocks, START_HOUR);
+
+  const changeDay = useCallback(
+    (amount: number) => {
+      const date = new Date(`${selectedDate}T00:00:00`);
+      date.setDate(date.getDate() + amount);
+      setSelectedDate(formatDateISO(date));
+    },
+    [selectedDate, setSelectedDate],
+  );
+
+  const handlePreviousDay = useCallback(() => changeDay(-1), [changeDay]);
+  const handleNextDay = useCallback(() => changeDay(1), [changeDay]);
+  const periodDrag = usePeriodDragNavigation({
+    mode: 'page',
+    onPrevious: handlePreviousDay,
+    onNext: handleNextDay,
+  });
 
   const handleCanvasClick = (e: React.MouseEvent<HTMLDivElement>) => {
     // Prevent trigger if clicking on an event card
@@ -41,8 +61,33 @@ export function DayView() {
   const nowTop = (currentHour - START_HOUR) * HOUR_HEIGHT + (currentMin / 60) * HOUR_HEIGHT;
 
   return (
-    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-4 sm:p-6 select-none">
-      <div className="max-w-4xl mx-auto w-full space-y-4">
+    <div className="flex-1 flex flex-col overflow-y-auto bg-slate-950 p-4 sm:p-6 select-none relative">
+      {periodDrag.feedback.direction && (
+        <div
+          className={`sticky top-1/2 z-40 h-0 pointer-events-none flex items-center ${
+            periodDrag.feedback.direction === 'previous' ? 'justify-start' : 'justify-end'
+          }`}
+          style={{ opacity: 0.35 + periodDrag.feedback.progress * 0.65 }}
+        >
+          <div
+            className={`flex items-center gap-2 px-3 py-2 rounded-full border shadow-xl backdrop-blur-md text-xs font-bold ${
+              periodDrag.thresholdReached
+                ? 'bg-purple-600/90 border-purple-300/70 text-white'
+                : 'bg-slate-900/90 border-slate-700 text-slate-200'
+            }`}
+          >
+            {periodDrag.feedback.direction === 'previous' && <ChevronLeft className="w-4 h-4" />}
+            <span>
+              {periodDrag.thresholdReached
+                ? `Thả để sang ngày ${periodDrag.feedback.direction === 'previous' ? 'trước' : 'sau'}`
+                : 'Kéo thêm để chuyển ngày'}
+            </span>
+            {periodDrag.feedback.direction === 'next' && <ChevronRight className="w-4 h-4" />}
+          </div>
+        </div>
+      )}
+
+      <div className="max-w-4xl mx-auto w-full space-y-4" style={periodDrag.contentStyle}>
         {/* Header Summary Toolbar */}
         <div className="flex items-center justify-between p-4 bg-slate-900/90 border border-slate-800 rounded-2xl shadow-sm">
           <div className="flex flex-col sm:flex-row sm:items-center gap-1.5 sm:gap-3">
@@ -66,10 +111,14 @@ export function DayView() {
         </div>
 
         {/* Timeline Canvas Container */}
-        <div className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-6 relative shadow-inner overflow-hidden">
+        <div
+          {...periodDrag.bind}
+          style={periodDrag.surfaceStyle}
+          className="bg-slate-900/60 border border-slate-800/80 rounded-2xl p-4 sm:p-6 relative shadow-inner overflow-hidden"
+        >
           {/* Background Hourly Grid Lines & Labels */}
           <div
-            className="relative cursor-pointer"
+            className="relative"
             style={{ height: TOTAL_HOURS * HOUR_HEIGHT }}
             onClick={handleCanvasClick}
           >
