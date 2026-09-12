@@ -22,6 +22,7 @@ import { initNetworkListeners, onSyncStatusChange } from './services/sync/syncMa
 import { GraphViewModal } from './components/modal/GraphViewModal';
 import { TaskManagerModal } from './components/modal/TaskManagerModal';
 import { ExportModal } from './components/modal/ExportModal';
+import { TrashModal } from './components/modal/TrashModal';
 
 // Sync timeout — 30 seconds max wait before allowing user in
 const SYNC_TIMEOUT_MS = 30_000;
@@ -279,6 +280,7 @@ export default function App() {
       <GraphViewModal />
       <TaskManagerModal isOpen={taskManagerOpen} onClose={() => setTaskManagerOpen(false)} />
       <ExportModal isOpen={exportModalOpen} onClose={() => setExportModalOpen(false)} />
+      <TrashModal />
       <Toasts />
     </ErrorBoundary>
   );

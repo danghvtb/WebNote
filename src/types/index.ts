@@ -145,6 +145,10 @@ export interface Notification {
   type: NotificationType;
   message: string;
   duration?: number;
+  action?: {
+    label: string;
+    onClick: () => void;
+  };
 }
 
 // --- Google Drive Types ---

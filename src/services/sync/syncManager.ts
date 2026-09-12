@@ -151,6 +151,15 @@ export async function queueSync(
   entityId: string,
   data?: unknown
 ): Promise<void> {
+  // When deleting an entity, clear any previous pending operations for this entityId
+  // to avoid zombie updates resurrecting a deleted item
+  if (type === 'delete') {
+    const staleOps = await db.syncQueue.where('entityId').equals(entityId).toArray().catch(() => []);
+    for (const stale of staleOps) {
+      await db.syncQueue.delete(stale.id).catch(() => {});
+    }
+  }
+
   const op: SyncOperation = {
     id: generateId('sync'),
     type,
@@ -288,9 +297,6 @@ export async function processGoogleSyncQueue(): Promise<void> {
         updatedPageIds.add(op.entityId);
       } else if (op.entity === 'page' && op.type === 'delete') {
         deletedPageIds.push(op.entityId);
-        structureChanged = true;
-      } else {
-        structureChanged = true;
       }
     }
 
@@ -321,11 +327,9 @@ export async function processGoogleSyncQueue(): Promise<void> {
       }
     }
 
-    // Incremental page sync: Only sync pages that changed if structure didn't radically change,
-    // or sync all modified pages in parallel batches
-    const pagesToSync = structureChanged
-      ? dbData.pages
-      : dbData.pages.filter((p) => updatedPageIds.has(p.id));
+    // Incremental page sync: Only sync individual pages that were actually updated/created
+    // Never re-sync all other unchanged pages just because one page was deleted!
+    const pagesToSync = dbData.pages.filter((p) => updatedPageIds.has(p.id));
 
     if (pagesToSync.length > 0) {
       await syncPagesFolderIncremental(rootFolderId, pagesToSync);
@@ -483,7 +487,9 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
     const pagesFolder = await getCachedFileId(rootFolderId, 'pages');
     if (pagesFolder) {
       const pageFiles = await listFiles(pagesFolder);
-      const activePageIds = new Set(dbData.pages?.map((p: Page) => p.id) || []);
+      const activePageIds = new Set(
+        dbData.pages?.filter((p: Page) => !p.deleted).map((p: Page) => p.id) || []
+      );
 
       // Download page files in parallel batches of 5
       const BATCH_SIZE = 5;

@@ -27,11 +27,14 @@ interface NotesState {
   // Mobile UI
   mobileView: 'days' | 'notebooks' | 'editor';
 
+  deletedPages: Page[];
+
   // Actions — Data Loading
   loadDays: () => Promise<void>;
   loadNotebooksByDay: (dayId: string) => Promise<void>;
   loadPagesByNotebook: (notebookId: string) => Promise<void>;
   loadRecentNotebooks: () => Promise<void>;
+  loadDeletedPages: () => Promise<void>;
 
   // Actions — Selection
   selectDay: (dayId: string) => void;
@@ -49,6 +52,8 @@ interface NotesState {
   updatePageContent: (pageId: string, content: string) => Promise<void>;
   updatePageTitle: (pageId: string, title: string) => Promise<void>;
   deletePage: (pageId: string) => Promise<void>;
+  restorePage: (pageId: string) => Promise<void>;
+  permanentlyDeletePage: (pageId: string) => Promise<void>;
   reorderPages: (notebookId: string, pageIds: string[]) => Promise<void>;
 
   // Actions — Mobile
@@ -74,6 +79,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   pagesLoading: false,
 
   mobileView: 'days',
+
+  deletedPages: [],
 
   // ── Data Loading ──
 
@@ -128,6 +135,15 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       set({ recentNotebooks: recent });
     } catch (error) {
       console.error('[NotesStore] Failed to load recent:', error);
+    }
+  },
+
+  loadDeletedPages: async () => {
+    try {
+      const deleted = await repo.getDeletedPages();
+      set({ deletedPages: deleted });
+    } catch (error) {
+      console.error('[NotesStore] Failed to load deleted pages:', error);
     }
   },
 
@@ -279,16 +295,55 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   deletePage: async (pageId) => {
     const { selectedPageId, selectedNotebookId, pages } = get();
+
+    // 1. Calculate smart adjacent page selection if active page is being deleted
+    let nextSelectedPageId: string | null = selectedPageId;
+    if (selectedPageId === pageId) {
+      const currentIndex = pages.findIndex((p) => p.id === pageId);
+      const remainingPages = pages.filter((p) => p.id !== pageId);
+      if (remainingPages.length === 0) {
+        nextSelectedPageId = null;
+      } else if (currentIndex < remainingPages.length) {
+        // Next page at same index
+        nextSelectedPageId = remainingPages[currentIndex].id;
+      } else {
+        // Was last page, select previous
+        nextSelectedPageId = remainingPages[remainingPages.length - 1].id;
+      }
+    }
+
+    // 2. Optimistic UI update immediately (no UI stutter)
+    set({
+      pages: pages.filter((p) => p.id !== pageId),
+      selectedPageId: nextSelectedPageId,
+    });
+
+    // 3. Perform soft delete in repository
     await repo.deletePage(pageId);
 
-    if (selectedPageId === pageId) {
-      const remainingPages = pages.filter((p) => p.id !== pageId);
-      set({ selectedPageId: remainingPages.length > 0 ? remainingPages[0].id : null });
-    }
+    // 4. Reload deleted pages in background
+    get().loadDeletedPages();
+  },
 
-    if (selectedNotebookId) {
-      await get().loadPagesByNotebook(selectedNotebookId);
+  restorePage: async (pageId) => {
+    const restored = await repo.restorePage(pageId);
+    if (restored) {
+      const { selectedNotebookId } = get();
+      if (selectedNotebookId === restored.notebookId) {
+        await get().loadPagesByNotebook(selectedNotebookId);
+      }
+      set({ selectedPageId: restored.id });
+      get().loadDeletedPages();
     }
+  },
+
+  permanentlyDeletePage: async (pageId) => {
+    await repo.permanentlyDeletePage(pageId);
+    set((s) => ({
+      deletedPages: s.deletedPages.filter((p) => p.id !== pageId),
+      pages: s.pages.filter((p) => p.id !== pageId),
+    }));
+    get().loadDeletedPages();
   },
 
   reorderPages: async (notebookId, pageIds) => {

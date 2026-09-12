@@ -3,7 +3,7 @@
 // Top bar: logo, search, sync status, user avatar.
 // ============================================================
 
-import { Search, Cloud, CloudOff, Loader2, AlertTriangle, Check, Menu, Network, CheckSquare, Download, Calendar } from 'lucide-react';
+import { Search, Cloud, CloudOff, Loader2, AlertTriangle, Check, Menu, Network, CheckSquare, Download, Calendar, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { formatTime } from '../../utils';
@@ -15,7 +15,7 @@ export function Header() {
   const {
     user, syncStatus, lastSyncTime, syncMessage,
     toggleSearch, setSettingsOpen, logout, setGraphViewOpen,
-    setTaskManagerOpen, setExportModalOpen,
+    setTaskManagerOpen, setExportModalOpen, setTrashModalOpen,
     mobileSidebarOpen, setMobileSidebarOpen,
   } = useAppStore();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -171,6 +171,15 @@ export function Header() {
         >
           <Download className="w-5 h-5 text-emerald-400" />
           <span className="hidden lg:inline">Export</span>
+        </button>
+
+        <button
+          onClick={() => setTrashModalOpen(true)}
+          className="p-2 rounded-xl text-slate-300 hover:text-rose-300 hover:bg-rose-950/30 transition-all cursor-pointer flex items-center gap-1.5 text-sm font-semibold border border-transparent hover:border-rose-500/30"
+          title="Thùng rác (Trash Bin)"
+        >
+          <Trash2 className="w-5 h-5 text-rose-400" />
+          <span className="hidden lg:inline">Thùng rác</span>
         </button>
         {renderSyncStatus()}
 

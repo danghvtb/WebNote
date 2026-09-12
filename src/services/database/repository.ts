@@ -330,14 +330,19 @@ export async function updatePageTitle(
 }
 
 /**
- * Soft-delete a page.
+ * Soft-delete a page (move to Trash).
  */
 export async function deletePage(pageId: string): Promise<void> {
   const page = await db.pages.get(pageId);
   if (!page) return;
 
-  // Delete from IndexedDB
-  await db.pages.delete(pageId);
+  const now = nowISO();
+
+  // Mark as deleted in IndexedDB
+  await db.pages.update(pageId, {
+    deleted: true,
+    updatedAt: now,
+  });
 
   // Remove from notebook's pageIds
   const notebook = await db.notebooks.get(page.notebookId);
@@ -345,12 +350,92 @@ export async function deletePage(pageId: string): Promise<void> {
     const updatedPageIds = notebook.pageIds.filter((id) => id !== pageId);
     await db.notebooks.update(notebook.id, {
       pageIds: updatedPageIds,
-      updatedAt: nowISO(),
+      updatedAt: now,
     });
   }
 
   // Remove from search index
   await db.searchIndex.where('entityId').equals(pageId).delete();
+}
+
+/**
+ * Restore a soft-deleted page back into its notebook.
+ */
+export async function restorePage(pageId: string): Promise<Page | null> {
+  const page = await db.pages.get(pageId);
+  if (!page) return null;
+
+  const now = nowISO();
+
+  // Restore page record
+  const restoredPage: Page = {
+    ...page,
+    deleted: false,
+    updatedAt: now,
+  };
+  await db.pages.put(restoredPage);
+
+  // Re-add to notebook's pageIds if not present
+  const notebook = await db.notebooks.get(page.notebookId);
+  if (notebook) {
+    if (!notebook.pageIds.includes(pageId)) {
+      const updatedPageIds = [...notebook.pageIds, pageId];
+      await db.notebooks.update(notebook.id, {
+        pageIds: updatedPageIds,
+        updatedAt: now,
+      });
+    }
+    await updateSearchIndexForPage(restoredPage, notebook.title);
+  }
+
+  return restoredPage;
+}
+
+/**
+ * Permanently delete a page (Hard delete from Dexie and clean up revisions/schedules).
+ */
+export async function permanentlyDeletePage(pageId: string): Promise<void> {
+  const page = await db.pages.get(pageId);
+
+  // Remove from IndexedDB pages table
+  await db.pages.delete(pageId);
+
+  // Remove from notebook if still present
+  if (page) {
+    const notebook = await db.notebooks.get(page.notebookId);
+    if (notebook && notebook.pageIds.includes(pageId)) {
+      const updatedPageIds = notebook.pageIds.filter((id) => id !== pageId);
+      await db.notebooks.update(notebook.id, {
+        pageIds: updatedPageIds,
+        updatedAt: nowISO(),
+      });
+    }
+  }
+
+  // Remove from search index
+  await db.searchIndex.where('entityId').equals(pageId).delete();
+
+  // Clean up all revisions of this page
+  await db.revisions.where('pageId').equals(pageId).delete().catch(() => {});
+
+  // Clean up or detach any scheduleBlocks linked to this page
+  const linkedBlocks = await db.scheduleBlocks.where('pageId').equals(pageId).toArray();
+  for (const block of linkedBlocks) {
+    await db.scheduleBlocks.update(block.id, {
+      pageId: undefined,
+      updatedAt: nowISO(),
+    });
+  }
+}
+
+/**
+ * Get all soft-deleted pages (Trash).
+ */
+export async function getDeletedPages(): Promise<Page[]> {
+  return db.pages
+    .filter((p) => !!p.deleted)
+    .reverse()
+    .sortBy('updatedAt');
 }
 
 /**
@@ -509,8 +594,9 @@ export async function exportDatabase(): Promise<{
   workCategories: WorkCategory[];
 }> {
   const days = await db.days.toArray();
-  const notebooks = await db.notebooks.filter((nb) => !nb.deleted).toArray();
-  const pages = await db.pages.filter((p) => !p.deleted).toArray();
+  const notebooks = await db.notebooks.toArray();
+  // Include both active and soft-deleted pages so Trash Bin syncs across devices
+  const pages = await db.pages.toArray();
   const scheduleBlocks = await db.scheduleBlocks.toArray();
   const customTasks = await db.customTasks.toArray();
   const workCategories = await db.workCategories.toArray();

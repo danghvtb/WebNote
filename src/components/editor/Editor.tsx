@@ -132,7 +132,7 @@ function serializeListItemNode(node: PMNode, depth: number, parentType: string, 
 }
 
 export function Editor() {
-  const { selectedPageId, pages, updatePageContent, updatePageTitle, selectPage, deletePage } = useNotesStore();
+  const { selectedPageId, pages, updatePageContent, updatePageTitle, selectPage, deletePage, restorePage } = useNotesStore();
   const { setSyncStatus, setConfirmModal, addNotification } = useAppStore();
   const [aiModalOpen, setAiModalOpen] = useState(false);
   const [slashMenuOpen, setSlashMenuOpen] = useState(false);
@@ -143,16 +143,39 @@ export function Editor() {
 
   const handleDeleteCurrentPage = () => {
     if (!selectedPageId) return;
-    const pageToDelete = pages.find((p) => p.id === selectedPageId);
+    const pageIdToDelete = selectedPageId;
+    const pageToDelete = pages.find((p) => p.id === pageIdToDelete);
+    const pageTitle = pageToDelete?.title || 'Untitled';
 
     setConfirmModal({
       open: true,
-      title: 'Xóa ghi chú (Delete Page)',
-      message: `Bạn có chắc chắn muốn xóa ghi chú "${pageToDelete?.title || 'Untitled'}" không?`,
+      title: 'Chuyển vào thùng rác (Move to Trash)',
+      message: `Bạn có chắc chắn muốn chuyển ghi chú "${pageTitle}" vào Thùng rác không?`,
       onConfirm: async () => {
-        await deletePage(selectedPageId);
-        await queueSync('delete', 'page', selectedPageId);
-        addNotification('success', 'Đã xóa ghi chú!');
+        // 1. Immediately cancel any pending autosave to prevent "Zombie Page"
+        if (saveTimerRef.current) {
+          clearTimeout(saveTimerRef.current);
+          saveTimerRef.current = null;
+        }
+
+        // 2. Perform soft delete & sync
+        await deletePage(pageIdToDelete);
+        await queueSync('delete', 'page', pageIdToDelete);
+
+        // 3. Show Toast with Undo action button
+        addNotification(
+          'info',
+          `Đã chuyển "${pageTitle}" vào Thùng rác`,
+          {
+            label: 'Hoàn tác',
+            onClick: async () => {
+              await restorePage(pageIdToDelete);
+              await queueSync('update', 'page', pageIdToDelete);
+              addNotification('success', `Đã khôi phục "${pageTitle}"`);
+            },
+          },
+          7000
+        );
       },
     });
   };

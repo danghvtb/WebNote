@@ -19,7 +19,7 @@ export function NotebookSidebar() {
     selectNotebook, selectPage, createPage, updatePageTitle, deletePage,
     deleteNotebook, duplicateNotebook, updateNotebook, days,
   } = useNotesStore();
-  const { setCreateNotebookOpen, addNotification, setConfirmModal } = useAppStore();
+  const { setCreateNotebookOpen, addNotification, setConfirmModal, setTrashModalOpen } = useAppStore();
 
   // Track expanded state for notebooks (Set of notebook IDs)
   const [expandedNotebookIds, setExpandedNotebookIds] = useState<Record<string, boolean>>({});
@@ -139,14 +139,31 @@ export function NotebookSidebar() {
 
   const handleDeletePage = (id: string) => {
     setContextMenu(null);
+    const targetPage = pages.find((p) => p.id === id) || allVaultPages.find((p) => p.id === id);
+    const pageTitle = targetPage?.title || 'Untitled';
+
     setConfirmModal({
       open: true,
-      title: 'Delete Page',
-      message: 'Are you sure you want to delete this page?',
+      title: 'Chuyển vào thùng rác (Move to Trash)',
+      message: `Bạn có chắc chắn muốn chuyển ghi chú "${pageTitle}" vào Thùng rác không?`,
       onConfirm: async () => {
         await deletePage(id);
         await queueSync('delete', 'page', id);
-        addNotification('success', 'Page deleted');
+
+        addNotification(
+          'info',
+          `Đã chuyển "${pageTitle}" vào Thùng rác`,
+          {
+            label: 'Hoàn tác',
+            onClick: async () => {
+              const { restorePage } = useNotesStore.getState();
+              await restorePage(id);
+              await queueSync('update', 'page', id);
+              addNotification('success', `Đã khôi phục "${pageTitle}"`);
+            },
+          },
+          7000
+        );
       },
     });
   };
@@ -387,6 +404,17 @@ export function NotebookSidebar() {
             );
           })
         )}
+      </div>
+
+      {/* Footer: Trash Bin Entry */}
+      <div className="px-3 py-2 border-t flex items-center justify-between" style={{ borderColor: 'var(--color-border)' }}>
+        <button
+          onClick={() => setTrashModalOpen(true)}
+          className="flex items-center gap-2 px-2.5 py-1.5 rounded-lg text-xs font-medium text-slate-400 hover:text-rose-400 hover:bg-rose-950/20 transition-all cursor-pointer w-full"
+        >
+          <Trash2 className="w-3.5 h-3.5" />
+          <span>Thùng rác ghi chú (Trash)</span>
+        </button>
       </div>
 
       {/* Context Menu */}

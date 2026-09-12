@@ -67,8 +67,14 @@ interface AppState {
   setRootFolderId: (folderId: string | null) => void;
   setNeedsFolderCreation: (needs: boolean) => void;
   setInitialSyncComplete: (done: boolean) => void;
-  setInitialSyncMessage: (msg: string) => void;
-  addNotification: (type: 'success' | 'error' | 'warning' | 'info', message: string) => void;
+  trashModalOpen: boolean;
+  setTrashModalOpen: (open: boolean) => void;
+  addNotification: (
+    type: 'success' | 'error' | 'warning' | 'info',
+    message: string,
+    action?: { label: string; onClick: () => void },
+    duration?: number
+  ) => void;
   removeNotification: (id: string) => void;
 }
 
@@ -185,17 +191,20 @@ export const useAppStore = create<AppState>((set) => ({
   setInitialSyncComplete: (done) => set({ initialSyncComplete: done }),
   setInitialSyncMessage: (msg) => set({ initialSyncMessage: msg }),
 
-  addNotification: (type, message) => {
+  trashModalOpen: false,
+  setTrashModalOpen: (open) => set({ trashModalOpen: open }),
+
+  addNotification: (type, message, action, duration = 5000) => {
     const id = crypto.randomUUID();
     set((s) => ({
-      notifications: [...s.notifications, { id, type, message }],
+      notifications: [...s.notifications, { id, type, message, action, duration }],
     }));
-    // Auto-remove after 5 seconds
+    // Auto-remove after specified duration
     setTimeout(() => {
       set((s) => ({
         notifications: s.notifications.filter((n) => n.id !== id),
       }));
-    }, 5000);
+    }, duration);
   },
 
   removeNotification: (id) =>

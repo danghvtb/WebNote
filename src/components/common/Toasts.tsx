@@ -44,9 +44,24 @@ export function Toasts() {
             <span className="text-sm flex-1" style={{ color: 'var(--color-text-primary)' }}>
               {notif.message}
             </span>
+            {notif.action && (
+              <button
+                onClick={() => {
+                  notif.action?.onClick();
+                  removeNotification(notif.id);
+                }}
+                className="px-2.5 py-1 rounded text-xs font-semibold cursor-pointer transition-colors"
+                style={{
+                  background: 'var(--color-accent)',
+                  color: '#ffffff',
+                }}
+              >
+                {notif.action.label}
+              </button>
+            )}
             <button
               onClick={() => removeNotification(notif.id)}
-              className="p-0.5 rounded cursor-pointer"
+              className="p-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity"
               style={{ color: 'var(--color-text-tertiary)' }}
               aria-label="Dismiss notification"
             >
