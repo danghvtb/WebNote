@@ -7,7 +7,7 @@ import { useEffect } from 'react';
 import { Calendar, Plus } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
 import { formatDateDisplay, getMonthLabel, isToday } from '../../utils';
-import { getNotebookCountByDay } from '../../services/database/repository';
+import { getAllVaultNotebooks } from '../../services/database/repository';
 import { useState } from 'react';
 
 interface DayWithCount {
@@ -29,16 +29,49 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
   }, [loadDays]);
 
   useEffect(() => {
+    let cancelled = false;
+
     const loadCounts = async () => {
-      const withCounts = await Promise.all(
-        days.map(async (day) => {
-          const count = await getNotebookCountByDay(day.id);
-          return { ...day, notebookCount: count };
-        })
-      );
-      setDaysWithCounts(withCounts);
+      try {
+        // Build the timeline from the notebooks as well as the Day records.
+        // Older/synced data can contain notebooks whose Day record is missing
+        // on this device, and those dates must still be visible in Timeline.
+        const notebooks = await getAllVaultNotebooks();
+        const dayById = new Map(days.map((day) => [day.id, day]));
+
+        for (const notebook of notebooks) {
+          if (!dayById.has(notebook.dateId)) {
+            const compactDate = notebook.dateId.replace(/^day_/, '');
+            if (/^\d{8}$/.test(compactDate)) {
+              dayById.set(notebook.dateId, {
+                id: notebook.dateId,
+                date: `${compactDate.slice(0, 4)}-${compactDate.slice(4, 6)}-${compactDate.slice(6, 8)}`,
+              });
+            }
+          }
+        }
+
+        const countByDay = new Map<string, number>();
+        for (const notebook of notebooks) {
+          countByDay.set(notebook.dateId, (countByDay.get(notebook.dateId) || 0) + 1);
+        }
+
+        const withCounts = Array.from(dayById.values())
+          .map((day) => ({ ...day, notebookCount: countByDay.get(day.id) || 0 }))
+          .sort((a, b) => b.date.localeCompare(a.date));
+
+        if (!cancelled) setDaysWithCounts(withCounts);
+      } catch (error) {
+        console.warn('[DaySidebar] Failed to load timeline counts:', error);
+        if (!cancelled) setDaysWithCounts([]);
+      }
     };
+
     loadCounts();
+
+    return () => {
+      cancelled = true;
+    };
   }, [days]);
 
   // Keep days with notes and always keep today visible, even when it is empty.
@@ -60,7 +93,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
 
   return (
     <aside
-      className={`${mobile ? 'w-full min-h-full' : 'w-56 h-full'} flex flex-col flex-shrink-0 glass-sidebar`}
+      className={`${mobile ? 'w-full h-full' : 'w-56 h-full'} flex flex-col flex-shrink-0 glass-sidebar`}
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
@@ -82,7 +115,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
       </div>
 
       {/* Day List */}
-      <div className={`${mobile ? 'flex-none overflow-visible' : 'flex-1 overflow-y-auto'} px-2 py-2`}>
+      <div className={`${mobile ? 'flex-1 min-h-0 overflow-y-auto' : 'flex-1 overflow-y-auto'} px-2 py-2`}>
         {visibleDaysWithCounts.length === 0 ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <Calendar className="w-8 h-8 mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
