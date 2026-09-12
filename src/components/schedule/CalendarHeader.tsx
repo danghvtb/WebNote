@@ -13,6 +13,7 @@ import {
   Sun,
   Plus,
   Filter,
+  FolderKanban,
 } from 'lucide-react';
 import { useScheduleStore, type ScheduleViewMode } from '../../stores/scheduleStore';
 import { todayDate } from '../../utils';
@@ -33,6 +34,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
     setDailyBriefingOpen,
     setAddModalOpen,
     setFilterBarOpen,
+    setTaskManagerModalOpen,
   } = useScheduleStore();
 
   const isFilterActive =
@@ -161,7 +163,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
       </div>
 
       {/* Right Controls: View Mode Switcher + Action Buttons */}
-      <div className="flex items-center justify-between sm:justify-end gap-2">
+      <div className="flex flex-wrap items-center justify-between sm:justify-end gap-2">
         {/* Center View Mode Switcher */}
         <div className="flex items-center p-0.5 sm:p-1 bg-slate-950 border border-slate-800 rounded-xl">
           {(['day', 'week', 'month'] as ScheduleViewMode[]).map((mode) => (
@@ -179,7 +181,7 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
           ))}
         </div>
 
-        <div className="flex items-center gap-1.5">
+        <div className="flex flex-wrap items-center justify-end gap-1.5">
           <button
             onClick={() => setFilterBarOpen(!filterBarOpen)}
             className={`p-1.5 sm:px-3 sm:py-1.5 text-[11px] sm:text-xs font-bold rounded-xl transition-all flex items-center gap-1 ${
@@ -200,6 +202,15 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
           >
             <Sun className="w-4 h-4 text-amber-400" />
             <span className="hidden md:inline">Briefing</span>
+          </button>
+
+          <button
+            onClick={() => setTaskManagerModalOpen(true)}
+            className="p-1.5 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-bold text-cyan-300 bg-cyan-500/10 hover:bg-cyan-500/20 border border-cyan-500/30 rounded-xl transition-all flex items-center gap-1"
+            title="Quản lý Work Task & Nhóm Work"
+          >
+            <FolderKanban className="w-4 h-4" />
+            <span className="hidden md:inline">Quản lý Work</span>
           </button>
 
           <button

@@ -14,7 +14,6 @@ export function AddScheduleModal() {
     addModalOpen,
     editingBlock,
     selectedTimeSlot,
-    customTasks,
     categories,
     setAddModalOpen,
     addOrUpdateBlock,
@@ -30,8 +29,6 @@ export function AddScheduleModal() {
   const [recurrence, setRecurrence] = useState<RecurrenceFrequency | 'none'>('none');
   const [completed, setCompleted] = useState(false);
 
-  // New fields for custom task & work category binding (Default: empty / no task)
-  const [selectedCustomTaskId, setSelectedCustomTaskId] = useState<string>('');
   const [selectedCategoryId, setSelectedCategoryId] = useState<string>('');
 
   useEffect(() => {
@@ -45,7 +42,6 @@ export function AddScheduleModal() {
       setColor(editingBlock.color || '#3b82f6');
       setRecurrence(editingBlock.recurrence?.frequency || 'none');
       setCompleted(editingBlock.completed || false);
-      setSelectedCustomTaskId(editingBlock.customTaskId || '');
       setSelectedCategoryId(editingBlock.categoryId || '');
     } else {
       const targetDate = selectedTimeSlot?.date || todayDate();
@@ -73,28 +69,11 @@ export function AddScheduleModal() {
       setColor(autoColor);
       setRecurrence('none');
       setCompleted(false);
-      setSelectedCustomTaskId('');
       setSelectedCategoryId('');
     }
   }, [editingBlock, selectedTimeSlot, addModalOpen]);
 
   if (!addModalOpen) return null;
-
-  // Auto fill title and category if a custom task is picked
-  const handleCustomTaskSelect = (taskId: string) => {
-    setSelectedCustomTaskId(taskId);
-    if (taskId) {
-      const task = customTasks.find((t) => t.id === taskId);
-      if (task) {
-        if (!title.trim()) setTitle(task.title);
-        if (task.categoryId) {
-          setSelectedCategoryId(task.categoryId);
-          const cat = categories.find((c) => c.id === task.categoryId);
-          if (cat) setColor(cat.color);
-        }
-      }
-    }
-  };
 
   const handleCategorySelect = (catId: string) => {
     setSelectedCategoryId(catId);
@@ -129,7 +108,7 @@ export function AddScheduleModal() {
       completed,
       recurrence: recurrence !== 'none' ? { frequency: recurrence } : undefined,
       taskId: editingBlock?.taskId,
-      customTaskId: selectedCustomTaskId || undefined,
+      customTaskId: editingBlock?.customTaskId,
       categoryId: selectedCategoryId || undefined,
       pageId: editingBlock?.pageId,
     };
@@ -170,24 +149,8 @@ export function AddScheduleModal() {
 
         {/* Modal Form */}
         <form onSubmit={handleSubmit} className="p-5 space-y-3.5">
-          {/* Optional Task / Category Binding */}
-          <div className="grid grid-cols-2 gap-3 p-3 bg-slate-950 border border-slate-800/80 rounded-xl">
-            <div>
-              <label className="block text-[11px] font-bold text-purple-300 mb-1">Gắn Work Task (Tùy chọn)</label>
-              <select
-                value={selectedCustomTaskId}
-                onChange={(e) => handleCustomTaskSelect(e.target.value)}
-                className="w-full px-2.5 py-1.5 text-xs bg-slate-900 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500/60"
-              >
-                <option value="">-- Không gán Task --</option>
-                {customTasks.map((t) => (
-                  <option key={t.id} value={t.id}>
-                    {t.title}
-                  </option>
-                ))}
-              </select>
-            </div>
-
+          {/* Work Category Binding */}
+          <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl">
             <div>
               <label className="block text-[11px] font-bold text-purple-300 mb-1">Nhóm Work / Project</label>
               <select
