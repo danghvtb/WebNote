@@ -5,7 +5,7 @@
 // ============================================================
 
 import { db } from './db';
-import type { Day, Notebook, Page, SearchEntry, ScheduleBlock, CustomUserTask, WorkCategory } from '../../types';
+import type { Day, Notebook, Page, SearchEntry, ScheduleBlock, CustomUserTask, WorkCategory, Tag } from '../../types';
 import {
   generateId,
   dayIdFromDate,
@@ -14,6 +14,77 @@ import {
   nowISO,
   stripHtml,
 } from '../../utils';
+
+export function normalizeTagName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+function tagKey(name: string): string {
+  return normalizeTagName(name).toLocaleLowerCase();
+}
+
+export async function getAllTags(): Promise<Tag[]> {
+  return db.tags.orderBy('name').toArray();
+}
+
+export async function createTag(name: string): Promise<Tag> {
+  const displayName = normalizeTagName(name);
+  if (!displayName) throw new Error('Tag name cannot be empty');
+  const normalizedName = tagKey(displayName);
+  if (await db.tags.where('normalizedName').equals(normalizedName).first()) throw new Error('A tag with this name already exists');
+  const now = nowISO();
+  const tag: Tag = { id: generateId('tag'), name: displayName, normalizedName, createdAt: now, updatedAt: now };
+  await db.tags.add(tag);
+  return tag;
+}
+
+export async function renameTag(tagId: string, name: string): Promise<Tag> {
+  const tag = await db.tags.get(tagId);
+  if (!tag) throw new Error('Tag not found');
+  const displayName = normalizeTagName(name);
+  if (!displayName) throw new Error('Tag name cannot be empty');
+  const normalizedName = tagKey(displayName);
+  const duplicate = await db.tags.where('normalizedName').equals(normalizedName).first();
+  if (duplicate && duplicate.id !== tagId) throw new Error('A tag with this name already exists');
+  const updated = { ...tag, name: displayName, normalizedName, updatedAt: nowISO() };
+  await db.tags.put(updated);
+  const pages = await db.pages.filter((p) => (p.tagIds || []).includes(tagId)).toArray();
+  for (const page of pages) {
+    const notebook = await db.notebooks.get(page.notebookId);
+    if (notebook) await updateSearchIndexForPage(page, notebook.title);
+  }
+  return updated;
+}
+
+export async function deleteTag(tagId: string): Promise<string[]> {
+  const tag = await db.tags.get(tagId);
+  if (!tag) return [];
+  const affected = await db.pages.filter((p) => (p.tagIds || []).includes(tagId)).toArray();
+  await db.transaction('rw', [db.tags, db.pages, db.notebooks, db.searchIndex], async () => {
+    await db.tags.delete(tagId);
+    for (const page of affected) {
+      const updated = { ...page, tagIds: (page.tagIds || []).filter((id) => id !== tagId), updatedAt: nowISO() };
+      await db.pages.put(updated);
+      const notebook = await db.notebooks.get(page.notebookId);
+      if (notebook) await updateSearchIndexForPage(updated, notebook.title);
+    }
+  });
+  return affected.map((p) => p.id);
+}
+
+export async function setPageTags(pageId: string, tagIds: string[]): Promise<Page | undefined> {
+  const page = await db.pages.get(pageId);
+  if (!page) return undefined;
+  const validIds: string[] = [];
+  for (const id of Array.from(new Set(tagIds))) if (await db.tags.get(id)) validIds.push(id);
+  const updated = { ...page, tagIds: validIds, updatedAt: nowISO() };
+  await db.transaction('rw', [db.pages, db.notebooks, db.tags, db.searchIndex], async () => {
+    await db.pages.put(updated);
+    const notebook = await db.notebooks.get(page.notebookId);
+    if (notebook) await updateSearchIndexForPage(updated, notebook.title);
+  });
+  return updated;
+}
 
 // ===================== DAY OPERATIONS =====================
 
@@ -248,6 +319,7 @@ export async function createPage(
     order,
     createdAt: now,
     updatedAt: now,
+    tagIds: [],
   };
 
   await db.pages.put(page);
@@ -487,6 +559,8 @@ async function updateSearchIndexForPage(page: Page, notebookTitle: string): Prom
     date: '',
     notebookId: page.notebookId,
     notebookTitle,
+    tagIds: page.tagIds || [],
+    tagNames: await Promise.all((page.tagIds || []).map(async (id) => (await db.tags.get(id))?.name || '')),
   };
   await db.searchIndex.put(entry);
 }
@@ -494,21 +568,34 @@ async function updateSearchIndexForPage(page: Page, notebookTitle: string): Prom
 /**
  * Search across all indexed content.
  */
-export async function searchAll(query: string): Promise<SearchEntry[]> {
-  if (!query.trim()) return [];
+export async function searchAll(query: string, tagIds: string[] = []): Promise<SearchEntry[]> {
+  if (!query.trim() && tagIds.length === 0) return [];
 
   const lowerQuery = query.toLowerCase();
   const entries = await db.searchIndex.toArray();
 
   return entries
     .filter((entry) => {
+      if (tagIds.length > 0 && (entry.type !== 'page' || !tagIds.every((id) => (entry.tagIds || []).includes(id)))) return false;
+      if (!query.trim()) return true;
       return (
         entry.title.toLowerCase().includes(lowerQuery) ||
         entry.content.toLowerCase().includes(lowerQuery) ||
-        (entry.notebookTitle && entry.notebookTitle.toLowerCase().includes(lowerQuery))
+        (entry.notebookTitle && entry.notebookTitle.toLowerCase().includes(lowerQuery)) ||
+        (entry.tagNames || []).some((name) => name.toLowerCase().includes(lowerQuery))
       );
     })
     .slice(0, 20); // Limit results
+}
+
+export async function rebuildSearchIndex(): Promise<void> {
+  const [notebooks, pages] = await Promise.all([db.notebooks.filter((nb) => !nb.deleted).toArray(), db.pages.filter((p) => !p.deleted).toArray()]);
+  await db.searchIndex.clear();
+  for (const notebook of notebooks) await updateSearchIndexForNotebook(notebook);
+  for (const page of pages) {
+    const notebook = notebooks.find((nb) => nb.id === page.notebookId);
+    await updateSearchIndexForPage({ ...page, tagIds: page.tagIds || [] }, notebook?.title || '');
+  }
 }
 
 // ===================== BULK OPERATIONS =====================
@@ -524,11 +611,13 @@ export async function loadFromDatabase(data: {
   scheduleBlocks?: ScheduleBlock[];
   customTasks?: CustomUserTask[];
   workCategories?: WorkCategory[];
+  tags?: Tag[];
 }): Promise<void> {
-  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.searchIndex], async () => {
+  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.searchIndex], async () => {
     // Clear existing data
     await db.days.clear();
     await db.notebooks.clear();
+    await db.tags.clear();
 
     // Load days
     if (data.days?.length) {
@@ -543,8 +632,9 @@ export async function loadFromDatabase(data: {
     // Load pages if included
     if (data.pages?.length) {
       await db.pages.clear();
-      await db.pages.bulkPut(data.pages);
+      await db.pages.bulkPut(data.pages.map((page) => ({ ...page, tagIds: page.tagIds || [] })));
     }
+    if (data.tags?.length) await db.tags.bulkPut(data.tags);
 
     // Load scheduleBlocks
     await db.scheduleBlocks.clear();
@@ -574,7 +664,7 @@ export async function loadFromDatabase(data: {
     for (const page of data.pages || []) {
       if (!page.deleted) {
         const nb = data.notebooks?.find((n) => n.id === page.notebookId);
-        await updateSearchIndexForPage(page, nb?.title || '');
+        await updateSearchIndexForPage({ ...page, tagIds: page.tagIds || [] }, nb?.title || '');
       }
     }
   });
@@ -589,6 +679,7 @@ export async function exportDatabase(): Promise<{
   days: Day[];
   notebooks: Notebook[];
   pages: Page[];
+  tags: Tag[];
   scheduleBlocks: ScheduleBlock[];
   customTasks: CustomUserTask[];
   workCategories: WorkCategory[];
@@ -597,16 +688,18 @@ export async function exportDatabase(): Promise<{
   const notebooks = await db.notebooks.toArray();
   // Include both active and soft-deleted pages so Trash Bin syncs across devices
   const pages = await db.pages.toArray();
+  const tags = await db.tags.toArray();
   const scheduleBlocks = await db.scheduleBlocks.toArray();
   const customTasks = await db.customTasks.toArray();
   const workCategories = await db.workCategories.toArray();
 
   return {
-    version: 1,
+    version: 2,
     updatedAt: nowISO(),
     days,
     notebooks,
     pages,
+    tags,
     scheduleBlocks,
     customTasks,
     workCategories,
@@ -641,6 +734,7 @@ export async function clearAllLocalData(): Promise<void> {
       db.scheduleBlocks,
       db.customTasks,
       db.workCategories,
+      db.tags,
       db.searchIndex,
       db.syncQueue,
     ],
@@ -651,6 +745,7 @@ export async function clearAllLocalData(): Promise<void> {
       await db.scheduleBlocks.clear();
       await db.customTasks.clear();
       await db.workCategories.clear();
+      await db.tags.clear();
       await db.searchIndex.clear();
       await db.syncQueue.clear();
     }

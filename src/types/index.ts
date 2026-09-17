@@ -28,7 +28,16 @@ export interface Page {
   order: number;
   createdAt: string;   // ISO 8601
   updatedAt: string;   // ISO 8601
+  tagIds: string[];    // References to Tag.id
   deleted?: boolean;   // Soft delete flag
+}
+
+export interface Tag {
+  id: string;
+  name: string;
+  normalizedName: string;
+  createdAt: string;
+  updatedAt: string;
 }
 
 export interface Revision {
@@ -95,7 +104,7 @@ export type SyncStatus =
 export interface SyncOperation {
   id: string;
   type: 'create' | 'update' | 'delete';
-  entity: 'notebook' | 'page' | 'database' | 'attachment' | 'schedule';
+  entity: 'notebook' | 'page' | 'tag' | 'database' | 'attachment' | 'schedule';
   entityId: string;
   data: string; // JSON stringified payload
   timestamp: string;
@@ -129,6 +138,8 @@ export interface SearchEntry {
   date: string;
   notebookId?: string;
   notebookTitle?: string;
+  tagIds?: string[];
+  tagNames?: string[];
 }
 
 // --- App State Types ---
@@ -244,5 +255,4 @@ export interface ScheduleSearchFilter {
   status?: 'all' | 'pending' | 'completed' | 'overdue';
   priority?: 'all' | 'high' | 'medium' | 'low';
 }
-
 

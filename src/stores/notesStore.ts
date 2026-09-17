@@ -4,7 +4,7 @@
 // ============================================================
 
 import { create } from 'zustand';
-import type { Day, Notebook, Page } from '../types';
+import type { Day, Notebook, Page, Tag } from '../types';
 import * as repo from '../services/database/repository';
 
 interface NotesState {
@@ -12,6 +12,7 @@ interface NotesState {
   days: Day[];
   notebooks: Notebook[];
   pages: Page[];
+  tags: Tag[];
   recentNotebooks: Notebook[];
 
   // Selection
@@ -35,6 +36,7 @@ interface NotesState {
   loadPagesByNotebook: (notebookId: string) => Promise<void>;
   loadRecentNotebooks: () => Promise<void>;
   loadDeletedPages: () => Promise<void>;
+  loadTags: () => Promise<void>;
 
   // Actions — Selection
   selectDay: (dayId: string) => void;
@@ -55,6 +57,10 @@ interface NotesState {
   restorePage: (pageId: string) => Promise<void>;
   permanentlyDeletePage: (pageId: string) => Promise<void>;
   reorderPages: (notebookId: string, pageIds: string[]) => Promise<void>;
+  createTag: (name: string) => Promise<Tag>;
+  renameTag: (id: string, name: string) => Promise<void>;
+  deleteTag: (id: string) => Promise<string[]>;
+  setPageTags: (pageId: string, tagIds: string[]) => Promise<void>;
 
   // Actions — Mobile
   setMobileView: (view: 'days' | 'notebooks' | 'editor') => void;
@@ -68,6 +74,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   days: [],
   notebooks: [],
   pages: [],
+  tags: [],
   recentNotebooks: [],
 
   selectedDayId: null,
@@ -145,6 +152,10 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     } catch (error) {
       console.error('[NotesStore] Failed to load deleted pages:', error);
     }
+  },
+
+  loadTags: async () => {
+    try { set({ tags: await repo.getAllTags() }); await repo.rebuildSearchIndex(); } catch (error) { console.error('[NotesStore] Failed to load tags:', error); }
   },
 
   // ── Selection ──
@@ -350,6 +361,28 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   reorderPages: async (notebookId, pageIds) => {
     await repo.reorderPages(notebookId, pageIds);
     await get().loadPagesByNotebook(notebookId);
+  },
+
+  createTag: async (name) => {
+    const tag = await repo.createTag(name);
+    set((s) => ({ tags: [...s.tags, tag].sort((a, b) => a.name.localeCompare(b.name)) }));
+    return tag;
+  },
+
+  renameTag: async (id, name) => {
+    const tag = await repo.renameTag(id, name);
+    set((s) => ({ tags: s.tags.map((t) => t.id === id ? tag : t).sort((a, b) => a.name.localeCompare(b.name)) }));
+  },
+
+  deleteTag: async (id) => {
+    const affected = await repo.deleteTag(id);
+    set((s) => ({ tags: s.tags.filter((t) => t.id !== id), pages: s.pages.map((p) => affected.includes(p.id) ? { ...p, tagIds: (p.tagIds || []).filter((t) => t !== id) } : p) }));
+    return affected;
+  },
+
+  setPageTags: async (pageId, tagIds) => {
+    const page = await repo.setPageTags(pageId, tagIds);
+    if (page) set((s) => ({ pages: s.pages.map((p) => p.id === pageId ? page : p) }));
   },
 
   // ── Mobile ──

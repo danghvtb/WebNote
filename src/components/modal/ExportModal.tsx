@@ -15,7 +15,7 @@ interface ExportModalProps {
 }
 
 export function ExportModal({ isOpen, onClose }: ExportModalProps) {
-  const { pages, selectedPageId, loadDays } = useNotesStore();
+  const { pages, tags, selectedPageId, loadDays, loadTags } = useNotesStore();
   const { addNotification } = useAppStore();
   const [importing, setImporting] = useState(false);
 
@@ -36,7 +36,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
       addNotification('warning', 'Please select a page first.');
       return;
     }
-    exportPageAsMarkdown(selectedPage);
+    exportPageAsMarkdown(selectedPage, tags);
     addNotification('success', `Exported "${selectedPage.title || 'Untitled'}" as Markdown.`);
   };
 
@@ -48,6 +48,7 @@ export function ExportModal({ isOpen, onClose }: ExportModalProps) {
     try {
       const result = await importVaultFromJSON(file);
       await loadDays(); // Refresh UI notes store
+      await loadTags();
       addNotification('success', result.message);
       onClose();
     } catch (err: unknown) {

@@ -23,6 +23,8 @@ import { GraphViewModal } from './components/modal/GraphViewModal';
 import { TaskManagerModal } from './components/modal/TaskManagerModal';
 import { ExportModal } from './components/modal/ExportModal';
 import { TrashModal } from './components/modal/TrashModal';
+import { TagManagerModal } from './components/modal/TagManagerModal';
+import { useNotesStore } from './stores/notesStore';
 
 // Sync timeout — 30 seconds max wait before allowing user in
 const SYNC_TIMEOUT_MS = 30_000;
@@ -34,6 +36,9 @@ function AppContent() {
     initialSyncComplete, initialSyncMessage,
     setInitialSyncComplete, setInitialSyncMessage,
   } = useAppStore();
+  const loadTags = useNotesStore((s) => s.loadTags);
+
+  useEffect(() => { if (isLoggedIn && initialSyncComplete) loadTags(); }, [isLoggedIn, initialSyncComplete, loadTags]);
 
   // ─── Session restore: sequential pull-first sync ───
   useEffect(() => {
@@ -268,7 +273,7 @@ function AppContent() {
 }
 
 export default function App() {
-  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen } = useAppStore();
+  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen, tagManagerOpen, setTagManagerOpen } = useAppStore();
 
   return (
     <ErrorBoundary>
@@ -281,6 +286,7 @@ export default function App() {
       <TaskManagerModal isOpen={taskManagerOpen} onClose={() => setTaskManagerOpen(false)} />
       <ExportModal isOpen={exportModalOpen} onClose={() => setExportModalOpen(false)} />
       <TrashModal />
+      <TagManagerModal isOpen={tagManagerOpen} onClose={() => setTagManagerOpen(false)} />
       <Toasts />
     </ErrorBoundary>
   );

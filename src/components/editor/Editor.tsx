@@ -33,6 +33,7 @@ import { CustomTaskItemComponent } from './CustomTaskItem';
 import { AutoTranslateBlock } from './AutoTranslateBlock';
 import { countWords, getReadingTime, extractWikiLinks } from '../../utils';
 import { getPageOverdueCount } from '../../utils/taskUtils';
+import { PageTagPicker } from './PageTagPicker';
 
 // Create lowlight instance with common languages
 const lowlight = createLowlight(common);
@@ -432,6 +433,8 @@ export function Editor() {
             }}
             onEnterKey={() => editor?.commands.focus('start')}
           />
+
+          <PageTagPicker pageId={selectedPage.id} tagIds={selectedPage.tagIds || []} />
 
           {/* Tiptap Editor */}
           <EditorContent editor={editor} />

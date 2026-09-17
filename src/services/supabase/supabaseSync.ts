@@ -159,6 +159,7 @@ export async function syncFromSupabase(options?: { isConnectOrLogin?: boolean })
         days: dbData.days || [],
         notebooks: dbData.notebooks || [],
         pages: dbData.pages || [],
+        tags: dbData.tags || [],
       });
 
       // Refresh active Zustand Store

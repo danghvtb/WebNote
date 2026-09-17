@@ -369,7 +369,7 @@ export async function processGoogleSyncQueue(): Promise<void> {
  */
 async function syncPagesFolderIncremental(
   rootFolderId: string,
-  pages: { id: string; content: string; title: string; notebookId: string }[]
+  pages: { id: string; content: string; title: string; notebookId: string; tagIds?: string[] }[]
 ): Promise<void> {
   let pagesFolderId = await getCachedFileId(rootFolderId, 'pages');
   if (!pagesFolderId) {
@@ -391,6 +391,7 @@ async function syncPagesFolderIncremental(
           title: page.title,
           content: page.content,
           notebookId: page.notebookId,
+          tagIds: page.tagIds || [],
         });
 
         const fileId = await getCachedFileId(pagesFolderId!, fileName);
@@ -474,6 +475,7 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
       days: dbData.days || [],
       notebooks: dbData.notebooks || [],
       pages: Array.from(pagesMap.values()),
+      tags: dbData.tags || [],
       scheduleBlocks: dbData.scheduleBlocks || [],
       customTasks: dbData.customTasks || [],
       workCategories: dbData.workCategories || [],
@@ -534,6 +536,7 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
           days: dbData.days || [],
           notebooks: dbData.notebooks || [],
           pages: finalPages,
+          tags: dbData.tags || [],
           scheduleBlocks: dbData.scheduleBlocks || [],
           customTasks: dbData.customTasks || [],
           workCategories: dbData.workCategories || [],

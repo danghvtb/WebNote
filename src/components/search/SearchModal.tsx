@@ -4,7 +4,7 @@
 // ============================================================
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, FileText, Notebook, X } from 'lucide-react';
+import { Search, FileText, Notebook, X, Tag as TagIcon } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useNotesStore } from '../../stores/notesStore';
 import { searchAll } from '../../services/database/repository';
@@ -13,9 +13,10 @@ import { createExcerpt } from '../../utils';
 
 export function SearchModal() {
   const { searchOpen, setSearchOpen, searchQuery, setSearchQuery } = useAppStore();
-  const { selectNotebook, selectPage } = useNotesStore();
+  const { selectNotebook, selectPage, tags, loadTags } = useNotesStore();
   const [results, setResults] = useState<SearchEntry[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
+  const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
   const inputRef = useRef<HTMLInputElement>(null);
   const searchTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -25,8 +26,10 @@ export function SearchModal() {
       setTimeout(() => inputRef.current?.focus(), 100);
       setResults([]);
       setSelectedIndex(0);
+      setSelectedTagIds([]);
+      loadTags();
     }
-  }, [searchOpen]);
+  }, [searchOpen, loadTags]);
 
   // Debounced search
   const handleSearch = useCallback(
@@ -39,14 +42,22 @@ export function SearchModal() {
         return;
       }
 
+      if (!query.trim() && selectedTagIds.length === 0) { setResults([]); return; }
       searchTimer.current = setTimeout(async () => {
-        const entries = await searchAll(query);
-        setResults(entries);
+        setResults(await searchAll(query, selectedTagIds));
         setSelectedIndex(0);
       }, 200);
     },
-    [setSearchQuery]
+    [setSearchQuery, selectedTagIds]
   );
+
+  const toggleTag = (id: string) => {
+    const next = selectedTagIds.includes(id) ? selectedTagIds.filter((x) => x !== id) : [...selectedTagIds, id];
+    setSelectedTagIds(next);
+    if (searchTimer.current) clearTimeout(searchTimer.current);
+    if (!searchQuery.trim() && next.length === 0) { setResults([]); return; }
+    searchTimer.current = setTimeout(async () => { setResults(await searchAll(searchQuery, next)); setSelectedIndex(0); }, 200);
+  };
 
   // Navigate to search result
   const handleSelect = useCallback(
@@ -122,9 +133,15 @@ export function SearchModal() {
           </button>
         </div>
 
+        <div className="px-4 py-2 border-b border-[var(--color-border)] flex flex-wrap items-center gap-1.5">
+          <TagIcon className="w-3.5 h-3.5 text-[var(--color-text-tertiary)]" />
+          {tags.map((tag) => <button key={tag.id} onClick={() => toggleTag(tag.id)} className={`px-2 py-0.5 rounded-full text-xs cursor-pointer border ${selectedTagIds.includes(tag.id) ? 'bg-cyan-500/20 text-cyan-300 border-cyan-400/50' : 'text-[var(--color-text-tertiary)] border-[var(--color-border)] hover:bg-[var(--color-bg-hover)]'}`}>#{tag.name}</button>)}
+          {tags.length === 0 && <span className="text-xs text-[var(--color-text-tertiary)]">Chưa có thẻ</span>}
+        </div>
+
         {/* Results */}
         <div className="max-h-80 overflow-y-auto">
-          {results.length === 0 && searchQuery.trim() ? (
+          {results.length === 0 && (searchQuery.trim() || selectedTagIds.length > 0) ? (
             <div className="px-4 py-8 text-center">
               <p className="text-sm" style={{ color: 'var(--color-text-tertiary)' }}>No results found</p>
             </div>
@@ -168,6 +185,7 @@ export function SearchModal() {
                         in {entry.notebookTitle}
                       </p>
                     )}
+                    {entry.type === 'page' && (entry.tagNames || []).length > 0 && <div className="flex gap-1 mt-1">{(entry.tagNames || []).map((name) => <span key={name} className="text-[10px] text-cyan-300">#{name}</span>)}</div>}
                   </div>
                 </button>
               ))}

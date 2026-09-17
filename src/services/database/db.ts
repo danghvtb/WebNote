@@ -15,6 +15,7 @@ import type {
   ScheduleBlock,
   CustomUserTask,
   WorkCategory,
+  Tag,
 } from '../../types';
 
 export class MyNotesDB extends Dexie {
@@ -28,6 +29,7 @@ export class MyNotesDB extends Dexie {
   scheduleBlocks!: Table<ScheduleBlock, string>;
   customTasks!: Table<CustomUserTask, string>;
   workCategories!: Table<WorkCategory, string>;
+  tags!: Table<Tag, string>;
 
   constructor() {
     super('MyNotesDB');
@@ -51,6 +53,15 @@ export class MyNotesDB extends Dexie {
       customTasks: 'id, categoryId, status, dueDate, updatedAt',
       workCategories: 'id, name',
     });
+
+    this.version(4).stores({
+      pages: 'id, notebookId, title, order, updatedAt, *tagIds',
+      tags: 'id, &normalizedName, name, updatedAt',
+    }).upgrade(async (tx) => {
+      await tx.table('pages').toCollection().modify((page: Page) => {
+        if (!Array.isArray(page.tagIds)) page.tagIds = [];
+      });
+    });
   }
 }
 
@@ -63,7 +74,7 @@ export const db = new MyNotesDB();
 export async function clearDatabase(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories],
+    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags],
     async () => {
       await db.days.clear();
       await db.notebooks.clear();
@@ -74,6 +85,7 @@ export async function clearDatabase(): Promise<void> {
       await db.scheduleBlocks.clear();
       await db.customTasks.clear();
       await db.workCategories.clear();
+      await db.tags.clear();
     }
   );
 }
