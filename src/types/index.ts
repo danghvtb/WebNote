@@ -40,6 +40,35 @@ export interface Tag {
   updatedAt: string;
 }
 
+export interface Project {
+  id: string;
+  name: string;
+  normalizedName: string;
+  description?: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
+export interface WorkReportProjectEntry {
+  projectId: string;
+  projectNameSnapshot: string;
+  content: string;
+  result: string;
+}
+
+export interface WorkReport {
+  id: string;
+  dayId: string;
+  projectEntries: WorkReportProjectEntry[];
+  issue: string;
+  solution: string;
+  nextWork: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
 export interface Revision {
   id: string;          // Format: "rev_<uuid>"
   pageId: string;      // Reference to Page.id
@@ -56,6 +85,10 @@ export interface Database {
   updatedAt: string;
   days: Day[];
   notebooks: Notebook[];
+  pages?: Page[];
+  tags?: Tag[];
+  projects?: Project[];
+  workReports?: WorkReport[];
   settings: AppSettings;
 }
 
@@ -104,7 +137,7 @@ export type SyncStatus =
 export interface SyncOperation {
   id: string;
   type: 'create' | 'update' | 'delete';
-  entity: 'notebook' | 'page' | 'tag' | 'database' | 'attachment' | 'schedule';
+  entity: 'notebook' | 'page' | 'tag' | 'project' | 'work_report' | 'database' | 'attachment' | 'schedule';
   entityId: string;
   data: string; // JSON stringified payload
   timestamp: string;
@@ -120,7 +153,7 @@ export type AppTheme = 'dark' | 'light' | 'system';
 export type TimelineGroupingMode = 'week' | 'month';
 
 export interface SearchResult {
-  type: 'notebook' | 'page';
+  type: 'notebook' | 'page' | 'work_report';
   id: string;
   title: string;
   excerpt: string;
@@ -131,11 +164,12 @@ export interface SearchResult {
 
 export interface SearchEntry {
   id: string;
-  type: 'notebook' | 'page';
+  type: 'notebook' | 'page' | 'work_report';
   entityId: string;
   title: string;
   content: string;
   date: string;
+  dayId?: string;
   notebookId?: string;
   notebookTitle?: string;
   tagIds?: string[];
@@ -255,4 +289,3 @@ export interface ScheduleSearchFilter {
   status?: 'all' | 'pending' | 'completed' | 'overdue';
   priority?: 'all' | 'high' | 'medium' | 'low';
 }
-

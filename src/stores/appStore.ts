@@ -35,6 +35,7 @@ interface AppState {
   taskManagerOpen: boolean;
   exportModalOpen: boolean;
   tagManagerOpen: boolean;
+  projectManagerOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileDaySidebarOpen: boolean;
   timelineGroupingMode: TimelineGroupingMode;
@@ -70,6 +71,7 @@ interface AppState {
   setTaskManagerOpen: (open: boolean) => void;
   setExportModalOpen: (open: boolean) => void;
   setTagManagerOpen: (open: boolean) => void;
+  setProjectManagerOpen: (open: boolean) => void;
   setMobileSidebarOpen: (open: boolean) => void;
   setMobileDaySidebarOpen: (open: boolean) => void;
   setTimelineGroupingMode: (mode: TimelineGroupingMode) => void;
@@ -113,6 +115,7 @@ export const useAppStore = create<AppState>((set) => ({
   taskManagerOpen: false,
   exportModalOpen: false,
   tagManagerOpen: false,
+  projectManagerOpen: false,
   mobileSidebarOpen: false,
   mobileDaySidebarOpen: false,
   timelineGroupingMode: 'week',
@@ -208,6 +211,7 @@ export const useAppStore = create<AppState>((set) => ({
   setTaskManagerOpen: (open) => set({ taskManagerOpen: open }),
   setExportModalOpen: (open) => set({ exportModalOpen: open }),
   setTagManagerOpen: (open) => set({ tagManagerOpen: open }),
+  setProjectManagerOpen: (open) => set({ projectManagerOpen: open }),
   setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
   setMobileDaySidebarOpen: (open) => set({ mobileDaySidebarOpen: open }),
   setTimelineGroupingMode: (mode) => set({ timelineGroupingMode: mode }),

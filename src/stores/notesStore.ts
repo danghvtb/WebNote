@@ -39,7 +39,7 @@ interface NotesState {
   loadTags: () => Promise<void>;
 
   // Actions — Selection
-  selectDay: (dayId: string) => void;
+  selectDay: (dayId: string) => Promise<void>;
   selectNotebook: (notebookId: string) => Promise<void>;
   selectPage: (pageId: string) => void;
   selectToday: () => Promise<void>;
@@ -67,6 +67,7 @@ interface NotesState {
 
   // Reset
   resetSelection: () => void;
+  clearPageSelection: () => void;
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
@@ -362,6 +363,8 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     await repo.reorderPages(notebookId, pageIds);
     await get().loadPagesByNotebook(notebookId);
   },
+
+  clearPageSelection: () => set({ selectedNotebookId: null, selectedPageId: null, pages: [] }),
 
   createTag: async (name) => {
     const tag = await repo.createTag(name);

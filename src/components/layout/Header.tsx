@@ -15,7 +15,7 @@ export function Header() {
   const {
     user, syncStatus, lastSyncTime, syncMessage,
     toggleSearch, setSettingsOpen, logout, setGraphViewOpen,
-    setTaskManagerOpen, setExportModalOpen, setTrashModalOpen, setTagManagerOpen,
+    setTaskManagerOpen, setExportModalOpen, setTrashModalOpen, setTagManagerOpen, setProjectManagerOpen,
     mobileSidebarOpen, setMobileSidebarOpen, setMobileDaySidebarOpen,
   } = useAppStore();
   const [userMenuOpen, setUserMenuOpen] = useState(false);
@@ -235,6 +235,15 @@ export function Header() {
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 Quản lý thẻ
+              </button>
+              <button
+                onClick={() => { setProjectManagerOpen(true); setUserMenuOpen(false); }}
+                className="w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                Quản lý dự án
               </button>
               <button
                 onClick={handleSync}

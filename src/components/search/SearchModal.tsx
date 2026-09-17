@@ -4,16 +4,18 @@
 // ============================================================
 
 import { useEffect, useRef, useState, useCallback } from 'react';
-import { Search, FileText, Notebook, X, Tag as TagIcon } from 'lucide-react';
+import { Search, FileText, Notebook, ClipboardList, X, Tag as TagIcon } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useNotesStore } from '../../stores/notesStore';
 import { searchAll } from '../../services/database/repository';
 import type { SearchEntry } from '../../types';
 import { createExcerpt } from '../../utils';
+import { useWorkReportStore } from '../../stores/workReportStore';
 
 export function SearchModal() {
   const { searchOpen, setSearchOpen, searchQuery, setSearchQuery } = useAppStore();
-  const { selectNotebook, selectPage, tags, loadTags } = useNotesStore();
+  const { selectDay, selectNotebook, selectPage, tags, loadTags } = useNotesStore();
+  const { openOrCreateReport } = useWorkReportStore();
   const [results, setResults] = useState<SearchEntry[]>([]);
   const [selectedIndex, setSelectedIndex] = useState(0);
   const [selectedTagIds, setSelectedTagIds] = useState<string[]>([]);
@@ -37,11 +39,6 @@ export function SearchModal() {
       setSearchQuery(query);
       if (searchTimer.current) clearTimeout(searchTimer.current);
 
-      if (!query.trim()) {
-        setResults([]);
-        return;
-      }
-
       if (!query.trim() && selectedTagIds.length === 0) { setResults([]); return; }
       searchTimer.current = setTimeout(async () => {
         setResults(await searchAll(query, selectedTagIds));
@@ -61,7 +58,7 @@ export function SearchModal() {
 
   // Navigate to search result
   const handleSelect = useCallback(
-    (entry: SearchEntry) => {
+    async (entry: SearchEntry) => {
       if (entry.type === 'notebook') {
         selectNotebook(entry.entityId);
       } else if (entry.type === 'page') {
@@ -69,10 +66,14 @@ export function SearchModal() {
           selectNotebook(entry.notebookId);
         }
         selectPage(entry.entityId);
+      } else if (entry.type === 'work_report' && entry.dayId) {
+        await selectDay(entry.dayId);
+        useNotesStore.getState().clearPageSelection();
+        await openOrCreateReport(entry.dayId);
       }
       setSearchOpen(false);
     },
-    [selectNotebook, selectPage, setSearchOpen]
+    [selectDay, selectNotebook, selectPage, setSearchOpen, openOrCreateReport]
   );
 
   // Keyboard navigation
@@ -168,6 +169,8 @@ export function SearchModal() {
                 >
                   {entry.type === 'notebook' ? (
                     <Notebook className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-accent)' }} />
+                  ) : entry.type === 'work_report' ? (
+                    <ClipboardList className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-accent)' }} />
                   ) : (
                     <FileText className="w-4 h-4 mt-0.5 flex-shrink-0" style={{ color: 'var(--color-text-tertiary)' }} />
                   )}
@@ -175,7 +178,7 @@ export function SearchModal() {
                     <p className="text-sm font-medium truncate" style={{ color: 'var(--color-text-primary)' }}>
                       {entry.title}
                     </p>
-                    {entry.content && entry.type === 'page' && (
+                    {entry.content && (entry.type === 'page' || entry.type === 'work_report') && (
                       <p className="text-xs mt-0.5 truncate" style={{ color: 'var(--color-text-tertiary)' }}>
                         {createExcerpt(entry.content, 80)}
                       </p>
@@ -185,6 +188,7 @@ export function SearchModal() {
                         in {entry.notebookTitle}
                       </p>
                     )}
+                    {entry.type === 'work_report' && <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>Báo cáo theo ngày</p>}
                     {entry.type === 'page' && (entry.tagNames || []).length > 0 && <div className="flex gap-1 mt-1">{(entry.tagNames || []).map((name) => <span key={name} className="text-[10px] text-cyan-300">#{name}</span>)}</div>}
                   </div>
                 </button>

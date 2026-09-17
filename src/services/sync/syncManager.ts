@@ -109,18 +109,21 @@ export async function refreshActiveNotesStore(): Promise<void> {
   try {
     const { useNotesStore } = await import('../../stores/notesStore');
     const { useScheduleStore } = await import('../../stores/scheduleStore');
+    const { useWorkReportStore } = await import('../../stores/workReportStore');
     const notesStore = useNotesStore.getState();
 
     await notesStore.loadDays();
     await notesStore.loadRecentNotebooks();
     await useScheduleStore.getState().loadAllBlocks();
     await useScheduleStore.getState().loadTasksAndCategories();
+    await useWorkReportStore.getState().loadProjects();
 
     const { selectedDayId, selectedNotebookId, recentNotebooks, days } = notesStore;
 
     // Refresh active day's notebooks list
     if (selectedDayId) {
       await notesStore.loadNotebooksByDay(selectedDayId);
+      await useWorkReportStore.getState().loadReportForDay(selectedDayId);
     }
 
     // Refresh active notebook's pages list
@@ -467,6 +470,8 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
       notebooks: dbData.notebooks || [],
       pages: Array.from(pagesMap.values()),
       tags: dbData.tags || [],
+      projects: dbData.projects || [],
+      workReports: dbData.workReports || [],
       scheduleBlocks: dbData.scheduleBlocks || [],
       customTasks: dbData.customTasks || [],
       workCategories: dbData.workCategories || [],
@@ -528,6 +533,8 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
           notebooks: dbData.notebooks || [],
           pages: finalPages,
           tags: dbData.tags || [],
+          projects: dbData.projects || [],
+          workReports: dbData.workReports || [],
           scheduleBlocks: dbData.scheduleBlocks || [],
           customTasks: dbData.customTasks || [],
           workCategories: dbData.workCategories || [],

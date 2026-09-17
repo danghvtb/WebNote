@@ -16,6 +16,8 @@ import type {
   CustomUserTask,
   WorkCategory,
   Tag,
+  Project,
+  WorkReport,
 } from '../../types';
 
 export class MyNotesDB extends Dexie {
@@ -30,6 +32,8 @@ export class MyNotesDB extends Dexie {
   customTasks!: Table<CustomUserTask, string>;
   workCategories!: Table<WorkCategory, string>;
   tags!: Table<Tag, string>;
+  projects!: Table<Project, string>;
+  workReports!: Table<WorkReport, string>;
 
   constructor() {
     super('MyNotesDB');
@@ -58,8 +62,33 @@ export class MyNotesDB extends Dexie {
       pages: 'id, notebookId, title, order, updatedAt, *tagIds',
       tags: 'id, &normalizedName, name, updatedAt',
     }).upgrade(async (tx) => {
+      const tagsTable = tx.table('tags');
+      const searchTable = tx.table('searchIndex');
       await tx.table('pages').toCollection().modify((page: Page) => {
         if (!Array.isArray(page.tagIds)) page.tagIds = [];
+      });
+      const pages = await tx.table('pages').toArray();
+      for (const page of pages) {
+        const entry = await searchTable.get(`search_${page.id}`);
+        if (!entry) continue;
+        const tagNames: string[] = [];
+        for (const tagId of page.tagIds || []) {
+          const tag = await tagsTable.get(tagId);
+          if (tag?.name) tagNames.push(tag.name);
+        }
+        await searchTable.put({ ...entry, tagIds: page.tagIds || [], tagNames });
+      }
+    });
+
+    this.version(5).stores({
+      projects: 'id, &normalizedName, name, updatedAt, deletedAt',
+      workReports: 'id, &dayId, updatedAt, deletedAt',
+    }).upgrade(async (tx) => {
+      await tx.table('workReports').toCollection().modify((report: Partial<WorkReport>) => {
+        if (!Array.isArray(report.projectEntries)) report.projectEntries = [];
+        if (typeof report.issue !== 'string') report.issue = '';
+        if (typeof report.solution !== 'string') report.solution = '';
+        if (typeof report.nextWork !== 'string') report.nextWork = '';
       });
     });
   }
@@ -74,7 +103,7 @@ export const db = new MyNotesDB();
 export async function clearDatabase(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags],
+    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports],
     async () => {
       await db.days.clear();
       await db.notebooks.clear();
@@ -86,6 +115,8 @@ export async function clearDatabase(): Promise<void> {
       await db.customTasks.clear();
       await db.workCategories.clear();
       await db.tags.clear();
+      await db.projects.clear();
+      await db.workReports.clear();
     }
   );
 }

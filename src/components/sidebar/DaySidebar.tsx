@@ -4,11 +4,12 @@
 // ============================================================
 
 import { useEffect, useMemo, useState } from 'react';
-import { Calendar, ChevronDown, Plus } from 'lucide-react';
+import { Calendar, ChevronDown, Plus, ClipboardList, Notebook } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
+import { useWorkReportStore } from '../../stores/workReportStore';
 import { useAppStore } from '../../stores/appStore';
 import { formatDateDisplay, isToday, todayDate, todayId } from '../../utils';
-import { getAllVaultNotebooks } from '../../services/database/repository';
+import { getAllVaultNotebooks, getAllWorkReports } from '../../services/database/repository';
 import {
   buildTimelineDays,
   dateFromDayId,
@@ -20,6 +21,7 @@ interface DayWithCount {
   id: string;
   date: string;
   notebookCount: number;
+  workReportCount?: number;
 }
 
 interface DaySidebarProps {
@@ -28,15 +30,19 @@ interface DaySidebarProps {
 
 export function DaySidebar({ mobile = false }: DaySidebarProps) {
   const { days, selectedDayId, selectDay, selectToday, loadDays } = useNotesStore();
+  const reportsVersion = useWorkReportStore((state) => state.reportsVersion);
   const {
     setMobileDaySidebarOpen,
+    setMobileSidebarOpen,
     timelineGroupingMode,
     setTimelineGroupingMode,
     expandedTimelineGroupKeys,
     toggleTimelineGroup,
     ensureTimelineGroupsExpanded,
+    setCreateNotebookOpen,
   } = useAppStore();
   const [daysWithCounts, setDaysWithCounts] = useState<DayWithCount[]>([]);
+  const [addMenuDayId, setAddMenuDayId] = useState<string | null>(null);
 
   useEffect(() => {
     loadDays();
@@ -50,11 +56,25 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
         // Build the timeline from the notebooks as well as the Day records.
         // Older/synced data can contain notebooks whose Day record is missing
         // on this device, and those dates must still be visible in Timeline.
-        const notebooks = await getAllVaultNotebooks();
+        const [notebooks, reports] = await Promise.all([getAllVaultNotebooks(), getAllWorkReports()]);
         const withCounts = buildTimelineDays(days, notebooks, {
           id: todayId(),
           date: todayDate(),
+        }).map((day) => ({ ...day, workReportCount: 0 }));
+        const byDay = new Map(withCounts.map((day) => [day.id, day]));
+        reports.forEach((report) => {
+          const existing = byDay.get(report.dayId);
+          if (existing) existing.workReportCount += 1;
+          else {
+            const date = dateFromDayId(report.dayId);
+            if (date) {
+              const day = { id: report.dayId, date, notebookCount: 0, workReportCount: 1 };
+              withCounts.push(day);
+              byDay.set(day.id, day);
+            }
+          }
         });
+        withCounts.sort((a, b) => b.date.localeCompare(a.date));
 
         if (!cancelled) setDaysWithCounts(withCounts);
       } catch (error) {
@@ -68,11 +88,11 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
     return () => {
       cancelled = true;
     };
-  }, [days]);
+  }, [days, reportsVersion]);
 
   // Keep days with notes and always keep today visible, even when it is empty.
   const visibleDaysWithCounts = useMemo(
-    () => daysWithCounts.filter((day) => day.notebookCount > 0 || isToday(day.date)),
+    () => daysWithCounts.filter((day) => day.notebookCount > 0 || (day.workReportCount || 0) > 0 || isToday(day.date)),
     [daysWithCounts],
   );
 
@@ -94,17 +114,35 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
   }, [ensureTimelineGroupsExpanded, selectedDate, timelineGroupingMode]);
 
   const handleToday = () => {
+    useWorkReportStore.getState().clearSelectedReport();
     selectToday();
-    if (mobile) setMobileDaySidebarOpen(false);
+    if (mobile) { setMobileDaySidebarOpen(false); setMobileSidebarOpen(false); }
   };
 
   const handleDaySelect = (day: DayWithCount) => {
+    useWorkReportStore.getState().clearSelectedReport();
     if (isToday(day.date)) {
       selectToday();
     } else {
       selectDay(day.id);
     }
-    if (mobile) setMobileDaySidebarOpen(false);
+    if (mobile) { setMobileDaySidebarOpen(false); setMobileSidebarOpen(false); }
+  };
+
+  const handleAddNotebook = (dayId: string) => {
+    setAddMenuDayId(null);
+    useWorkReportStore.getState().clearSelectedReport();
+    selectDay(dayId);
+    setCreateNotebookOpen(true);
+  };
+
+  const handleAddReport = async (dayId: string) => {
+    setAddMenuDayId(null);
+    useWorkReportStore.getState().clearSelectedReport();
+    await selectDay(dayId);
+    useNotesStore.getState().clearPageSelection();
+    await useWorkReportStore.getState().openOrCreateReport(dayId);
+    if (mobile) { setMobileDaySidebarOpen(false); setMobileSidebarOpen(false); }
   };
 
   return (
@@ -183,7 +221,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                   <span className="min-w-0 text-left">
                     <span className="block text-xs font-semibold truncate">{group.label}</span>
                     <span className="block text-[10px] mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
-                      {group.notebookCount} {group.notebookCount === 1 ? 'notebook' : 'notebooks'} · {group.notebookDayCount} {group.notebookDayCount === 1 ? 'day' : 'days'}
+                      {group.notebookCount} {group.notebookCount === 1 ? 'notebook' : 'notebooks'} · {group.notebookDayCount} {group.notebookDayCount === 1 ? 'day' : 'days'}{group.workReportCount ? ` · ${group.workReportCount} báo cáo` : ''}
                     </span>
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -192,16 +230,14 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                   const selected = day.id === selectedDayId;
                   const today = isToday(day.date);
                   return (
+                    <div key={day.id} className="relative group">
                     <button
-                      key={day.id}
                       onClick={() => handleDaySelect(day)}
-                      className="w-full text-left flex items-center gap-3 px-3 py-2 rounded-lg mb-0.5 transition-colors cursor-pointer"
-                      style={{
-                        background: selected ? 'var(--color-bg-active)' : 'transparent',
-                      }}
+                      className="w-full text-left flex items-center gap-3 px-3 py-2 pr-8 rounded-lg mb-0.5 transition-colors cursor-pointer"
+                      style={{ background: selected ? 'var(--color-bg-active)' : 'transparent' }}
                       onMouseEnter={(e) => !selected && (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                       onMouseLeave={(e) => !selected && (e.currentTarget.style.background = 'transparent')}
-                      aria-label={`${formatDateDisplay(day.date)} - ${day.notebookCount} notebooks`}
+                      aria-label={`${formatDateDisplay(day.date)} - ${day.notebookCount} notebooks${day.workReportCount ? ', có báo cáo công việc' : ''}`}
                     >
                       <div
                         className="w-2 h-2 rounded-full flex-shrink-0"
@@ -228,10 +264,16 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                           )}
                         </div>
                         <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-                          {day.notebookCount} {day.notebookCount === 1 ? 'notebook' : 'notebooks'}
+                          {day.notebookCount} {day.notebookCount === 1 ? 'notebook' : 'notebooks'}{day.workReportCount ? ` · ${day.workReportCount} báo cáo` : ''}
                         </span>
                       </div>
                     </button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setAddMenuDayId((current) => current === day.id ? null : day.id); }} className="absolute right-1 top-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 cursor-pointer" style={{ color: 'var(--color-accent)' }} aria-label={`Thêm nội dung cho ${formatDateDisplay(day.date)}`}><Plus className="w-3.5 h-3.5" /></button>
+                    {addMenuDayId === day.id && <div className="absolute right-0 top-9 z-30 w-48 rounded-lg p-1 shadow-xl" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+                      <button type="button" onClick={() => handleAddNotebook(day.id)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-left cursor-pointer hover:bg-[var(--color-bg-hover)]" style={{ color: 'var(--color-text-secondary)' }}><Notebook className="w-3.5 h-3.5" /> Sổ ghi chú</button>
+                      <button type="button" onClick={() => handleAddReport(day.id)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-left cursor-pointer hover:bg-[var(--color-bg-hover)]" style={{ color: 'var(--color-text-secondary)' }}><ClipboardList className="w-3.5 h-3.5" /> Báo cáo công việc</button>
+                    </div>}
+                    </div>
                   );
                 })}
               </div>

@@ -5,7 +5,7 @@
 
 import { db } from '../database/db';
 import { rebuildSearchIndex } from '../database/repository';
-import type { Page, Notebook, Day, Tag } from '../../types';
+import type { Page, Notebook, Day, Tag, Project, WorkReport } from '../../types';
 
 export interface VaultBackupData {
   version: string;
@@ -14,6 +14,8 @@ export interface VaultBackupData {
   notebooks: Notebook[];
   pages: Page[];
   tags?: Tag[];
+  projects?: Project[];
+  workReports?: WorkReport[];
 }
 
 /**
@@ -24,14 +26,17 @@ export async function exportVaultAsJSON() {
   const notebooks = await db.notebooks.toArray();
   const pages = await db.pages.toArray();
   const tags = await db.tags.toArray();
+  const projects = await db.projects.toArray();
 
   const backupData: VaultBackupData = {
-    version: '5.0',
+    version: '6.0',
     exportDate: new Date().toISOString(),
     days,
     notebooks,
     pages,
     tags,
+    projects,
+    workReports: await db.workReports.toArray(),
   };
 
   const jsonString = JSON.stringify(backupData, null, 2);
@@ -101,6 +106,15 @@ export async function importVaultFromJSON(jsonFile: File): Promise<{ success: bo
 
         await db.tags.clear();
         if (backup.tags && Array.isArray(backup.tags)) await db.tags.bulkPut(backup.tags);
+        await db.projects.clear();
+        if (backup.projects && Array.isArray(backup.projects)) await db.projects.bulkPut(backup.projects);
+        await db.workReports.clear();
+        if (backup.workReports && Array.isArray(backup.workReports)) {
+          await db.workReports.bulkPut(backup.workReports.map((report) => ({
+            ...report,
+            projectEntries: Array.isArray(report.projectEntries) ? report.projectEntries : [],
+          })));
+        }
         await db.pages.bulkPut(backup.pages.map((page) => ({ ...page, tagIds: page.tagIds || [] })));
         await rebuildSearchIndex();
 

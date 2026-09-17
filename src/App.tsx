@@ -24,6 +24,7 @@ import { TaskManagerModal } from './components/modal/TaskManagerModal';
 import { ExportModal } from './components/modal/ExportModal';
 import { TrashModal } from './components/modal/TrashModal';
 import { TagManagerModal } from './components/modal/TagManagerModal';
+import { ProjectManagerModal } from './components/modal/ProjectManagerModal';
 import { useNotesStore } from './stores/notesStore';
 
 // Sync timeout — background pull must never block local-first editing
@@ -273,7 +274,7 @@ function AppContent() {
 }
 
 export default function App() {
-  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen, tagManagerOpen, setTagManagerOpen } = useAppStore();
+  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen, tagManagerOpen, setTagManagerOpen, projectManagerOpen, setProjectManagerOpen } = useAppStore();
 
   return (
     <ErrorBoundary>
@@ -287,6 +288,7 @@ export default function App() {
       <ExportModal isOpen={exportModalOpen} onClose={() => setExportModalOpen(false)} />
       <TrashModal />
       <TagManagerModal isOpen={tagManagerOpen} onClose={() => setTagManagerOpen(false)} />
+      <ProjectManagerModal isOpen={projectManagerOpen} onClose={() => setProjectManagerOpen(false)} />
       <Toasts />
     </ErrorBoundary>
   );

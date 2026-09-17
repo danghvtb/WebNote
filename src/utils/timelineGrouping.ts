@@ -11,6 +11,7 @@ export interface TimelineDayLike {
   id: string;
   date: string;
   notebookCount: number;
+  workReportCount?: number;
 }
 
 export interface TimelineGroup {
@@ -19,6 +20,8 @@ export interface TimelineGroup {
   days: TimelineDayLike[];
   notebookDayCount: number;
   notebookCount: number;
+  workReportDayCount: number;
+  workReportCount: number;
 }
 
 export interface TimelineNotebookLike {
@@ -113,6 +116,8 @@ export function groupTimelineDays(
       existing.days.push(day);
       if (day.notebookCount > 0) existing.notebookDayCount += 1;
       existing.notebookCount += day.notebookCount;
+      if ((day.workReportCount || 0) > 0) existing.workReportDayCount += 1;
+      existing.workReportCount += day.workReportCount || 0;
       continue;
     }
 
@@ -122,6 +127,8 @@ export function groupTimelineDays(
       days: [day],
       notebookDayCount: day.notebookCount > 0 ? 1 : 0,
       notebookCount: day.notebookCount,
+      workReportDayCount: (day.workReportCount || 0) > 0 ? 1 : 0,
+      workReportCount: day.workReportCount || 0,
     });
   }
 

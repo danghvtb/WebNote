@@ -5,7 +5,19 @@
 // ============================================================
 
 import { db } from './db';
-import type { Day, Notebook, Page, SearchEntry, ScheduleBlock, CustomUserTask, WorkCategory, Tag } from '../../types';
+import type {
+  Day,
+  Notebook,
+  Page,
+  SearchEntry,
+  ScheduleBlock,
+  CustomUserTask,
+  WorkCategory,
+  Tag,
+  Project,
+  WorkReport,
+  WorkReportProjectEntry,
+} from '../../types';
 import {
   generateId,
   dayIdFromDate,
@@ -84,6 +96,171 @@ export async function setPageTags(pageId: string, tagIds: string[]): Promise<Pag
     if (notebook) await updateSearchIndexForPage(updated, notebook.title);
   });
   return updated;
+}
+
+// ===================== PROJECT OPERATIONS =====================
+
+export function normalizeProjectName(name: string): string {
+  return name.trim().replace(/\s+/g, ' ');
+}
+
+function projectKey(name: string): string {
+  return normalizeProjectName(name).toLocaleLowerCase();
+}
+
+export async function getProjects(includeDeleted = false): Promise<Project[]> {
+  return db.projects
+    .orderBy('name')
+    .filter((project) => includeDeleted || !project.deletedAt)
+    .toArray();
+}
+
+export async function createProject(name: string, description = ''): Promise<Project> {
+  const displayName = normalizeProjectName(name);
+  if (!displayName) throw new Error('Project name cannot be empty');
+  const normalizedName = projectKey(displayName);
+  const duplicates = await db.projects.where('normalizedName').equals(normalizedName).toArray();
+  if (duplicates.length > 0) throw new Error('A project with this name already exists');
+
+  const now = nowISO();
+  const project: Project = {
+    id: generateId('project'),
+    name: displayName,
+    normalizedName,
+    description: description.trim(),
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.projects.put(project);
+  return project;
+}
+
+export async function updateProject(id: string, updates: Partial<Pick<Project, 'name' | 'description'>>): Promise<Project> {
+  const project = await db.projects.get(id);
+  if (!project) throw new Error('Project not found');
+
+  const displayName = updates.name === undefined ? project.name : normalizeProjectName(updates.name);
+  if (!displayName) throw new Error('Project name cannot be empty');
+  const normalizedName = projectKey(displayName);
+  const duplicates = await db.projects.where('normalizedName').equals(normalizedName).toArray();
+  if (duplicates.some((project) => project.id !== id && !project.deletedAt)) throw new Error('A project with this name already exists');
+
+  const updated: Project = {
+    ...project,
+    name: displayName,
+    normalizedName,
+    description: updates.description === undefined ? project.description : updates.description.trim(),
+    updatedAt: nowISO(),
+  };
+  await db.projects.put(updated);
+  return updated;
+}
+
+export async function archiveProject(id: string): Promise<Project | undefined> {
+  const project = await db.projects.get(id);
+  if (!project) return undefined;
+  const updated = { ...project, deletedAt: nowISO(), updatedAt: nowISO() };
+  await db.projects.put(updated);
+  return updated;
+}
+
+export async function restoreProject(id: string): Promise<Project | undefined> {
+  const project = await db.projects.get(id);
+  if (!project) return undefined;
+  const duplicates = await db.projects.where('normalizedName').equals(project.normalizedName).toArray();
+  if (duplicates.some((candidate) => candidate.id !== id && !candidate.deletedAt)) throw new Error('A project with this name already exists');
+  const { deletedAt: _deletedAt, ...rest } = project;
+  const restored = { ...rest, updatedAt: nowISO() };
+  await db.projects.put(restored);
+  return restored;
+}
+
+export async function getProjectUsageCount(projectId: string): Promise<number> {
+  return db.workReports
+    .filter((report) => !report.deletedAt && report.projectEntries.some((entry) => entry.projectId === projectId))
+    .count();
+}
+
+// ===================== WORK REPORT OPERATIONS =====================
+
+export async function getWorkReportByDay(dayId: string, includeDeleted = false): Promise<WorkReport | undefined> {
+  const report = await db.workReports.where('dayId').equals(dayId).first();
+  if (report?.deletedAt && !includeDeleted) return undefined;
+  return report;
+}
+
+export async function getAllWorkReports(includeDeleted = false): Promise<WorkReport[]> {
+  return db.workReports.filter((report) => includeDeleted || !report.deletedAt).toArray();
+}
+
+export async function createOrGetWorkReport(dayId: string): Promise<WorkReport> {
+  const existing = await db.workReports.where('dayId').equals(dayId).first();
+  if (existing) {
+    if (existing.deletedAt) {
+      const restored = { ...existing, deletedAt: undefined, updatedAt: nowISO() };
+      await db.workReports.put(restored);
+      await updateSearchIndexForWorkReport(restored);
+      return restored;
+    }
+    return existing;
+  }
+
+  const now = nowISO();
+  const report: WorkReport = {
+    id: generateId('report'),
+    dayId,
+    projectEntries: [],
+    issue: '',
+    solution: '',
+    nextWork: '',
+    createdAt: now,
+    updatedAt: now,
+  };
+  await db.workReports.add(report);
+  await updateSearchIndexForWorkReport(report);
+  return report;
+}
+
+export async function updateWorkReport(
+  id: string,
+  updates: Partial<Pick<WorkReport, 'projectEntries' | 'issue' | 'solution' | 'nextWork'>>,
+): Promise<WorkReport | undefined> {
+  const report = await db.workReports.get(id);
+  if (!report) return undefined;
+  const projectEntries: WorkReportProjectEntry[] = updates.projectEntries
+    ? Array.from(new Map(updates.projectEntries.map((entry) => [entry.projectId, entry])).values())
+    : report.projectEntries;
+  const updated: WorkReport = { ...report, ...updates, projectEntries, updatedAt: nowISO() };
+  await db.workReports.put(updated);
+  await updateSearchIndexForWorkReport(updated);
+  return updated;
+}
+
+export async function deleteWorkReport(id: string): Promise<void> {
+  const report = await db.workReports.get(id);
+  if (!report) return;
+  await db.workReports.update(id, { deletedAt: nowISO(), updatedAt: nowISO() });
+  await db.searchIndex.where('entityId').equals(id).delete();
+}
+
+export function formatWorkReport(report: WorkReport, date: string): string {
+  const formattedDate = date
+    ? date.split('-').reverse().join('/')
+    : '';
+  const plusLines = (value: string) => value.split(/\r?\n/).filter((line) => line.trim()).map((line) => `+ ${line.trim()}`).join('\n');
+  let text = `Báo cáo công việc ${formattedDate}\n`;
+  text += '- Tên dự án:\n';
+  report.projectEntries.forEach((entry, index) => {
+    text += `${index + 1}. ${entry.projectNameSnapshot}\n`;
+    text += '- Nội dung công việc:\n';
+    text += `${plusLines(entry.content)}\n`;
+    text += '- Kết quả công việc:\n';
+    text += `${plusLines(entry.result)}\n`;
+  });
+  text += `\n- Vấn đề tồn tại:\n${plusLines(report.issue)}`;
+  text += `\n\n- Hướng giải quyết:\n${plusLines(report.solution)}`;
+  text += `\n\n- Công việc ngày tiếp theo:\n${plusLines(report.nextWork)}`;
+  return text;
 }
 
 // ===================== DAY OPERATIONS =====================
@@ -565,6 +742,28 @@ async function updateSearchIndexForPage(page: Page, notebookTitle: string): Prom
   await db.searchIndex.put(entry);
 }
 
+async function updateSearchIndexForWorkReport(report: WorkReport): Promise<void> {
+  const day = await db.days.get(report.dayId);
+  const projectNames = report.projectEntries.map((entry) => entry.projectNameSnapshot).filter(Boolean);
+  const content = [
+    projectNames.join(' '),
+    ...report.projectEntries.flatMap((entry) => [entry.content, entry.result]),
+    report.issue,
+    report.solution,
+    report.nextWork,
+  ].filter(Boolean).join('\n');
+  const entry: SearchEntry = {
+    id: `search_${report.id}`,
+    type: 'work_report',
+    entityId: report.id,
+    title: `Báo cáo công việc ${day?.date ? day.date.split('-').reverse().join('/') : ''}`.trim(),
+    content,
+    date: day?.date || '',
+    dayId: report.dayId,
+  };
+  await db.searchIndex.put(entry);
+}
+
 /**
  * Search across all indexed content.
  */
@@ -589,13 +788,18 @@ export async function searchAll(query: string, tagIds: string[] = []): Promise<S
 }
 
 export async function rebuildSearchIndex(): Promise<void> {
-  const [notebooks, pages] = await Promise.all([db.notebooks.filter((nb) => !nb.deleted).toArray(), db.pages.filter((p) => !p.deleted).toArray()]);
+  const [notebooks, pages, reports] = await Promise.all([
+    db.notebooks.filter((nb) => !nb.deleted).toArray(),
+    db.pages.filter((p) => !p.deleted).toArray(),
+    db.workReports.filter((report) => !report.deletedAt).toArray(),
+  ]);
   await db.searchIndex.clear();
   for (const notebook of notebooks) await updateSearchIndexForNotebook(notebook);
   for (const page of pages) {
     const notebook = notebooks.find((nb) => nb.id === page.notebookId);
     await updateSearchIndexForPage({ ...page, tagIds: page.tagIds || [] }, notebook?.title || '');
   }
+  for (const report of reports) await updateSearchIndexForWorkReport(report);
 }
 
 // ===================== BULK OPERATIONS =====================
@@ -612,12 +816,16 @@ export async function loadFromDatabase(data: {
   customTasks?: CustomUserTask[];
   workCategories?: WorkCategory[];
   tags?: Tag[];
+  projects?: Project[];
+  workReports?: WorkReport[];
 }): Promise<void> {
-  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.searchIndex], async () => {
+  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports, db.searchIndex], async () => {
     // Clear existing data
     await db.days.clear();
     await db.notebooks.clear();
     await db.tags.clear();
+    await db.projects.clear();
+    await db.workReports.clear();
 
     // Load days
     if (data.days?.length) {
@@ -635,6 +843,13 @@ export async function loadFromDatabase(data: {
       await db.pages.bulkPut(data.pages.map((page) => ({ ...page, tagIds: page.tagIds || [] })));
     }
     if (data.tags?.length) await db.tags.bulkPut(data.tags);
+    if (data.projects?.length) await db.projects.bulkPut(data.projects);
+    if (data.workReports?.length) {
+      await db.workReports.bulkPut(data.workReports.map((report) => ({
+        ...report,
+        projectEntries: Array.isArray(report.projectEntries) ? report.projectEntries : [],
+      })));
+    }
 
     // Load scheduleBlocks
     await db.scheduleBlocks.clear();
@@ -667,6 +882,9 @@ export async function loadFromDatabase(data: {
         await updateSearchIndexForPage({ ...page, tagIds: page.tagIds || [] }, nb?.title || '');
       }
     }
+    for (const report of data.workReports || []) {
+      if (!report.deletedAt) await updateSearchIndexForWorkReport(report);
+    }
   });
 }
 
@@ -680,6 +898,8 @@ export async function exportDatabase(): Promise<{
   notebooks: Notebook[];
   pages: Page[];
   tags: Tag[];
+  projects: Project[];
+  workReports: WorkReport[];
   scheduleBlocks: ScheduleBlock[];
   customTasks: CustomUserTask[];
   workCategories: WorkCategory[];
@@ -689,17 +909,21 @@ export async function exportDatabase(): Promise<{
   // Include both active and soft-deleted pages so Trash Bin syncs across devices
   const pages = await db.pages.toArray();
   const tags = await db.tags.toArray();
+  const projects = await db.projects.toArray();
+  const workReports = await db.workReports.toArray();
   const scheduleBlocks = await db.scheduleBlocks.toArray();
   const customTasks = await db.customTasks.toArray();
   const workCategories = await db.workCategories.toArray();
 
   return {
-    version: 2,
+    version: 3,
     updatedAt: nowISO(),
     days,
     notebooks,
     pages,
     tags,
+    projects,
+    workReports,
     scheduleBlocks,
     customTasks,
     workCategories,
@@ -735,6 +959,8 @@ export async function clearAllLocalData(): Promise<void> {
       db.customTasks,
       db.workCategories,
       db.tags,
+      db.projects,
+      db.workReports,
       db.searchIndex,
       db.syncQueue,
     ],
@@ -746,6 +972,8 @@ export async function clearAllLocalData(): Promise<void> {
       await db.customTasks.clear();
       await db.workCategories.clear();
       await db.tags.clear();
+      await db.projects.clear();
+      await db.workReports.clear();
       await db.searchIndex.clear();
       await db.syncQueue.clear();
     }

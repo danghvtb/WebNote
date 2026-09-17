@@ -8,9 +8,14 @@ import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { X, Calendar } from 'lucide-react';
+import { useWorkReportStore } from '../../stores/workReportStore';
+import { WorkReportEditor } from '../workReport/WorkReportEditor';
+import { useEffect } from 'react';
 
 export function AppLayout() {
-  const { selectedPageId } = useNotesStore();
+  const { selectedPageId, selectedNotebookId } = useNotesStore();
+  const selectedReportId = useWorkReportStore((s) => s.selectedReportId);
+  const clearSelectedReport = useWorkReportStore((s) => s.clearSelectedReport);
   const { activeTab } = useScheduleStore();
   const {
     mobileSidebarOpen,
@@ -18,6 +23,10 @@ export function AppLayout() {
     mobileDaySidebarOpen,
     setMobileDaySidebarOpen,
   } = useAppStore();
+
+  useEffect(() => {
+    if (selectedReportId && (selectedPageId || selectedNotebookId)) clearSelectedReport();
+  }, [selectedPageId, selectedNotebookId, selectedReportId, clearSelectedReport]);
 
   return (
     <div className="h-screen flex flex-col overflow-hidden" style={{ background: 'var(--color-bg-primary)' }}>
@@ -75,7 +84,9 @@ export function AppLayout() {
 
           {/* Main Content Area */}
           <div className="flex-1 overflow-hidden flex flex-col">
-            {selectedPageId ? (
+            {selectedReportId ? (
+              <WorkReportEditor key={selectedReportId} />
+            ) : selectedPageId ? (
               <Editor />
             ) : (
               <HomePage />
