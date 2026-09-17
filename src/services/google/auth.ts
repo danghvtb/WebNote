@@ -7,16 +7,10 @@ import type { GoogleUser } from '../../types';
 
 const SCOPES = 'https://www.googleapis.com/auth/drive.file https://www.googleapis.com/auth/userinfo.profile https://www.googleapis.com/auth/userinfo.email';
 
-const DEFAULT_CLIENT_ID = '211817470852-h18qb3h9n9iebd8i0ihaqq9qj2im4947.apps.googleusercontent.com';
-
-// Dynamically get the client ID — allows build-time or runtime config
+// The client ID must be configured explicitly so it remains stable between builds.
 function getClientId(): string {
-  // Try environment variable first (Vite build-time)
   const envClientId = import.meta.env.VITE_GOOGLE_CLIENT_ID;
-  if (envClientId && envClientId !== 'YOUR_GOOGLE_CLIENT_ID') {
-    return envClientId;
-  }
-  return DEFAULT_CLIENT_ID;
+  return envClientId && envClientId !== 'YOUR_GOOGLE_CLIENT_ID' ? envClientId : '';
 }
 
 interface TokenResponse {
@@ -35,6 +29,11 @@ let currentAccessToken: string | null = null;
 // Promise resolvers for the token callback
 let tokenResolve: ((token: string) => void) | null = null;
 let tokenReject: ((error: Error) => void) | null = null;
+
+export type SignInOptions = {
+  prompt?: '' | 'select_account' | 'consent' | 'none';
+  loginHint?: string;
+};
 
 /**
  * Load the Google Identity Services script.
@@ -98,11 +97,9 @@ export async function initGoogleAuth(): Promise<void> {
     throw new Error('Google Client ID is not configured. Set VITE_GOOGLE_CLIENT_ID in .env');
   }
 
-  // Restore stored token if available
-  const storedToken = localStorage.getItem('mynotes_token');
-  if (storedToken) {
-    currentAccessToken = storedToken;
-  }
+  // Restore a token only while it is still valid. Expired tokens must not trigger
+  // an OAuth popup during application startup.
+  currentAccessToken = getValidAccessToken();
 
   tokenClient = google.accounts.oauth2.initTokenClient({
     client_id: clientId,
@@ -134,10 +131,9 @@ export async function initGoogleAuth(): Promise<void> {
 }
 
 /**
- * Sign in with Google — triggers OAuth popup.
- * Returns the access token.
+ * Request a token from a user gesture. The default is the first-login flow.
  */
-export function signIn(): Promise<string> {
+export function signIn(options: SignInOptions = {}): Promise<string> {
   return new Promise((resolve, reject) => {
     if (!tokenClient) {
       reject(new Error('Google Auth not initialized'));
@@ -145,33 +141,34 @@ export function signIn(): Promise<string> {
     }
     tokenResolve = resolve;
     tokenReject = reject;
-    tokenClient.requestAccessToken({});
+    const request: { prompt?: string; login_hint?: string } = {};
+    request.prompt = options.prompt ?? 'select_account';
+    if (options.loginHint) request.login_hint = options.loginHint;
+    tokenClient.requestAccessToken(request);
   });
 }
 
 /**
- * Sign in silently (no popup) — used for token refresh.
+ * Reconnect Drive after an access token expires. This is intentionally called
+ * only from a user gesture; GIS token model does not support a browser-only
+ * refresh token.
  */
-export function signInSilent(): Promise<string> {
-  return new Promise(async (resolve, reject) => {
-    if (!tokenClient) {
-      try {
-        await initGoogleAuth();
-      } catch (err) {
-        reject(err);
-        return;
-      }
-    }
-    tokenResolve = resolve;
-    tokenReject = reject;
-    tokenClient?.requestAccessToken({ prompt: '' });
-  });
+export function connectGoogleDrive(loginHint?: string): Promise<string> {
+  return signIn({ prompt: '', loginHint });
 }
 
 /**
  * Sign out — revoke the token and clear stored session.
  */
 export function signOut(): void {
+  const savedUser = localStorage.getItem('mynotes_user');
+  let accountRootKey: string | null = null;
+  try {
+    const email = savedUser ? (JSON.parse(savedUser) as { email?: string }).email : '';
+    if (email) accountRootKey = `mynotes_root_folder:${email.toLowerCase()}`;
+  } catch {
+    // Ignore malformed legacy session data.
+  }
   if (currentAccessToken) {
     try {
       google.accounts.oauth2.revoke(currentAccessToken, () => {
@@ -186,12 +183,14 @@ export function signOut(): void {
   localStorage.removeItem('mynotes_token');
   localStorage.removeItem('mynotes_token_expiry');
   localStorage.removeItem('mynotes_root_folder');
+  localStorage.removeItem('mynotes_rootFolderId');
+  if (accountRootKey) localStorage.removeItem(accountRootKey);
 }
 
 /**
- * Get the current access token if not expired.
+ * Get the current access token if it has not expired.
  */
-export function getAccessToken(): string | null {
+export function getValidAccessToken(): string | null {
   const token = currentAccessToken || localStorage.getItem('mynotes_token');
   const expiry = localStorage.getItem('mynotes_token_expiry');
   if (!token) return null;
@@ -199,7 +198,9 @@ export function getAccessToken(): string | null {
   if (expiry) {
     const expiresAt = parseInt(expiry, 10);
     if (Date.now() >= expiresAt) {
-      // Token has expired
+      currentAccessToken = null;
+      localStorage.removeItem('mynotes_token');
+      localStorage.removeItem('mynotes_token_expiry');
       return null;
     }
   }
@@ -207,40 +208,24 @@ export function getAccessToken(): string | null {
   return currentAccessToken;
 }
 
+// Backwards-compatible alias for consumers that only need a read-only check.
+export const getAccessToken = getValidAccessToken;
+
 /**
- * Ensure we have a valid access token — refresh silently if needed.
- * If silent refresh is blocked (e.g. Third-party cookie policy), fallback to active sign in.
+ * Require a valid token without ever opening an OAuth UI.
  */
-export async function ensureAccessToken(interactiveFallback = false): Promise<string> {
-  const token = getAccessToken();
+export async function ensureAccessToken(): Promise<string> {
+  const token = getValidAccessToken();
   if (token) return token;
-
-  // Try silent refresh first
-  try {
-    return await signInSilent();
-  } catch (err) {
-    console.warn('[Auth] Silent token refresh failed:', err);
-    
-    if (interactiveFallback) {
-      try {
-        console.log('[Auth] Attempting interactive sign-in fallback...');
-        return await signIn();
-      } catch (interactiveErr) {
-        console.error('[Auth] Interactive sign-in failed/cancelled:', interactiveErr);
-      }
-    }
-
-    // Notify app that user needs re-authorization
-    window.dispatchEvent(new CustomEvent('mynotes_auth_required'));
-    throw new Error('AUTH_REQUIRED');
-  }
+  window.dispatchEvent(new CustomEvent('mynotes_auth_required'));
+  throw new Error('AUTH_REQUIRED');
 }
 
 /**
  * Check if the user is authenticated.
  */
 export function isAuthenticated(): boolean {
-  return getAccessToken() !== null;
+  return getValidAccessToken() !== null;
 }
 
 /**
@@ -275,7 +260,7 @@ export async function fetchUserProfile(accessToken: string): Promise<GoogleUser>
 declare global {
   namespace google.accounts.oauth2 {
     interface TokenClient {
-      requestAccessToken(config?: { prompt?: string }): void;
+      requestAccessToken(config?: { prompt?: string; login_hint?: string }): void;
     }
     interface ClientConfigError {
       message?: string;

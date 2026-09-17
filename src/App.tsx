@@ -26,7 +26,7 @@ import { TrashModal } from './components/modal/TrashModal';
 import { TagManagerModal } from './components/modal/TagManagerModal';
 import { useNotesStore } from './stores/notesStore';
 
-// Sync timeout — 30 seconds max wait before allowing user in
+// Sync timeout — background pull must never block local-first editing
 const SYNC_TIMEOUT_MS = 30_000;
 
 function AppContent() {
@@ -44,7 +44,14 @@ function AppContent() {
   useEffect(() => {
     const savedUserStr = localStorage.getItem('mynotes_user');
     const savedToken = localStorage.getItem('mynotes_token');
-    const savedFolder = localStorage.getItem('mynotes_root_folder');
+    const savedExpiry = Number(localStorage.getItem('mynotes_token_expiry') || 0);
+    let savedFolder: string | null = null;
+    try {
+      const savedEmail = savedUserStr ? (JSON.parse(savedUserStr) as { email?: string }).email : '';
+      if (savedEmail) savedFolder = localStorage.getItem(`mynotes_root_folder:${savedEmail.toLowerCase()}`);
+    } catch {
+      savedFolder = null;
+    }
 
     if (!savedUserStr) return;
 
@@ -53,55 +60,51 @@ function AppContent() {
     const restoreSession = async () => {
       try {
         const savedUser = JSON.parse(savedUserStr);
-        setAuth(savedUser, savedToken);
+        const hasValidToken = Boolean(savedToken && (!savedExpiry || Date.now() < savedExpiry));
+        setAuth(savedUser, hasValidToken ? savedToken : null);
 
         if (savedFolder) {
           setRootFolderId(savedFolder);
         }
 
-        // Mark as logged in but NOT sync complete yet — show loading screen
-        setInitialSyncComplete(false);
-        setInitialSyncMessage('Đang khôi phục phiên đăng nhập...');
+        // Restore the local session immediately. Drive synchronization is
+        // deliberately non-blocking so an expired token never traps the user
+        // behind a loading screen.
+        setInitialSyncComplete(true);
+        setInitialSyncMessage('');
         setInitialized(true);
 
         // Pre-import for use in sync timeout callback
         const { markInitialPullComplete: unlockPull } = await import('./services/sync/syncManager');
 
-        // ── Safety timeout: auto-unlock after SYNC_TIMEOUT_MS ──
-        const timeoutId = setTimeout(() => {
-          syncTimedOut = true;
-          console.warn('[App] Sync timeout reached — unlocking UI with local data.');
+        if (!hasValidToken) {
           unlockPull();
-          setInitialSyncComplete(true);
-          addNotification('warning', 'Đồng bộ mất quá lâu. Dữ liệu có thể chưa được cập nhật đầy đủ.');
-        }, SYNC_TIMEOUT_MS);
-
-        // ── Step 1: Try Supabase sync first ──
-        let supabaseSynced = false;
-        try {
-          const { supabase, isSupabaseConfigured } = await import('./services/supabase/supabaseClient');
-          if (isSupabaseConfigured() && supabase) {
-            const { data: { session } } = await supabase.auth.getSession();
-            if (session) {
-              setInitialSyncMessage('Đang tải dữ liệu từ Supabase...');
-              const { syncFromSupabase } = await import('./services/supabase/supabaseSync');
-              await syncFromSupabase({ isConnectOrLogin: true });
-              supabaseSynced = true;
-            }
+          setSyncStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
+          try {
+            const { useScheduleStore } = await import('./stores/scheduleStore');
+            const scheduleStore = useScheduleStore.getState();
+            await scheduleStore.loadAllBlocks();
+            await scheduleStore.loadTasksAndCategories();
+          } catch (err) {
+            console.warn('[App] Schedule store load error:', err);
           }
-        } catch (err) {
-          console.warn('[App] Supabase session restore:', err);
+          return;
         }
 
-        // ── Step 2: Google Drive sync (if Supabase didn't handle it) ──
-        if (!supabaseSynced && !syncTimedOut) {
+        // Google Drive pull runs in the background while the local vault is usable.
+        const timeoutId = setTimeout(() => {
+          syncTimedOut = true;
+          console.warn('[App] Background sync timeout reached — keeping local data available.');
+          unlockPull();
+          addNotification('warning', 'Đồng bộ mất quá lâu. Dữ liệu local vẫn sẵn sàng.');
+        }, SYNC_TIMEOUT_MS);
+
+        if (!syncTimedOut) {
           try {
             setInitialSyncMessage('Đang kết nối Google Drive...');
             const { initGoogleAuth, ensureAccessToken } = await import('./services/google/auth');
             await initGoogleAuth();
-            await ensureAccessToken().catch((err) => {
-              console.warn('[App] Silent token restore failed:', err);
-            });
+            await ensureAccessToken();
 
             setInitialSyncMessage('Đang kiểm tra thư mục MyNotes...');
             const { ensureRootFolder } = await import('./services/google/rootFolderManager');
@@ -126,13 +129,10 @@ function AppContent() {
           }
         }
 
-        // ── Clear timeout & finalize ──
+        // ── Finalize background pull ──
         clearTimeout(timeoutId);
-
-        if (!syncTimedOut) {
-          setInitialSyncComplete(true);
-          setInitialSyncMessage('');
-        }
+        setInitialSyncComplete(true);
+        setInitialSyncMessage('');
 
         // Load schedule data into stores after sync
         try {
@@ -151,7 +151,7 @@ function AppContent() {
     };
 
     restoreSession();
-  }, [setAuth, setRootFolderId, setInitialized, setInitialSyncComplete, setInitialSyncMessage, addNotification]);
+  }, [setAuth, setRootFolderId, setInitialized, setInitialSyncComplete, setInitialSyncMessage, setSyncStatus, addNotification]);
 
   // Initialize theme
   useEffect(() => {

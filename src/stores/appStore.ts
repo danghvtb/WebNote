@@ -139,6 +139,7 @@ export const useAppStore = create<AppState>((set) => ({
       localStorage.setItem('mynotes_token', token);
     } else {
       localStorage.removeItem('mynotes_token');
+      localStorage.removeItem('mynotes_token_expiry');
     }
     set({ isLoggedIn: !!user, user, accessToken: token, authError: null });
   },
@@ -148,12 +149,26 @@ export const useAppStore = create<AppState>((set) => ({
   setAuthError: (error) => set({ authError: error, authLoading: false }),
 
   logout: () => {
+    let accountRootKey: string | null = null;
+    try {
+      const rawUser = localStorage.getItem('mynotes_user');
+      const email = rawUser ? (JSON.parse(rawUser) as { email?: string }).email : '';
+      if (email) accountRootKey = `mynotes_root_folder:${email.toLowerCase()}`;
+    } catch {
+      // Ignore malformed legacy session data.
+    }
     localStorage.removeItem('mynotes_user');
     localStorage.removeItem('mynotes_token');
+    localStorage.removeItem('mynotes_token_expiry');
     localStorage.removeItem('mynotes_root_folder');
+    localStorage.removeItem('mynotes_rootFolderId');
+    if (accountRootKey) localStorage.removeItem(accountRootKey);
     // Reset sync guard so next login does a fresh pull
     import('../services/sync/syncManager').then(({ resetInitialPullState }) => {
       resetInitialPullState();
+    });
+    import('../services/google/rootFolderManager').then(({ clearRootFolderCache }) => {
+      clearRootFolderCache().catch(() => undefined);
     });
     set({
       isLoggedIn: false,

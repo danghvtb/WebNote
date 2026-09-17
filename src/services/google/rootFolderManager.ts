@@ -160,32 +160,67 @@ export async function validateRootFolder(folderId: string): Promise<boolean> {
 // ===================== LOCAL CACHE =====================
 
 const ROOT_FOLDER_KEY = 'rootFolderId';
+export const ROOT_FOLDER_STORAGE_PREFIX = 'mynotes_root_folder:';
+
+function getAccountRootFolderKey(): string | null {
+  try {
+    const rawUser = localStorage.getItem('mynotes_user');
+    const user = rawUser ? JSON.parse(rawUser) as { email?: string } : null;
+    return user?.email ? `${ROOT_FOLDER_STORAGE_PREFIX}${user.email.toLowerCase()}` : null;
+  } catch {
+    return null;
+  }
+}
 
 async function getCachedRootFolderId(): Promise<string | null> {
+  const accountKey = getAccountRootFolderKey();
   try {
-    const record = await db.appState.get(ROOT_FOLDER_KEY);
-    return record?.value || null;
+    if (accountKey) {
+      const record = await db.appState.get(accountKey);
+      if (record?.value) return record.value;
+    }
+    // Migrate the old global cache once for the currently remembered account.
+    const legacyRecord = await db.appState.get(ROOT_FOLDER_KEY);
+    if (legacyRecord?.value && accountKey) {
+      await db.appState.put({ key: accountKey, value: legacyRecord.value });
+      return legacyRecord.value;
+    }
   } catch {
-    // Fallback to localStorage
-    return localStorage.getItem('mynotes_rootFolderId');
+    // Continue with localStorage fallback below.
   }
+  if (accountKey) {
+    return localStorage.getItem(accountKey) || localStorage.getItem('mynotes_root_folder');
+  }
+  return localStorage.getItem('mynotes_root_folder') || localStorage.getItem('mynotes_rootFolderId');
 }
 
 async function saveCachedRootFolderId(folderId: string): Promise<void> {
+  const accountKey = getAccountRootFolderKey();
   try {
-    await db.appState.put({ key: ROOT_FOLDER_KEY, value: folderId });
+    await db.appState.put({ key: accountKey || ROOT_FOLDER_KEY, value: folderId });
   } catch {
-    // Fallback to localStorage
-    localStorage.setItem('mynotes_rootFolderId', folderId);
+    // Fallback to localStorage.
   }
+  if (accountKey) localStorage.setItem(accountKey, folderId);
+  localStorage.setItem('mynotes_root_folder', folderId);
 }
 
 async function clearCachedRootFolderId(): Promise<void> {
+  const accountKey = getAccountRootFolderKey();
   try {
     await db.appState.delete(ROOT_FOLDER_KEY);
+    if (accountKey) await db.appState.delete(accountKey);
   } catch {
-    localStorage.removeItem('mynotes_rootFolderId');
+    // Ignore storage errors.
   }
+  if (accountKey) localStorage.removeItem(accountKey);
+  localStorage.removeItem('mynotes_root_folder');
+  localStorage.removeItem('mynotes_rootFolderId');
+}
+
+/** Clear all local root-folder cache entries during logout/account switching. */
+export async function clearRootFolderCache(): Promise<void> {
+  await clearCachedRootFolderId();
 }
 
 /**

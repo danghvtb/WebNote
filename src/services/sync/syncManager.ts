@@ -1,6 +1,6 @@
 // ============================================================
 // MyNotes — Sync Manager
-// Orchestrates local IndexedDB ↔ Google Drive ↔ Supabase synchronization.
+// Orchestrates local IndexedDB ↔ Google Drive synchronization.
 // ============================================================
 
 import { db } from '../database/db';
@@ -205,7 +205,7 @@ function debouncedSync(): void {
 }
 
 /**
- * Unified trigger for active cloud sync provider or local fallback.
+ * Unified trigger for Google Drive sync or local fallback.
  */
 export async function triggerSync(): Promise<void> {
   // ── SYNC GUARD: Block push until initial pull is done ──
@@ -219,22 +219,7 @@ export async function triggerSync(): Promise<void> {
     return;
   }
 
-  // 1. Try Supabase Sync first if configured
-  try {
-    const { isSupabaseConfigured, supabase } = await import('../supabase/supabaseClient');
-    if (isSupabaseConfigured() && supabase) {
-      const { data: { session } } = await supabase.auth.getSession();
-      if (session) {
-        const { pushToSupabase } = await import('../supabase/supabaseSync');
-        await pushToSupabase();
-        return;
-      }
-    }
-  } catch (err) {
-    console.warn('[Sync] Supabase trigger check:', err);
-  }
-
-  // 2. Try Google Drive Sync if configured
+  // Try Google Drive Sync if a folder is available.
   try {
     const rootFolderId = await getRootFolderId();
     if (rootFolderId) {
@@ -249,10 +234,13 @@ export async function triggerSync(): Promise<void> {
     }
   } catch (err) {
     console.warn('[Sync] Google Drive trigger check:', err);
+    if ((err as { status?: number })?.status === 401 || (err instanceof Error && err.message === 'AUTH_REQUIRED')) {
+      setStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
+      return;
+    }
   }
 
-  // 3. Fallback: Local offline mode (Data saved in IndexedDB)
-  await db.syncQueue.clear();
+  // Fallback: Local offline mode (data remains in IndexedDB).
   lastSyncTime = nowISO();
   setStatus('saved');
 }
@@ -278,7 +266,6 @@ export async function processGoogleSyncQueue(): Promise<void> {
       if (folderRes.status === 'found') {
         rootFolderId = folderRes.folderId;
       } else {
-        await db.syncQueue.clear();
         lastSyncTime = nowISO();
         setStatus('saved');
         syncInProgress = false;
@@ -341,6 +328,10 @@ export async function processGoogleSyncQueue(): Promise<void> {
     setStatus('saved');
   } catch (error) {
     console.error('[Sync] Error:', error);
+    if ((error as { status?: number })?.status === 401 || (error instanceof Error && error.message === 'AUTH_REQUIRED')) {
+      setStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
+      return;
+    }
     setStatus('error', error instanceof Error ? error.message : 'Sync failed');
 
     // Retry failed operations with exponential backoff
@@ -560,6 +551,11 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
     }
   } catch (error) {
     console.error('[Sync] Error syncing from cloud:', error);
+    if ((error as { status?: number })?.status === 401 || (error instanceof Error && error.message === 'AUTH_REQUIRED')) {
+      setStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
+      if (options?.isConnectOrLogin) initialPullComplete = true;
+      return;
+    }
     setStatus('error', error instanceof Error ? error.message : 'Sync failed');
 
     // Even on error, allow push after login attempt so app is usable

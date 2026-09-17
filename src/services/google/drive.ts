@@ -15,7 +15,8 @@ const JSON_MIME = 'application/json';
 
 /**
  * Make an authenticated request to Google Drive API.
- * Handles token refresh and error responses.
+ * Handles token validity and error responses. Token renewal is initiated by the
+ * UI reconnect action, never from a background request.
  */
 async function driveRequest(
   url: string,
@@ -32,18 +33,8 @@ async function driveRequest(
   });
 
   if (response.status === 401) {
-    // Token might have just expired — try once more
-    const newToken = await ensureAccessToken();
-    headers.set('Authorization', `Bearer ${newToken}`);
-    const retryResponse = await fetch(url, { ...options, headers });
-    if (!retryResponse.ok) {
-      throw new DriveApiError(
-        `Drive API error: ${retryResponse.status}`,
-        retryResponse.status,
-        await retryResponse.text()
-      );
-    }
-    return retryResponse;
+    window.dispatchEvent(new CustomEvent('mynotes_auth_required'));
+    throw new DriveApiError('Google Drive authorization required', 401, 'AUTH_REQUIRED');
   }
 
   if (!response.ok) {

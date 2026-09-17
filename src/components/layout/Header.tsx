@@ -41,13 +41,17 @@ export function Header() {
   const handleSync = async () => {
     try {
       if (syncStatus === 'auth_required' || syncStatus === 'error') {
-        const { signIn, fetchUserProfile } = await import('../../services/google/auth');
-        const token = await signIn();
+        const { initGoogleAuth, connectGoogleDrive, fetchUserProfile } = await import('../../services/google/auth');
+        await initGoogleAuth();
+        const token = await connectGoogleDrive(user?.email);
         const profile = await fetchUserProfile(token);
+        if (user?.email && profile.email.toLowerCase() !== user.email.toLowerCase()) {
+          throw new Error('Tài khoản Google không khớp. Hãy đăng xuất rồi chọn Đổi tài khoản.');
+        }
         const { setAuth } = useAppStore.getState();
         setAuth(profile, token);
       }
-      forceSync();
+      await forceSync();
     } catch (err) {
       console.warn('[Header] Re-auth failed:', err);
     }
@@ -240,6 +244,15 @@ export function Header() {
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 Sync Now
+              </button>
+              <button
+                onClick={handleLogout}
+                className="w-full text-left px-3 py-2 text-sm transition-colors cursor-pointer"
+                style={{ color: 'var(--color-text-secondary)' }}
+                onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
+                onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
+              >
+                Đổi tài khoản
               </button>
               <div style={{ borderTop: '1px solid var(--color-border)', margin: '4px 0' }} />
               <button
