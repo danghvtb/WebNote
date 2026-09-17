@@ -63,9 +63,9 @@ export function AppLayout() {
                     className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium bg-slate-800 text-cyan-400 border border-slate-700"
                   >
                     <Calendar className="w-3.5 h-3.5" />
-                    <span>Timeline</span>
+                    <span>{mobileDaySidebarOpen ? 'Nội dung ngày' : 'Timeline'}</span>
                   </button>
-                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">Notebooks</span>
+                  <span className="text-sm font-semibold text-[var(--color-text-primary)]">{mobileDaySidebarOpen ? 'Timeline' : 'Nội dung ngày'}</span>
                   <button
                     onClick={() => setMobileSidebarOpen(false)}
                     className="p-1 rounded-lg text-[var(--color-text-tertiary)] hover:text-white"

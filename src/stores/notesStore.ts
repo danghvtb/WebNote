@@ -68,6 +68,7 @@ interface NotesState {
   // Reset
   resetSelection: () => void;
   clearPageSelection: () => void;
+  clearPageEditorSelection: () => void;
 }
 
 export const useNotesStore = create<NotesState>((set, get) => ({
@@ -220,7 +221,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   selectToday: async () => {
     const today = await repo.ensureToday();
-    get().selectDay(today.id);
+    await get().selectDay(today.id);
     await get().loadDays(); // Refresh days list
   },
 
@@ -365,6 +366,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   clearPageSelection: () => set({ selectedNotebookId: null, selectedPageId: null, pages: [] }),
+  clearPageEditorSelection: () => set({ selectedPageId: null }),
 
   createTag: async (name) => {
     const tag = await repo.createTag(name);

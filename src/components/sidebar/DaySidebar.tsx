@@ -113,20 +113,28 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
     ensureTimelineGroupsExpanded(timelineGroupingMode, keys);
   }, [ensureTimelineGroupsExpanded, selectedDate, timelineGroupingMode]);
 
-  const handleToday = () => {
+  const handleToday = async () => {
     useWorkReportStore.getState().clearSelectedReport();
-    selectToday();
-    if (mobile) { setMobileDaySidebarOpen(false); setMobileSidebarOpen(false); }
+    await selectToday();
+    if (mobile) {
+      useNotesStore.getState().clearPageEditorSelection();
+      setMobileSidebarOpen(true);
+      setMobileDaySidebarOpen(false);
+    }
   };
 
-  const handleDaySelect = (day: DayWithCount) => {
+  const handleDaySelect = async (day: DayWithCount) => {
     useWorkReportStore.getState().clearSelectedReport();
     if (isToday(day.date)) {
-      selectToday();
+      await selectToday();
     } else {
-      selectDay(day.id);
+      await selectDay(day.id);
     }
-    if (mobile) { setMobileDaySidebarOpen(false); setMobileSidebarOpen(false); }
+    if (mobile) {
+      useNotesStore.getState().clearPageEditorSelection();
+      setMobileSidebarOpen(true);
+      setMobileDaySidebarOpen(false);
+    }
   };
 
   const handleAddNotebook = (dayId: string) => {

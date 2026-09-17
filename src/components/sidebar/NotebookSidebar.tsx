@@ -263,7 +263,7 @@ export function NotebookSidebar() {
             <button type="button" onClick={(event) => { event.stopPropagation(); handleDeleteReport(); }} className="p-1 text-rose-400 cursor-pointer" aria-label="Xóa báo cáo"><Trash2 className="w-3 h-3" /></button>
           </div>
         </div>}
-        {notebooks.length === 0 ? (
+        {notebooks.length === 0 && !dayReport ? (
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <Notebook className="w-8 h-8 mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
             <p className="text-sm text-center mb-3" style={{ color: 'var(--color-text-tertiary)' }}>No notebooks yet</p>
@@ -275,6 +275,11 @@ export function NotebookSidebar() {
               <Plus className="w-3 h-3" />
               New Notebook
             </button>
+          </div>
+        ) : notebooks.length === 0 ? (
+          <div className="px-3 py-6 text-center">
+            <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Chưa có sổ ghi chú trong ngày này.</p>
+            <button type="button" onClick={() => setCreateNotebookOpen(true)} className="mt-3 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer" style={{ background: 'var(--color-accent-dim)', color: 'var(--color-accent)' }}><Plus className="w-3 h-3" /> Thêm sổ ghi chú</button>
           </div>
         ) : (
           notebooks.map((nb) => {
