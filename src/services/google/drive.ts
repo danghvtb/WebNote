@@ -144,7 +144,7 @@ export async function fileExists(fileId: string): Promise<boolean> {
  */
 export async function getFileMetadata(
   fileId: string,
-  fields: string = 'id,name,mimeType,modifiedTime,size,parents'
+  fields: string = 'id,name,mimeType,modifiedTime,size,version,md5Checksum,parents'
 ): Promise<DriveFile> {
   const response = await driveRequest(
     `${DRIVE_API_BASE}/files/${fileId}?fields=${fields}`
@@ -209,7 +209,7 @@ export async function createFile(
   ].join('\r\n');
 
   const response = await driveRequest(
-    `${DRIVE_UPLOAD_BASE}/files?uploadType=multipart&fields=id,name,mimeType,modifiedTime`,
+    `${DRIVE_UPLOAD_BASE}/files?uploadType=multipart&fields=id,name,mimeType,modifiedTime,size,version,md5Checksum`,
     {
       method: 'POST',
       headers: {
@@ -231,7 +231,7 @@ export async function updateFile(
   mimeType: string = JSON_MIME
 ): Promise<DriveFile> {
   const response = await driveRequest(
-    `${DRIVE_UPLOAD_BASE}/files/${fileId}?uploadType=media&fields=id,name,mimeType,modifiedTime`,
+    `${DRIVE_UPLOAD_BASE}/files/${fileId}?uploadType=media&fields=id,name,mimeType,modifiedTime,size,version,md5Checksum`,
     {
       method: 'PATCH',
       headers: { 'Content-Type': mimeType },

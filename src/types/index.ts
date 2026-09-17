@@ -208,6 +208,9 @@ export interface DriveFile {
   createdTime?: string;
   modifiedTime?: string;
   size?: string;
+  version?: string;
+  md5Checksum?: string;
+  trashed?: boolean;
 }
 
 export interface DriveFileList {

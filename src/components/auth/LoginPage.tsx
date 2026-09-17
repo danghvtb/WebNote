@@ -39,7 +39,21 @@ export function LoginPage() {
       // Step 3: Get user profile
       setStep('Getting your profile...');
       const user = await fetchUserProfile(accessToken);
+      const { getVaultOwnerEmail, clearAllLocalData } = await import('../../services/database/repository');
+      const previousOwner = await getVaultOwnerEmail();
+      if (previousOwner && previousOwner.toLowerCase() !== user.email.toLowerCase()) {
+        // The user explicitly chose a different Google account. Never expose
+        // or upload the previous account's cache to this account.
+        await clearAllLocalData();
+      }
+      localStorage.setItem('mynotes_cloud_bootstrap_pending', '1');
       setAuth(user, accessToken);
+      // Let the local-first shell render immediately. Drive discovery and the
+      // snapshot pull continue while the user can already see/edit cached data.
+      setInitialSyncComplete(true);
+      setInitialSyncMessage('');
+      setInitialized(true);
+      setNeedsFolderCreation(false);
 
       // Step 4: Find or detect root folder
       setStep('Looking for MyNotes folder...');
@@ -47,10 +61,6 @@ export function LoginPage() {
 
       if (result.status === 'found') {
         setRootFolderId(result.folderId);
-        setStep('Clearing local cache...');
-        const { clearAllLocalData } = await import('../../services/database/repository');
-        await clearAllLocalData();
-
         setStep('Downloading your notes from Google Drive...');
         await syncFromCloud({ isConnectOrLogin: true });
 
@@ -69,10 +79,6 @@ export function LoginPage() {
         // Multiple folders — use the first one with database
         const best = result.folders.find((f) => f.hasDatabase) || result.folders[0];
         setRootFolderId(best.id);
-
-        setStep('Clearing local cache...');
-        const { clearAllLocalData } = await import('../../services/database/repository');
-        await clearAllLocalData();
 
         setStep('Downloading your notes from Google Drive...');
         await syncFromCloud({ isConnectOrLogin: true });
@@ -164,6 +170,7 @@ export function LoginPage() {
         <button
           onClick={async () => {
             // Offline mode — bypass sync guard entirely
+            localStorage.removeItem('mynotes_cloud_bootstrap_pending');
             const { markInitialPullComplete } = await import('../../services/sync/syncManager');
             markInitialPullComplete();
             setInitialSyncComplete(true);
@@ -198,6 +205,7 @@ export function LoginPage() {
               type="button"
               onClick={async () => {
                 // Offline mode — bypass sync guard entirely
+                localStorage.removeItem('mynotes_cloud_bootstrap_pending');
                 const { markInitialPullComplete } = await import('../../services/sync/syncManager');
                 markInitialPullComplete();
                 setInitialSyncComplete(true);

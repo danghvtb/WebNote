@@ -58,39 +58,13 @@ export function loadGISScript(): Promise<void> {
 /**
  * Load the Google API client library (for Drive API calls).
  */
-export function loadGapiScript(): Promise<void> {
-  return new Promise((resolve, reject) => {
-    if (document.getElementById('gapi-script')) {
-      if (window.gapi) {
-        resolve();
-      }
-      return;
-    }
-    const script = document.createElement('script');
-    script.id = 'gapi-script';
-    script.src = 'https://apis.google.com/js/api.js';
-    script.async = true;
-    script.defer = true;
-    script.onload = () => {
-      window.gapi.load('client', async () => {
-        try {
-          await window.gapi.client.init({});
-          resolve();
-        } catch (err) {
-          reject(err);
-        }
-      });
-    };
-    script.onerror = () => reject(new Error('Failed to load Google API client'));
-    document.head.appendChild(script);
-  });
-}
-
 /**
  * Initialize Google Auth — loads scripts and creates token client.
  */
 export async function initGoogleAuth(): Promise<void> {
-  await Promise.all([loadGISScript(), loadGapiScript()]);
+  // Drive requests use authenticated fetch; do not load the unused GAPI
+  // client on the startup critical path.
+  await loadGISScript();
 
   const clientId = getClientId();
   if (!clientId) {
@@ -273,14 +247,5 @@ declare global {
       error_callback?: (error: ClientConfigError) => void;
     }): TokenClient;
     function revoke(token: string, callback: () => void): void;
-  }
-  interface Window {
-    gapi: {
-      load: (api: string, callback: () => void) => void;
-      client: {
-        init: (config: Record<string, unknown>) => Promise<void>;
-        setToken: (token: { access_token: string }) => void;
-      };
-    };
   }
 }

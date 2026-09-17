@@ -98,8 +98,10 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     try {
       let days = await repo.getAllDays();
 
-      // If database is empty on first launch, auto seed demo vault with feature notes
-      if (days.length === 0) {
+      // Do not seed while a cloud snapshot is still being resolved. Otherwise a
+      // cold login can create demo records that are accidentally uploaded.
+      const cloudBootstrapPending = localStorage.getItem('mynotes_cloud_bootstrap_pending') === '1';
+      if (days.length === 0 && !cloudBootstrapPending) {
         const { seedDemoVault } = await import('../services/database/seedDemo');
         const { notebook } = await seedDemoVault();
         days = await repo.getAllDays();
@@ -157,7 +159,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   loadTags: async () => {
-    try { set({ tags: await repo.getAllTags() }); await repo.rebuildSearchIndex(); } catch (error) { console.error('[NotesStore] Failed to load tags:', error); }
+    try { set({ tags: await repo.getAllTags() }); } catch (error) { console.error('[NotesStore] Failed to load tags:', error); }
   },
 
   // ── Selection ──

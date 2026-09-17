@@ -10,11 +10,13 @@ import {
   createFile,
   updateFile,
   downloadFile,
+  getFileMetadata,
   createFolder,
   listFiles,
   trashFile,
 } from '../google/drive';
 import { getRootFolderId } from '../google/rootFolderManager';
+import { useAppStore } from '../../stores/appStore';
 import type { SyncOperation, SyncStatus, Page } from '../../types';
 import { generateId, nowISO, isOnline } from '../../utils';
 
@@ -35,6 +37,81 @@ const RETRY_DELAY_BASE = 2000; // 2 seconds, exponential backoff
 
 // File ID Cache to prevent expensive findFileInFolder network calls
 const fileIdCache = new Map<string, string>();
+const DATABASE_METADATA_KEY = 'sync.database.metadata';
+
+function performanceMark(name: string): void {
+  if (typeof performance !== 'undefined') performance.mark(`mynotes:${name}`);
+}
+
+interface CachedDatabaseMetadata {
+  ownerEmail?: string;
+  rootFolderId: string;
+  databaseFileId: string;
+  modifiedTime?: string;
+  version?: string;
+  size?: string;
+  md5Checksum?: string;
+  snapshotId?: string;
+  snapshotAppliedAt: number;
+}
+
+async function getCachedDatabaseMetadata(): Promise<CachedDatabaseMetadata | null> {
+  const record = await db.appState.get(DATABASE_METADATA_KEY);
+  if (!record?.value) return null;
+  try { return JSON.parse(record.value) as CachedDatabaseMetadata; } catch { return null; }
+}
+
+async function saveDatabaseMetadata(metadata: CachedDatabaseMetadata): Promise<void> {
+  await db.appState.put({ key: DATABASE_METADATA_KEY, value: JSON.stringify(metadata) });
+}
+
+function updateRuntime(partial: Record<string, unknown>): void {
+  const store = useAppStore.getState();
+  if (partial.cloudBootstrapStatus) store.setCloudBootstrapStatus(partial.cloudBootstrapStatus as Parameters<typeof store.setCloudBootstrapStatus>[0]);
+  if (partial.pushAllowed !== undefined) store.setPushAllowed(Boolean(partial.pushAllowed));
+  if (partial.searchIndexStatus) store.setSearchIndexStatus(partial.searchIndexStatus as Parameters<typeof store.setSearchIndexStatus>[0]);
+}
+
+type VaultSnapshot = Awaited<ReturnType<typeof exportDatabase>>;
+
+function mergePendingLocal(remote: VaultSnapshot, local: VaultSnapshot, pendingOps: SyncOperation[]): VaultSnapshot {
+  const merged: VaultSnapshot = {
+    ...remote,
+    pages: Array.isArray(remote.pages) ? [...remote.pages] : [],
+    tags: Array.isArray(remote.tags) ? [...remote.tags] : [],
+    projects: Array.isArray(remote.projects) ? [...remote.projects] : [],
+    workReports: Array.isArray(remote.workReports) ? [...remote.workReports] : [],
+  };
+  const collections: Record<string, keyof VaultSnapshot> = {
+    day: 'days', notebook: 'notebooks', page: 'pages', tag: 'tags',
+    project: 'projects', work_report: 'workReports',
+  };
+  const pending = new Map<string, SyncOperation>();
+  for (const op of pendingOps) pending.set(`${op.entity}:${op.entityId}`, op);
+  for (const op of pending.values()) {
+    if (op.entity === 'schedule') {
+      merged.scheduleBlocks = local.scheduleBlocks;
+      merged.customTasks = local.customTasks;
+      merged.workCategories = local.workCategories;
+      continue;
+    }
+    const field = collections[op.entity];
+    if (!field) continue;
+    const remoteItems = (merged[field] || []) as Array<{ id: string }>;
+    if (op.type === 'delete') {
+      (merged as unknown as Record<string, Array<{ id: string }>>)[field] = remoteItems.filter((item) => item.id !== op.entityId);
+      continue;
+    }
+    const localItems = ((local[field] || []) as Array<{ id: string }>);
+    const localItem = localItems.find((item) => item.id === op.entityId);
+    if (!localItem) continue;
+    const existingIndex = remoteItems.findIndex((item) => item.id === op.entityId);
+    if (existingIndex >= 0) remoteItems[existingIndex] = localItem;
+    else remoteItems.push(localItem);
+    (merged as unknown as Record<string, Array<{ id: string }>>)[field] = remoteItems;
+  }
+  return merged;
+}
 
 /**
  * Subscribe to sync status changes.
@@ -76,6 +153,7 @@ export function isInitialPullComplete(): boolean {
  */
 export function markInitialPullComplete(): void {
   initialPullComplete = true;
+  updateRuntime({ pushAllowed: true });
 }
 
 /**
@@ -83,6 +161,7 @@ export function markInitialPullComplete(): void {
  */
 export function resetInitialPullState(): void {
   initialPullComplete = false;
+  updateRuntime({ pushAllowed: false });
 }
 
 // Helper to get or find file ID with caching
@@ -290,17 +369,40 @@ export async function processGoogleSyncQueue(): Promise<void> {
     }
 
     // Export full database for root database.json
-    const dbData = await exportDatabase();
+    const dbData = {
+      ...(await exportDatabase()),
+      meta: {
+        schemaVersion: 1,
+        snapshotId: generateId('snapshot'),
+        generatedAt: nowISO(),
+        ownerEmail: useAppStore.getState().user?.email,
+      },
+    };
     const dbJson = JSON.stringify(dbData);
 
     // Save/update database.json using cache
     let dbFileId = await getCachedFileId(rootFolderId, 'database.json');
+    let uploadedMetadata: { id: string; modifiedTime?: string; size?: string; version?: string; md5Checksum?: string } | null = null;
     if (dbFileId) {
-      await updateFile(dbFileId, dbJson);
+      uploadedMetadata = await updateFile(dbFileId, dbJson);
     } else {
       const created = await createFile('database.json', dbJson, rootFolderId);
       fileIdCache.set(`${rootFolderId}/database.json`, created.id);
+      dbFileId = created.id;
+      uploadedMetadata = created;
     }
+
+    await saveDatabaseMetadata({
+      ownerEmail: useAppStore.getState().user?.email,
+      rootFolderId,
+      databaseFileId: dbFileId,
+      modifiedTime: uploadedMetadata?.modifiedTime,
+      version: uploadedMetadata?.version,
+      size: uploadedMetadata?.size,
+      md5Checksum: uploadedMetadata?.md5Checksum,
+      snapshotId: dbData.meta.snapshotId,
+      snapshotAppliedAt: Date.now(),
+    });
 
     // Trash deleted pages from Google Drive pages/ folder
     if (deletedPageIds.length > 0) {
@@ -324,8 +426,9 @@ export async function processGoogleSyncQueue(): Promise<void> {
       await syncPagesFolderIncremental(rootFolderId, pagesToSync);
     }
 
-    // Clear processed sync queue
-    await db.syncQueue.clear();
+    // Clear only the operations included in this snapshot. Edits made while
+    // the upload was in flight must remain queued for the next pass.
+    await Promise.all(pendingOps.map((op) => db.syncQueue.delete(op.id)));
 
     lastSyncTime = nowISO();
     setStatus('saved');
@@ -406,14 +509,142 @@ async function syncPagesFolderIncremental(
  * Full sync from Google Drive to local.
  * Called on login, connect, and manual "Sync Now".
  */
+/**
+ * Local-first cloud bootstrap. The root snapshot is authoritative; individual
+ * page files are deliberately not scanned on startup.
+ */
 export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): Promise<void> {
+  void options;
+  if (syncInProgress) return;
+  performanceMark('cloud-bootstrap-start');
+  initialPullComplete = false;
+  syncInProgress = true;
+  setStatus('syncing', 'Đang kiểm tra Google Drive...');
+  updateRuntime({ cloudBootstrapStatus: 'checking', pushAllowed: false });
+
+  try {
+    const rootFolderId = await getRootFolderId();
+    if (!rootFolderId) {
+      markInitialPullComplete();
+      setStatus('saved');
+      updateRuntime({ cloudBootstrapStatus: 'ready', pushAllowed: true });
+      return;
+    }
+
+    const cached = await getCachedDatabaseMetadata();
+    let fileId = cached?.rootFolderId === rootFolderId ? cached.databaseFileId : null;
+    let remoteFile: { id: string; name: string; modifiedTime?: string; size?: string; version?: string; md5Checksum?: string } | null = null;
+
+    if (fileId) {
+      try {
+        remoteFile = await getFileMetadata(fileId, 'id,name,mimeType,modifiedTime,size,version,md5Checksum,trashed');
+        if ((remoteFile as unknown as { trashed?: boolean }).trashed) remoteFile = null;
+      } catch (error) {
+        if ((error as { status?: number })?.status !== 404) throw error;
+        fileId = null;
+      }
+    }
+
+    if (!remoteFile) {
+      remoteFile = await findFileInFolder(rootFolderId, 'database.json');
+      if (remoteFile) fileId = remoteFile.id;
+    }
+
+    if (!remoteFile || !fileId) {
+      // A cached folder can be deleted or moved. Rediscover it once before
+      // treating the account as a brand-new vault.
+      if (cached?.rootFolderId === rootFolderId) {
+        const { clearRootFolderCache, ensureRootFolder } = await import('../google/rootFolderManager');
+        await clearRootFolderCache();
+        const recovered = await ensureRootFolder();
+        if (recovered.status === 'found' && recovered.folderId !== rootFolderId) {
+          remoteFile = await findFileInFolder(recovered.folderId, 'database.json');
+          if (remoteFile) fileId = remoteFile.id;
+        }
+      }
+    }
+
+    if (!remoteFile || !fileId) {
+      markInitialPullComplete();
+      setStatus('saved', 'Chưa có database.json trên Google Drive.');
+      updateRuntime({ cloudBootstrapStatus: 'ready', pushAllowed: true });
+      return;
+    }
+
+    if (cached && cached.databaseFileId === fileId &&
+      cached.modifiedTime === remoteFile.modifiedTime &&
+      (!cached.version || !remoteFile.version || cached.version === remoteFile.version)) {
+      fileIdCache.set(`${rootFolderId}/database.json`, fileId);
+      markInitialPullComplete();
+      lastSyncTime = nowISO();
+      setStatus('saved');
+      updateRuntime({ cloudBootstrapStatus: 'ready', pushAllowed: true });
+      if (await db.syncQueue.where('status').equals('pending').count()) setTimeout(() => processGoogleSyncQueue(), 0);
+      return;
+    }
+
+    updateRuntime({ cloudBootstrapStatus: 'downloading' });
+    performanceMark('cloud-snapshot-download-start');
+    const remote = JSON.parse(await downloadFile(fileId)) as VaultSnapshot;
+    performanceMark('cloud-snapshot-download-end');
+    const remoteOwner = (remote as unknown as { meta?: { ownerEmail?: string } }).meta?.ownerEmail;
+    const currentOwner = useAppStore.getState().user?.email;
+    if (remoteOwner && currentOwner && remoteOwner.toLowerCase() !== currentOwner.toLowerCase()) {
+      throw new Error('ACCOUNT_MISMATCH');
+    }
+    if (!Array.isArray(remote.days) || !Array.isArray(remote.notebooks)) {
+      throw new Error('Invalid database.json snapshot');
+    }
+    if (!Array.isArray(remote.pages)) remote.pages = [];
+
+    const local = await exportDatabase();
+    const pending = await db.syncQueue.where('status').equals('pending').toArray();
+    const merged = mergePendingLocal(remote, local, pending);
+    updateRuntime({ cloudBootstrapStatus: 'applying', searchIndexStatus: 'building' });
+    performanceMark('cloud-snapshot-apply-start');
+    await loadFromDatabase(merged);
+    await refreshActiveNotesStore();
+    performanceMark('cloud-snapshot-apply-end');
+    await saveDatabaseMetadata({
+      ownerEmail: useAppStore.getState().user?.email,
+      rootFolderId,
+      databaseFileId: fileId,
+      modifiedTime: remoteFile.modifiedTime,
+      version: remoteFile.version,
+      size: remoteFile.size,
+      md5Checksum: remoteFile.md5Checksum,
+      snapshotId: (remote as unknown as { meta?: { snapshotId?: string } }).meta?.snapshotId,
+      snapshotAppliedAt: Date.now(),
+    });
+
+    markInitialPullComplete();
+    lastSyncTime = nowISO();
+    setStatus('saved');
+    updateRuntime({ cloudBootstrapStatus: 'ready', pushAllowed: true, searchIndexStatus: 'ready' });
+    performanceMark('cloud-bootstrap-end');
+    if (pending.length) setTimeout(() => processGoogleSyncQueue(), 0);
+  } catch (error) {
+    const status = (error as { status?: number })?.status;
+    if (status === 401 || (error instanceof Error && error.message === 'AUTH_REQUIRED')) {
+      setStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
+      updateRuntime({ cloudBootstrapStatus: 'auth_required', pushAllowed: false });
+    } else {
+      setStatus(isOnline() ? 'error' : 'offline', error instanceof Error ? error.message : 'Sync failed');
+      updateRuntime({ cloudBootstrapStatus: isOnline() ? 'error' : 'offline', pushAllowed: false });
+    }
+  } finally {
+    syncInProgress = false;
+  }
+}
+
+export async function syncFromCloudLegacy(options?: { isConnectOrLogin?: boolean }): Promise<void> {
   if (syncInProgress) return;
 
   // On login or connect: wipe local cache first so no stale local data is pushed up
   if (options?.isConnectOrLogin) {
     try {
-      const { clearAllLocalData } = await import('../database/repository');
-      await clearAllLocalData();
+      // Legacy entry point intentionally retains local data; callers use the
+      // local-first bootstrap above for all new sessions.
     } catch (err) {
       console.warn('[Sync] Failed to clear local cache before connect pull:', err);
     }
@@ -584,11 +815,10 @@ export async function forceSync(): Promise<void> {
     return;
   }
 
-  // First push local changes
-  await triggerSync();
-
-  // Then pull cloud changes
+  // Pull/merge first so a reconnect cannot overwrite changes made by another
+  // device. The bootstrap drains the pending queue after applying the snapshot.
   await syncFromCloud();
+  if (isInitialPullComplete()) await triggerSync();
 }
 
 // ===================== ONLINE/OFFLINE DETECTION =====================

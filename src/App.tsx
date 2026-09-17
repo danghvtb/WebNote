@@ -36,8 +36,11 @@ function AppContent() {
     setAuth, setRootFolderId, setInitialized, addNotification,
     initialSyncComplete, initialSyncMessage,
     setInitialSyncComplete, setInitialSyncMessage,
+    setLocalHydrationStatus, setCloudBootstrapStatus, setPushAllowed,
   } = useAppStore();
   const loadTags = useNotesStore((s) => s.loadTags);
+  const loadDays = useNotesStore((s) => s.loadDays);
+  const loadRecentNotebooks = useNotesStore((s) => s.loadRecentNotebooks);
 
   useEffect(() => { if (isLoggedIn && initialSyncComplete) loadTags(); }, [isLoggedIn, initialSyncComplete, loadTags]);
 
@@ -62,7 +65,17 @@ function AppContent() {
       try {
         const savedUser = JSON.parse(savedUserStr);
         const hasValidToken = Boolean(savedToken && (!savedExpiry || Date.now() < savedExpiry));
+        localStorage.setItem('mynotes_cloud_bootstrap_pending', '1');
+        setLocalHydrationStatus('loading');
+        if (typeof performance !== 'undefined') performance.mark('mynotes:local-hydrate-start');
         setAuth(savedUser, hasValidToken ? savedToken : null);
+
+        // Read IndexedDB before loading GIS/Drive. The cached vault is the
+        // first usable UI and remains editable while cloud bootstrap runs.
+        await loadDays();
+        await loadRecentNotebooks();
+        setLocalHydrationStatus(useNotesStore.getState().days.length > 0 ? 'ready' : 'empty');
+        if (typeof performance !== 'undefined') performance.mark('mynotes:local-hydrate-end');
 
         if (savedFolder) {
           setRootFolderId(savedFolder);
@@ -75,11 +88,9 @@ function AppContent() {
         setInitialSyncMessage('');
         setInitialized(true);
 
-        // Pre-import for use in sync timeout callback
-        const { markInitialPullComplete: unlockPull } = await import('./services/sync/syncManager');
-
         if (!hasValidToken) {
-          unlockPull();
+          setCloudBootstrapStatus('auth_required');
+          setPushAllowed(false);
           setSyncStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
           try {
             const { useScheduleStore } = await import('./stores/scheduleStore');
@@ -96,7 +107,6 @@ function AppContent() {
         const timeoutId = setTimeout(() => {
           syncTimedOut = true;
           console.warn('[App] Background sync timeout reached — keeping local data available.');
-          unlockPull();
           addNotification('warning', 'Đồng bộ mất quá lâu. Dữ liệu local vẫn sẵn sàng.');
         }, SYNC_TIMEOUT_MS);
 
@@ -121,12 +131,12 @@ function AppContent() {
               // No folder or error — enable push, user starts fresh
               const { markInitialPullComplete } = await import('./services/sync/syncManager');
               markInitialPullComplete();
+              setPushAllowed(true);
             }
           } catch (err) {
             console.warn('[App] Google Drive session restore error:', err);
-            // Enable push on error so app doesn't deadlock
-            const { markInitialPullComplete } = await import('./services/sync/syncManager');
-            markInitialPullComplete();
+            setCloudBootstrapStatus('error');
+            setPushAllowed(false);
           }
         }
 
@@ -134,7 +144,6 @@ function AppContent() {
         clearTimeout(timeoutId);
         setInitialSyncComplete(true);
         setInitialSyncMessage('');
-
         // Load schedule data into stores after sync
         try {
           const { useScheduleStore } = await import('./stores/scheduleStore');
@@ -146,13 +155,14 @@ function AppContent() {
         }
       } catch (err) {
         console.warn('[App] Session restore error:', err);
+        setLocalHydrationStatus('error');
         setInitialSyncComplete(true);
         setInitialSyncMessage('');
       }
     };
 
     restoreSession();
-  }, [setAuth, setRootFolderId, setInitialized, setInitialSyncComplete, setInitialSyncMessage, setSyncStatus, addNotification]);
+  }, [setAuth, setRootFolderId, setInitialized, setInitialSyncComplete, setInitialSyncMessage, setSyncStatus, addNotification, loadDays, loadRecentNotebooks, setLocalHydrationStatus, setCloudBootstrapStatus, setPushAllowed]);
 
   // Initialize theme
   useEffect(() => {

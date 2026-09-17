@@ -788,18 +788,53 @@ export async function searchAll(query: string, tagIds: string[] = []): Promise<S
 }
 
 export async function rebuildSearchIndex(): Promise<void> {
-  const [notebooks, pages, reports] = await Promise.all([
+  const [notebooks, pages, reports, tags] = await Promise.all([
     db.notebooks.filter((nb) => !nb.deleted).toArray(),
     db.pages.filter((p) => !p.deleted).toArray(),
     db.workReports.filter((report) => !report.deletedAt).toArray(),
+    db.tags.toArray(),
   ]);
-  await db.searchIndex.clear();
-  for (const notebook of notebooks) await updateSearchIndexForNotebook(notebook);
-  for (const page of pages) {
-    const notebook = notebooks.find((nb) => nb.id === page.notebookId);
-    await updateSearchIndexForPage({ ...page, tagIds: page.tagIds || [] }, notebook?.title || '');
-  }
-  for (const report of reports) await updateSearchIndexForWorkReport(report);
+  const tagNames = new Map(tags.map((tag) => [tag.id, tag.name]));
+  const notebookTitles = new Map(notebooks.map((notebook) => [notebook.id, notebook.title]));
+  const dayDates = new Map((await db.days.toArray()).map((day) => [day.id, day.date]));
+  const entries: SearchEntry[] = [
+    ...notebooks.map((notebook): SearchEntry => ({
+      id: `search_${notebook.id}`,
+      type: 'notebook',
+      entityId: notebook.id,
+      title: notebook.title,
+      content: notebook.title,
+      date: notebook.dateId.replace('day_', '').replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+    })),
+    ...pages.map((page): SearchEntry => ({
+      id: `search_${page.id}`,
+      type: 'page',
+      entityId: page.id,
+      title: page.title,
+      content: stripHtml(page.content),
+      date: '',
+      notebookId: page.notebookId,
+      notebookTitle: notebookTitles.get(page.notebookId) || '',
+      tagIds: page.tagIds || [],
+      tagNames: (page.tagIds || []).map((id) => tagNames.get(id) || '').filter(Boolean),
+    })),
+    ...reports.map((report): SearchEntry => {
+      const projectNames = report.projectEntries.map((entry) => entry.projectNameSnapshot).filter(Boolean);
+      return {
+        id: `search_${report.id}`,
+        type: 'work_report',
+        entityId: report.id,
+        title: `Báo cáo công việc ${dayDates.get(report.dayId)?.split('-').reverse().join('/') || ''}`.trim(),
+        content: [projectNames.join(' '), ...report.projectEntries.flatMap((entry) => [entry.content, entry.result]), report.issue, report.solution, report.nextWork].filter(Boolean).join('\n'),
+        date: dayDates.get(report.dayId) || '',
+        dayId: report.dayId,
+      };
+    }),
+  ];
+  await db.transaction('rw', db.searchIndex, async () => {
+    await db.searchIndex.clear();
+    if (entries.length) await db.searchIndex.bulkPut(entries);
+  });
 }
 
 // ===================== BULK OPERATIONS =====================
@@ -837,10 +872,10 @@ export async function loadFromDatabase(data: {
       await db.notebooks.bulkPut(data.notebooks);
     }
 
-    // Load pages if included
-    if (data.pages?.length) {
+    // A full snapshot explicitly includes pages, including an empty array.
+    if (Array.isArray(data.pages)) {
       await db.pages.clear();
-      await db.pages.bulkPut(data.pages.map((page) => ({ ...page, tagIds: page.tagIds || [] })));
+      if (data.pages.length) await db.pages.bulkPut(data.pages.map((page) => ({ ...page, tagIds: page.tagIds || [] })));
     }
     if (data.tags?.length) await db.tags.bulkPut(data.tags);
     if (data.projects?.length) await db.projects.bulkPut(data.projects);
@@ -869,22 +904,41 @@ export async function loadFromDatabase(data: {
       await db.workCategories.bulkPut(data.workCategories);
     }
 
-    // Rebuild search index
+    // Build the index in memory and write it once. The previous implementation
+    // performed a database lookup for every page tag and one put per entry.
     await db.searchIndex.clear();
+    const tagNames = new Map((data.tags || []).map((tag) => [tag.id, tag.name]));
+    const notebookTitles = new Map((data.notebooks || []).map((notebook) => [notebook.id, notebook.title]));
+    const dayDates = new Map((data.days || []).map((day) => [day.id, day.date]));
+    const entries: SearchEntry[] = [];
     for (const nb of data.notebooks || []) {
-      if (!nb.deleted) {
-        await updateSearchIndexForNotebook(nb);
-      }
+      if (!nb.deleted) entries.push({
+        id: `search_${nb.id}`, type: 'notebook', entityId: nb.id,
+        title: nb.title, content: nb.title,
+        date: nb.dateId.replace('day_', '').replace(/(\d{4})(\d{2})(\d{2})/, '$1-$2-$3'),
+      });
     }
     for (const page of data.pages || []) {
-      if (!page.deleted) {
-        const nb = data.notebooks?.find((n) => n.id === page.notebookId);
-        await updateSearchIndexForPage({ ...page, tagIds: page.tagIds || [] }, nb?.title || '');
-      }
+      if (!page.deleted) entries.push({
+        id: `search_${page.id}`, type: 'page', entityId: page.id,
+        title: page.title, content: stripHtml(page.content), date: '',
+        notebookId: page.notebookId, notebookTitle: notebookTitles.get(page.notebookId) || '',
+        tagIds: page.tagIds || [],
+        tagNames: (page.tagIds || []).map((id) => tagNames.get(id) || '').filter(Boolean),
+      });
     }
     for (const report of data.workReports || []) {
-      if (!report.deletedAt) await updateSearchIndexForWorkReport(report);
+      if (!report.deletedAt) {
+        const projectNames = report.projectEntries.map((entry) => entry.projectNameSnapshot).filter(Boolean);
+        entries.push({
+          id: `search_${report.id}`, type: 'work_report', entityId: report.id,
+          title: `Báo cáo công việc ${dayDates.get(report.dayId)?.split('-').reverse().join('/') || ''}`.trim(),
+          content: [projectNames.join(' '), ...report.projectEntries.flatMap((entry) => [entry.content, entry.result]), report.issue, report.solution, report.nextWork].filter(Boolean).join('\n'),
+          date: dayDates.get(report.dayId) || '', dayId: report.dayId,
+        });
+      }
     }
+    if (entries.length) await db.searchIndex.bulkPut(entries);
   });
 }
 
@@ -946,7 +1000,8 @@ export async function getAllVaultNotebooks(): Promise<Notebook[]> {
 
 /**
  * Completely clear all local IndexedDB tables and sync queue.
- * Used on login, connection, and account switch to prevent stale local cache from overwriting cloud data.
+ * Used only for explicit local-data reset/account replacement. Login and
+ * reconnect preserve the cache and merge pending operations instead.
  */
 export async function clearAllLocalData(): Promise<void> {
   await db.transaction(
@@ -961,6 +1016,7 @@ export async function clearAllLocalData(): Promise<void> {
       db.tags,
       db.projects,
       db.workReports,
+      db.appState,
       db.searchIndex,
       db.syncQueue,
     ],
@@ -974,8 +1030,21 @@ export async function clearAllLocalData(): Promise<void> {
       await db.tags.clear();
       await db.projects.clear();
       await db.workReports.clear();
+      await db.appState.delete('sync.database.metadata');
       await db.searchIndex.clear();
       await db.syncQueue.clear();
     }
   );
+}
+
+/** Return the account that owns the active local vault, if known. */
+export async function getVaultOwnerEmail(): Promise<string | null> {
+  const record = await db.appState.get('sync.database.metadata');
+  if (!record?.value) return null;
+  try {
+    const metadata = JSON.parse(record.value) as { ownerEmail?: string };
+    return metadata.ownerEmail || null;
+  } catch {
+    return null;
+  }
 }

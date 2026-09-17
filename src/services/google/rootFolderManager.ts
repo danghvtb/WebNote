@@ -42,6 +42,18 @@ export async function ensureRootFolder(): Promise<RootFolderResult> {
     const cachedFolderId = await getCachedRootFolderId();
     if (cachedFolderId) {
       console.log('[RootFolder] Found cached rootFolderId:', cachedFolderId);
+      // A successful snapshot pull records the folder and database file
+      // together. In that warm path the database metadata request is the
+      // validation, so avoid an extra folder existence round-trip.
+      try {
+        const metadata = await db.appState.get('sync.database.metadata');
+        if (metadata?.value) {
+          const parsed = JSON.parse(metadata.value) as { rootFolderId?: string };
+          if (parsed.rootFolderId === cachedFolderId) return { status: 'found', folderId: cachedFolderId };
+        }
+      } catch {
+        // Fall through to the legacy existence check.
+      }
       const exists = await fileExists(cachedFolderId);
       if (exists) {
         console.log('[RootFolder] Cached folder verified on Drive');

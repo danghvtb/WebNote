@@ -103,13 +103,14 @@ export const db = new MyNotesDB();
 export async function clearDatabase(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports],
+    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.appState, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports],
     async () => {
       await db.days.clear();
       await db.notebooks.clear();
       await db.pages.clear();
       await db.revisions.clear();
       await db.syncQueue.clear();
+      await db.appState.clear();
       await db.searchIndex.clear();
       await db.scheduleBlocks.clear();
       await db.customTasks.clear();

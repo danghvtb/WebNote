@@ -50,6 +50,10 @@ interface AppState {
   // Sync guard — blocks UI & push until initial cloud pull finishes
   initialSyncComplete: boolean;
   initialSyncMessage: string;
+  localHydrationStatus: 'idle' | 'loading' | 'ready' | 'empty' | 'error';
+  cloudBootstrapStatus: 'idle' | 'auth_required' | 'checking' | 'downloading' | 'applying' | 'ready' | 'offline' | 'error';
+  searchIndexStatus: 'ready' | 'building' | 'error';
+  pushAllowed: boolean;
 
   // Notifications
   notifications: Notification[];
@@ -83,6 +87,10 @@ interface AppState {
   setNeedsFolderCreation: (needs: boolean) => void;
   setInitialSyncComplete: (done: boolean) => void;
   setInitialSyncMessage: (msg: string) => void;
+  setLocalHydrationStatus: (status: AppState['localHydrationStatus']) => void;
+  setCloudBootstrapStatus: (status: AppState['cloudBootstrapStatus']) => void;
+  setSearchIndexStatus: (status: AppState['searchIndexStatus']) => void;
+  setPushAllowed: (allowed: boolean) => void;
   trashModalOpen: boolean;
   setTrashModalOpen: (open: boolean) => void;
   addNotification: (
@@ -128,6 +136,10 @@ export const useAppStore = create<AppState>((set) => ({
 
   initialSyncComplete: false,
   initialSyncMessage: '',
+  localHydrationStatus: 'idle',
+  cloudBootstrapStatus: 'idle',
+  searchIndexStatus: 'ready',
+  pushAllowed: false,
 
   notifications: [],
 
@@ -179,8 +191,12 @@ export const useAppStore = create<AppState>((set) => ({
       accessToken: null,
       initialized: false,
       rootFolderId: null,
+      needsFolderCreation: false,
       initialSyncComplete: false,
       initialSyncMessage: '',
+      localHydrationStatus: 'idle',
+      cloudBootstrapStatus: 'idle',
+      pushAllowed: false,
     });
   },
 
@@ -255,6 +271,10 @@ export const useAppStore = create<AppState>((set) => ({
   setNeedsFolderCreation: (needs) => set({ needsFolderCreation: needs }),
   setInitialSyncComplete: (done) => set({ initialSyncComplete: done }),
   setInitialSyncMessage: (msg) => set({ initialSyncMessage: msg }),
+  setLocalHydrationStatus: (status) => set({ localHydrationStatus: status }),
+  setCloudBootstrapStatus: (status) => set({ cloudBootstrapStatus: status }),
+  setSearchIndexStatus: (status) => set({ searchIndexStatus: status }),
+  setPushAllowed: (allowed) => set({ pushAllowed: allowed }),
 
   trashModalOpen: false,
   setTrashModalOpen: (open) => set({ trashModalOpen: open }),
