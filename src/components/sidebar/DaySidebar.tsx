@@ -90,9 +90,9 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
     };
   }, [days, reportsVersion]);
 
-  // Keep days with notes and always keep today visible, even when it is empty.
+  // Show every calendar day, including days without notebooks or work reports.
   const visibleDaysWithCounts = useMemo(
-    () => daysWithCounts.filter((day) => day.notebookCount > 0 || (day.workReportCount || 0) > 0 || isToday(day.date)),
+    () => daysWithCounts,
     [daysWithCounts],
   );
 
