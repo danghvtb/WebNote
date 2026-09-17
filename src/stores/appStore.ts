@@ -4,7 +4,13 @@
 // ============================================================
 
 import { create } from 'zustand';
-import type { GoogleUser, SyncStatus, AppTheme, Notification } from '../types';
+import type {
+  GoogleUser,
+  SyncStatus,
+  AppTheme,
+  Notification,
+  TimelineGroupingMode,
+} from '../types';
 
 interface AppState {
   // Auth
@@ -30,6 +36,8 @@ interface AppState {
   exportModalOpen: boolean;
   mobileSidebarOpen: boolean;
   mobileDaySidebarOpen: boolean;
+  timelineGroupingMode: TimelineGroupingMode;
+  expandedTimelineGroupKeys: Record<TimelineGroupingMode, string[]>;
   confirmModal: { open: boolean; title: string; message: string; onConfirm: (() => void) | null };
 
   // App state
@@ -62,6 +70,9 @@ interface AppState {
   setExportModalOpen: (open: boolean) => void;
   setMobileSidebarOpen: (open: boolean) => void;
   setMobileDaySidebarOpen: (open: boolean) => void;
+  setTimelineGroupingMode: (mode: TimelineGroupingMode) => void;
+  toggleTimelineGroup: (mode: TimelineGroupingMode, key: string) => void;
+  ensureTimelineGroupsExpanded: (mode: TimelineGroupingMode, keys: string[]) => void;
   setConfirmModal: (modal: { open: boolean; title: string; message: string; onConfirm: (() => void) | null }) => void;
   setInitialized: (initialized: boolean) => void;
   setRootFolderId: (folderId: string | null) => void;
@@ -101,6 +112,8 @@ export const useAppStore = create<AppState>((set) => ({
   exportModalOpen: false,
   mobileSidebarOpen: false,
   mobileDaySidebarOpen: false,
+  timelineGroupingMode: 'week',
+  expandedTimelineGroupKeys: { week: [], month: [] },
   confirmModal: { open: false, title: '', message: '', onConfirm: null },
 
   initialized: false,
@@ -178,6 +191,34 @@ export const useAppStore = create<AppState>((set) => ({
   setExportModalOpen: (open) => set({ exportModalOpen: open }),
   setMobileSidebarOpen: (open) => set({ mobileSidebarOpen: open }),
   setMobileDaySidebarOpen: (open) => set({ mobileDaySidebarOpen: open }),
+  setTimelineGroupingMode: (mode) => set({ timelineGroupingMode: mode }),
+  toggleTimelineGroup: (mode, key) =>
+    set((state) => {
+      const currentKeys = state.expandedTimelineGroupKeys[mode];
+      const nextKeys = currentKeys.includes(key)
+        ? currentKeys.filter((currentKey) => currentKey !== key)
+        : [...currentKeys, key];
+
+      return {
+        expandedTimelineGroupKeys: {
+          ...state.expandedTimelineGroupKeys,
+          [mode]: nextKeys,
+        },
+      };
+    }),
+  ensureTimelineGroupsExpanded: (mode, keys) =>
+    set((state) => {
+      const currentKeys = state.expandedTimelineGroupKeys[mode];
+      const nextKeys = Array.from(new Set([...currentKeys, ...keys]));
+      if (nextKeys.length === currentKeys.length) return state;
+
+      return {
+        expandedTimelineGroupKeys: {
+          ...state.expandedTimelineGroupKeys,
+          [mode]: nextKeys,
+        },
+      };
+    }),
   setConfirmModal: (modal) => set({ confirmModal: modal }),
   setInitialized: (initialized) => set({ initialized }),
   setRootFolderId: (folderId) => {

@@ -108,6 +108,8 @@ export interface SyncOperation {
 
 export type AppTheme = 'dark' | 'light' | 'system';
 
+export type TimelineGroupingMode = 'week' | 'month';
+
 export interface SearchResult {
   type: 'notebook' | 'page';
   id: string;
@@ -242,6 +244,5 @@ export interface ScheduleSearchFilter {
   status?: 'all' | 'pending' | 'completed' | 'overdue';
   priority?: 'all' | 'high' | 'medium' | 'low';
 }
-
 
 

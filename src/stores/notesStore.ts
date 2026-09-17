@@ -259,6 +259,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   duplicateNotebook: async (id) => {
     await repo.duplicateNotebook(id);
     const { selectedDayId } = get();
+    await get().loadDays();
     if (selectedDayId) {
       await get().loadNotebooksByDay(selectedDayId);
     }
