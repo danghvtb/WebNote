@@ -181,6 +181,73 @@ function mergePendingLocal(remote: VaultSnapshot, local: VaultSnapshot, pendingO
 }
 
 /**
+ * Protect the local-first cache from an incomplete or stale cloud snapshot.
+ * A valid snapshot may still be older than this browser (for example when a
+ * second device has not uploaded its latest database.json yet). Never discard
+ * a local record that is newer than the remote record, or that is absent from
+ * the remote collection. Soft-deleted records remain part of the snapshot so
+ * this also prevents an old cloud copy from resurrecting deleted content.
+ */
+export function mergeNewerLocalRecords(remote: VaultSnapshot, local: VaultSnapshot): {
+  snapshot: VaultSnapshot;
+  preserved: Array<{ entity: SyncOperation['entity']; item: { id: string } }>;
+} {
+  const merged: VaultSnapshot = {
+    ...remote,
+    days: [...(remote.days || [])],
+    notebooks: [...(remote.notebooks || [])],
+    pages: [...(remote.pages || [])],
+    tags: [...(remote.tags || [])],
+    projects: [...(remote.projects || [])],
+    workReports: [...(remote.workReports || [])],
+    attachments: [...(remote.attachments || [])],
+    scheduleBlocks: [...(remote.scheduleBlocks || [])],
+    customTasks: [...(remote.customTasks || [])],
+    workCategories: [...(remote.workCategories || [])],
+  };
+  const preserved: Array<{ entity: SyncOperation['entity']; item: { id: string } }> = [];
+  // Days do not have a standalone sync entity; still retain a local day when
+  // an older snapshot omitted it, otherwise preserved notebooks would lose
+  // their parent timeline record during the apply transaction.
+  const remoteDays = merged.days as Array<{ id: string; updatedAt?: string; createdAt?: string }>;
+  const remoteDayIds = new Set(remoteDays.map((day) => day.id));
+  for (const localDay of (local.days || []) as Array<{ id: string; updatedAt?: string; createdAt?: string }>) {
+    if (!remoteDayIds.has(localDay.id)) remoteDays.push(localDay);
+  }
+  merged.days = remoteDays;
+  const collections: Array<{ entity: SyncOperation['entity']; key: keyof VaultSnapshot }> = [
+    { entity: 'notebook', key: 'notebooks' },
+    { entity: 'page', key: 'pages' }, { entity: 'tag', key: 'tags' },
+    { entity: 'project', key: 'projects' }, { entity: 'work_report', key: 'workReports' },
+    { entity: 'attachment', key: 'attachments' }, { entity: 'schedule', key: 'scheduleBlocks' },
+  ];
+  for (const { entity, key } of collections) {
+    const remoteItems = (merged[key] || []) as Array<{ id: string; updatedAt?: string; createdAt?: string }>;
+    const localItems = (local[key] || []) as Array<{ id: string; updatedAt?: string; createdAt?: string }>;
+    const remoteById = new Map(remoteItems.map((item) => [item.id, item]));
+    for (const localItem of localItems) {
+      const remoteItem = remoteById.get(localItem.id);
+      const localTime = Date.parse(localItem.updatedAt || localItem.createdAt || '') || 0;
+      const remoteTime = Date.parse(remoteItem?.updatedAt || remoteItem?.createdAt || '') || 0;
+      if (!remoteItem || localTime > remoteTime) {
+        const index = remoteItems.findIndex((item) => item.id === localItem.id);
+        if (index >= 0) remoteItems[index] = localItem;
+        else remoteItems.push(localItem);
+        preserved.push({ entity, item: localItem });
+      }
+    }
+    (merged as unknown as Record<string, unknown[]>)[key] = remoteItems;
+  }
+  // Schedules are an aggregate: local custom tasks/categories must travel with
+  // locally newer schedule blocks to avoid a partial schedule rollback.
+  if (preserved.some(({ entity }) => entity === 'schedule')) {
+    merged.customTasks = [...(local.customTasks || [])];
+    merged.workCategories = [...(local.workCategories || [])];
+  }
+  return { snapshot: merged, preserved };
+}
+
+/**
  * Subscribe to sync status changes.
  */
 export function onSyncStatusChange(listener: SyncListener): () => void {
@@ -713,8 +780,21 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
     validateRemoteSnapshot(remote as VaultSnapshot & { meta?: { schemaVersion?: number } });
 
     // Snapshots created before attachment support must not erase local files.
-    const pending = await db.syncQueue.where('status').equals('pending').toArray();
-    const merged = mergePendingLocal(remote, local, pending);
+    let pending = await db.syncQueue.where('status').equals('pending').toArray();
+    const baseMerge = mergeNewerLocalRecords(remote as VaultSnapshot, local);
+    const pendingKeys = new Set(pending.map((operation) => `${operation.entity}:${operation.entityId}`));
+    // If an older app/version failed to enqueue a local mutation, recreate a
+    // pending operation before applying the cloud snapshot. This makes the
+    // protection durable and lets the normal upload path reconcile it later.
+    for (const { entity, item } of baseMerge.preserved) {
+      const key = `${entity}:${item.id}`;
+      if (!pendingKeys.has(key)) {
+        await queueSync('update', entity, item.id, item);
+        pendingKeys.add(key);
+      }
+    }
+    pending = await db.syncQueue.where('status').equals('pending').toArray();
+    const merged = mergePendingLocal(baseMerge.snapshot, local, pending);
     updateRuntime({ cloudBootstrapStatus: 'applying', searchIndexStatus: 'building' });
     performanceMark('cloud-snapshot-apply-start');
     await loadFromDatabase(merged);
