@@ -4,6 +4,7 @@ import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { getAllVaultPages } from '../../services/database/repository';
 import { queueSync } from '../../services/sync/syncManager';
+import { DialogShell } from '../common/DialogShell';
 
 export function TagManagerModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const { tags, loadTags, createTag, renameTag, deleteTag } = useNotesStore();
@@ -47,8 +48,7 @@ export function TagManagerModal({ isOpen, onClose }: { isOpen: boolean; onClose:
     } });
   };
 
-  return <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-    <div className="w-full max-w-lg rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-2xl" onClick={(e) => e.stopPropagation()}>
+  return <DialogShell open={isOpen} onClose={onClose} ariaLabel="Quản lý thẻ" className="w-full max-w-lg rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-2xl">
       <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]">
         <div className="flex items-center gap-2"><TagIcon className="w-5 h-5 text-cyan-400" /><h2 className="text-base font-semibold">Quản lý thẻ</h2></div>
         <button onClick={onClose} className="p-1 cursor-pointer"><X className="w-5 h-5" /></button>
@@ -60,6 +60,5 @@ export function TagManagerModal({ isOpen, onClose }: { isOpen: boolean; onClose:
           {sortedTags.length === 0 && <p className="text-sm text-center py-6 text-[var(--color-text-tertiary)]">Chưa có thẻ nào</p>}
         </div>
       </div>
-    </div>
-  </div>;
+  </DialogShell>;
 }

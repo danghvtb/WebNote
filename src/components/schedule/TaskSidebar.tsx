@@ -3,6 +3,7 @@
 // Displays unscheduled tasks from Vault ready to be scheduled
 // ============================================================
 
+/* oxlint-disable react(set-state-in-effect) -- derived tasks refresh from external vault data. */
 import { useEffect, useState } from 'react';
 import { CheckSquare, CalendarPlus, Search, FileText } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
@@ -35,11 +36,14 @@ export function TaskSidebar() {
     } catch (err) {
       console.error('[TaskSidebar] Error parsing vault tasks:', err);
     } finally {
-      setLoading(false);
+    // oxlint-disable-next-line react(set-state-in-effect)
+    setLoading(false);
     }
   };
 
   useEffect(() => {
+    // Refresh derived tasks when schedule blocks change.
+    // oxlint-disable-next-line react(set-state-in-effect)
     fetchVaultTasks();
   }, [blocks]);
 
@@ -184,7 +188,7 @@ export function TaskSidebar() {
 
                     <button
                       onClick={() => handleQuickScheduleCustomTask(t)}
-                      className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg flex items-center gap-1 shadow-sm"
+                      className="touch-target opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg flex items-center gap-1 shadow-sm"
                     >
                       <CalendarPlus className="w-3 h-3" /> + Lịch
                     </button>
@@ -215,7 +219,7 @@ export function TaskSidebar() {
 
                 <button
                   onClick={() => handleQuickScheduleNoteTask(t)}
-                  className="opacity-0 group-hover:opacity-100 transition-opacity px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg flex items-center gap-1 shadow-sm"
+                  className="touch-target opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity px-2 py-1 bg-purple-600 hover:bg-purple-500 text-white font-bold rounded-lg flex items-center gap-1 shadow-sm"
                 >
                   <CalendarPlus className="w-3 h-3" /> + Lịch
                 </button>

@@ -145,7 +145,7 @@ export function DayView() {
 
                   {/* Click Hover Helper Text */}
                   <div className="ml-14 flex-1 opacity-0 group-hover:opacity-100 transition-opacity flex items-center text-[10px] font-semibold text-purple-400/80 pt-1">
-                    + Click để tạo lịch lúc {hourStr}
+                    + Nhấn để tạo lịch lúc {hourStr}
                   </div>
                 </div>
               );

@@ -56,8 +56,8 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
   const groups: ToolbarButton[][] = [
     // AI & Slash Assistant & Auto Translate
     [
-      { icon: <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />, title: 'AI Assistant (Summarize, Polish, Tasks)', action: () => onOpenAI?.() },
-      { icon: <Languages className={`w-5 h-5 ${isTranslateOpen ? 'text-purple-300 font-bold' : 'text-purple-400'}`} />, title: 'Block Auto Dịch Trực Tiếp (Live Auto-Translate)', action: () => onToggleTranslate?.(), isActive: () => !!isTranslateOpen },
+      { icon: <Sparkles className="w-5 h-5 text-purple-400 animate-pulse" />, title: 'Trợ lý AI (Tóm tắt, biên tập, công việc)', action: () => onOpenAI?.() },
+      { icon: <Languages className={`w-5 h-5 ${isTranslateOpen ? 'text-purple-300 font-bold' : 'text-purple-400'}`} />, title: 'Dịch trực tiếp khối văn bản', action: () => onToggleTranslate?.(), isActive: () => !!isTranslateOpen },
       { icon: <span className="text-sm font-extrabold px-1 text-purple-400">/</span>, title: 'Slash Command Menu (Type /)', action: () => onToggleSlashMenu?.() },
     ],
     // Text formatting
@@ -99,7 +99,7 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
     ],
     // Delete Note
     [
-      { icon: <Trash2 className="w-5 h-5 text-rose-400 hover:text-rose-300" />, title: 'Xóa bài viết này (Delete Note)', action: () => onDeletePage?.() },
+      { icon: <Trash2 className="w-5 h-5 text-rose-400 hover:text-rose-300" />, title: 'Xóa trang ghi chú', action: () => onDeletePage?.() },
     ],
   ];
 
@@ -155,7 +155,7 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
         >
           <input
             type="url"
-            placeholder="Paste URL..."
+            placeholder="Dán URL..."
             value={linkUrl}
             onChange={(e) => setLinkUrl(e.target.value)}
             onKeyDown={(e) => e.key === 'Enter' && handleAddLink()}
@@ -172,7 +172,7 @@ export function EditorToolbar({ editor, onOpenAI, onToggleSlashMenu, onDeletePag
             onClick={() => setShowLinkInput(false)}
             className="text-xs text-slate-400 hover:text-white"
           >
-            Cancel
+            Hủy
           </button>
         </div>
       )}

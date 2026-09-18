@@ -3,12 +3,14 @@
 // Quick modal form to create or modify a schedule item/time block
 // ============================================================
 
+/* oxlint-disable react(set-state-in-effect) -- form state mirrors the selected block. */
 import React, { useState, useEffect } from 'react';
 import { X, Calendar } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
 import { todayDate } from '../../utils';
 import type { ScheduleBlock, RecurrenceFrequency } from '../../types';
 import { Time24Picker } from '../common/Time24Picker';
+import { DialogShell } from '../common/DialogShell';
 
 export function AddScheduleModal() {
   const {
@@ -34,7 +36,10 @@ export function AddScheduleModal() {
 
   useEffect(() => {
     if (editingBlock) {
+      // Populate the form from the selected external record.
+      // oxlint-disable-next-line react(set-state-in-effect)
       setTitle(editingBlock.title || '');
+      // oxlint-disable-next-line react(set-state-in-effect)
       setDescription(editingBlock.description || '');
       setDate(editingBlock.date || todayDate());
       setStartTime(editingBlock.startTime || '09:00');
@@ -119,17 +124,16 @@ export function AddScheduleModal() {
   };
 
   const COLOR_PRESETS = [
-    { label: 'Blue', value: '#3b82f6' },
-    { label: 'Purple', value: '#a855f7' },
-    { label: 'Amber', value: '#f59e0b' },
-    { label: 'Emerald', value: '#10b981' },
-    { label: 'Rose', value: '#f43f5e' },
-    { label: 'Cyan', value: '#06b6d4' },
+    { label: 'Xanh dương', value: '#3b82f6' },
+    { label: 'Tím', value: '#a855f7' },
+    { label: 'Hổ phách', value: '#f59e0b' },
+    { label: 'Xanh lục', value: '#10b981' },
+    { label: 'Hồng đỏ', value: '#f43f5e' },
+    { label: 'Xanh lam', value: '#06b6d4' },
   ];
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
-      <div className="relative w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
+    <DialogShell open={addModalOpen} onClose={() => setAddModalOpen(false)} ariaLabel={editingBlock ? 'Chỉnh sửa lịch biểu' : 'Thêm lịch làm việc'} className="w-full max-w-lg bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/90">
           <div className="flex items-center gap-2.5">
@@ -142,7 +146,8 @@ export function AddScheduleModal() {
           </div>
           <button
             onClick={() => setAddModalOpen(false)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="touch-target p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            aria-label="Đóng lịch biểu"
           >
             <X className="w-5 h-5" />
           </button>
@@ -153,7 +158,7 @@ export function AddScheduleModal() {
           {/* Work Category Binding */}
           <div className="p-3 bg-slate-950 border border-slate-800/80 rounded-xl">
             <div>
-              <label className="block text-[11px] font-bold text-purple-300 mb-1">Nhóm Work / Project</label>
+              <label className="block text-[11px] font-bold text-purple-300 mb-1">Nhóm công việc / dự án</label>
               <select
                 value={selectedCategoryId}
                 onChange={(e) => handleCategorySelect(e.target.value)}
@@ -171,7 +176,7 @@ export function AddScheduleModal() {
 
           {/* Title */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1">Tên Công Việc / Sự Kiện *</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Tên công việc / sự kiện *</label>
             <input
               type="text"
               required
@@ -233,7 +238,7 @@ export function AddScheduleModal() {
             </div>
 
             <div>
-              <label className="block text-xs font-semibold text-slate-300 mb-1">Lặp Lại (Recurrence)</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1">Lặp lại</label>
               <select
                 value={recurrence}
                 onChange={(e) => setRecurrence(e.target.value as any)}
@@ -250,17 +255,19 @@ export function AddScheduleModal() {
 
           {/* Color Presets */}
           <div>
-            <label className="block text-xs font-semibold text-slate-300 mb-1.5">Màu Thẻ Display</label>
+              <label className="block text-xs font-semibold text-slate-300 mb-1.5">Màu hiển thị</label>
             <div className="flex items-center gap-2">
               {COLOR_PRESETS.map((c) => (
                 <button
                   type="button"
                   key={c.value}
                   onClick={() => setColor(c.value)}
-                  className={`w-7 h-7 rounded-full transition-all flex items-center justify-center ${
+                  className={`touch-target w-7 h-7 rounded-full transition-all flex items-center justify-center ${
                     color === c.value ? 'ring-2 ring-white scale-110' : 'hover:scale-105'
                   }`}
                   style={{ backgroundColor: c.value }}
+                  aria-label={`Chọn màu ${c.label}`}
+                  aria-pressed={color === c.value}
                 />
               ))}
             </div>
@@ -308,7 +315,6 @@ export function AddScheduleModal() {
             </button>
           </div>
         </form>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

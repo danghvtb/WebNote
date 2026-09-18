@@ -17,6 +17,9 @@ import type {
   Project,
   WorkReport,
   WorkReportProjectEntry,
+  Attachment,
+  Revision,
+  SearchFilters,
 } from '../../types';
 import {
   generateId,
@@ -26,6 +29,7 @@ import {
   nowISO,
   stripHtml,
 } from '../../utils';
+import { parseAllTasks } from '../../utils/taskUtils';
 
 export function normalizeTagName(name: string): string {
   return name.trim().replace(/\s+/g, ' ');
@@ -189,6 +193,12 @@ export async function getWorkReportByDay(dayId: string, includeDeleted = false):
   return report;
 }
 
+export async function getWorkReportById(id: string, includeDeleted = false): Promise<WorkReport | undefined> {
+  const report = await db.workReports.get(id);
+  if (report?.deletedAt && !includeDeleted) return undefined;
+  return report;
+}
+
 export async function getAllWorkReports(includeDeleted = false): Promise<WorkReport[]> {
   return db.workReports.filter((report) => includeDeleted || !report.deletedAt).toArray();
 }
@@ -243,6 +253,43 @@ export async function deleteWorkReport(id: string): Promise<void> {
   await db.searchIndex.where('entityId').equals(id).delete();
 }
 
+/** Permanently remove a deleted work report and its search entry. */
+export async function permanentlyDeleteWorkReport(id: string): Promise<void> {
+  await db.transaction('rw', [db.workReports, db.searchIndex], async () => {
+    await db.workReports.delete(id);
+    await db.searchIndex.where('entityId').equals(id).delete();
+  });
+}
+
+export async function restoreWorkReport(id: string): Promise<WorkReport | undefined> {
+  const report = await db.workReports.get(id);
+  if (!report) return undefined;
+  const restored = { ...report, deletedAt: undefined, updatedAt: nowISO() };
+  await db.workReports.put(restored);
+  await updateSearchIndexForWorkReport(restored);
+  return restored;
+}
+
+export async function getTrashSummary(): Promise<{ pages: number; notebooks: number; workReports: number; total: number }> {
+  const [pages, notebooks, workReports] = await Promise.all([
+    db.pages.filter((page) => Boolean(page.deleted)).count(),
+    db.notebooks.filter((notebook) => Boolean(notebook.deleted)).count(),
+    db.workReports.filter((report) => Boolean(report.deletedAt)).count(),
+  ]);
+  return { pages, notebooks, workReports, total: pages + notebooks + workReports };
+}
+
+export async function emptyTrash(): Promise<void> {
+  const [pages, notebooks, reports] = await Promise.all([
+    db.pages.filter((page) => Boolean(page.deleted)).toArray(),
+    db.notebooks.filter((notebook) => Boolean(notebook.deleted)).toArray(),
+    db.workReports.filter((report) => Boolean(report.deletedAt)).toArray(),
+  ]);
+  for (const page of pages) await permanentlyDeletePage(page.id);
+  for (const notebook of notebooks) await permanentlyDeleteNotebook(notebook.id);
+  for (const report of reports) await permanentlyDeleteWorkReport(report.id);
+}
+
 export function formatWorkReport(report: WorkReport, date: string): string {
   const formattedDate = date
     ? date.split('-').reverse().join('/')
@@ -261,6 +308,42 @@ export function formatWorkReport(report: WorkReport, date: string): string {
   text += `\n\n- Hướng giải quyết:\n${plusLines(report.solution)}`;
   text += `\n\n- Công việc ngày tiếp theo:\n${plusLines(report.nextWork)}`;
   return text;
+}
+
+// ===================== ATTACHMENTS =====================
+
+export async function getPageAttachments(pageId: string, includeDeleted = false): Promise<Attachment[]> {
+  const attachments = await db.attachments.where('pageId').equals(pageId).toArray();
+  return includeDeleted ? attachments : attachments.filter((attachment) => !attachment.deletedAt);
+}
+
+export async function addPageAttachment(input: Omit<Attachment, 'id' | 'createdAt' | 'updatedAt'>): Promise<Attachment> {
+  const now = nowISO();
+  const attachment: Attachment = { ...input, id: generateId('attachment'), createdAt: now, updatedAt: now };
+  await db.attachments.put(attachment);
+  return attachment;
+}
+
+export async function deletePageAttachment(id: string): Promise<void> {
+  const attachment = await db.attachments.get(id);
+  if (!attachment) return;
+  await db.attachments.put({ ...attachment, deletedAt: nowISO(), updatedAt: nowISO() });
+}
+
+export async function restorePageAttachment(id: string): Promise<Attachment | undefined> {
+  const attachment = await db.attachments.get(id);
+  if (!attachment) return undefined;
+  const restored = { ...attachment, deletedAt: undefined, updatedAt: nowISO() };
+  await db.attachments.put(restored);
+  return restored;
+}
+
+export async function getDeletedAttachments(): Promise<Attachment[]> {
+  return db.attachments.filter((attachment) => Boolean(attachment.deletedAt)).toArray();
+}
+
+export async function permanentlyDeletePageAttachment(id: string): Promise<void> {
+  await db.attachments.delete(id);
 }
 
 // ===================== DAY OPERATIONS =====================
@@ -358,12 +441,12 @@ export async function createNotebook(
  * Get all notebooks for a day.
  */
 export async function getNotebooksByDay(dayId: string): Promise<Notebook[]> {
-  return db.notebooks
+  const notebooks = await db.notebooks
     .where('dateId')
     .equals(dayId)
     .filter((nb) => !nb.deleted)
-    .sortBy('updatedAt')
-    .then((nbs) => nbs.reverse());
+    .sortBy('updatedAt');
+  return notebooks.reverse().sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)));
 }
 
 /**
@@ -403,9 +486,12 @@ export async function deleteNotebook(notebookId: string): Promise<void> {
 
   const pages = await db.pages.where('notebookId').equals(notebookId).toArray();
 
-  // Delete notebook and pages from IndexedDB
-  await db.notebooks.delete(notebookId);
-  await db.pages.where('notebookId').equals(notebookId).delete();
+  const now = nowISO();
+  // Keep notebook and pages recoverable in Trash. This also prevents a later
+  // cloud snapshot from resurrecting children that were intentionally removed.
+  await db.notebooks.update(notebookId, { deleted: true, deletedAt: now, updatedAt: now });
+  await db.pages.where('notebookId').equals(notebookId).modify({ deleted: true, deletedAt: now, updatedAt: now });
+  await db.attachments.where('pageId').anyOf(pages.map((page) => page.id)).modify({ deletedAt: now, updatedAt: now }).catch(() => {});
 
   // Remove from search index
   await db.searchIndex.where('entityId').equals(notebookId).delete();
@@ -481,7 +567,7 @@ export async function getNotebookCountByDay(dayId: string): Promise<number> {
  */
 export async function createPage(
   notebookId: string,
-  title: string = 'Untitled'
+  title: string = 'Chưa có tiêu đề'
 ): Promise<Page> {
   const notebook = await db.notebooks.get(notebookId);
   if (!notebook) throw new Error(`Notebook ${notebookId} not found`);
@@ -516,11 +602,12 @@ export async function createPage(
  * Get all pages for a notebook.
  */
 export async function getPagesByNotebook(notebookId: string): Promise<Page[]> {
-  return db.pages
+  const pages = await db.pages
     .where('notebookId')
     .equals(notebookId)
     .filter((p) => !p.deleted)
     .sortBy('order');
+  return pages.sort((a, b) => Number(Boolean(b.isPinned)) - Number(Boolean(a.isPinned)) || a.order - b.order);
 }
 
 /**
@@ -530,12 +617,106 @@ export async function getPage(pageId: string): Promise<Page | undefined> {
   return db.pages.get(pageId);
 }
 
+export async function restoreNotebook(notebookId: string): Promise<Notebook | undefined> {
+  const notebook = await db.notebooks.get(notebookId);
+  if (!notebook) return undefined;
+  const now = nowISO();
+  const restored = { ...notebook, deleted: false, deletedAt: undefined, updatedAt: now };
+  await db.notebooks.put(restored);
+  await db.pages.where('notebookId').equals(notebookId).modify({ deleted: false, deletedAt: undefined, updatedAt: now });
+  const pageIds = (await db.pages.where('notebookId').equals(notebookId).toArray()).map((page) => page.id);
+  if (pageIds.length) await db.attachments.where('pageId').anyOf(pageIds).modify({ deletedAt: undefined, updatedAt: now }).catch(() => {});
+  await updateSearchIndexForNotebook(restored);
+  return restored;
+}
+
+export async function getDeletedNotebooks(): Promise<Notebook[]> {
+  return db.notebooks.filter((notebook) => !!notebook.deleted).reverse().sortBy('updatedAt');
+}
+
+export async function permanentlyDeleteNotebook(notebookId: string): Promise<void> {
+  const pages = await db.pages.where('notebookId').equals(notebookId).toArray();
+  await db.transaction('rw', [db.notebooks, db.pages, db.attachments, db.revisions, db.searchIndex], async () => {
+    await db.notebooks.delete(notebookId);
+    await db.pages.where('notebookId').equals(notebookId).delete();
+    await db.attachments.where('pageId').anyOf(pages.map((page) => page.id)).delete().catch(() => {});
+    for (const page of pages) {
+      await db.revisions.where('pageId').equals(page.id).delete();
+      await db.searchIndex.where('entityId').equals(page.id).delete();
+    }
+    await db.searchIndex.where('entityId').equals(notebookId).delete();
+  });
+}
+
+// ===================== REVISION OPERATIONS =====================
+
+/** Save a point-in-time page snapshot for recovery/history. */
+export async function createRevision(pageId: string, deviceId = 'browser'): Promise<Revision | undefined> {
+  const page = await db.pages.get(pageId);
+  if (!page) return undefined;
+  const revision: Revision = {
+    id: generateId('rev'),
+    pageId,
+    content: page.content,
+    title: page.title,
+    createdAt: nowISO(),
+    deviceId,
+  };
+  await db.revisions.put(revision);
+  return revision;
+}
+
+export async function getPageRevisions(pageId: string, limit = 30): Promise<Revision[]> {
+  const revisions = await db.revisions.where('pageId').equals(pageId).sortBy('createdAt');
+  return revisions.reverse().slice(0, limit);
+}
+
+export async function setPagePinned(pageId: string, isPinned: boolean): Promise<Page | undefined> {
+  const page = await db.pages.get(pageId);
+  if (!page) return undefined;
+  const updated = { ...page, isPinned, updatedAt: nowISO() };
+  await db.pages.put(updated);
+  return updated;
+}
+
+export async function setNotebookPinned(notebookId: string, isPinned: boolean): Promise<Notebook | undefined> {
+  const notebook = await db.notebooks.get(notebookId);
+  if (!notebook) return undefined;
+  const updated = { ...notebook, isPinned, updatedAt: nowISO() };
+  await db.notebooks.put(updated);
+  await updateSearchIndexForNotebook(updated);
+  return updated;
+}
+
+/** Restore a revision while preserving the current page as a new revision. */
+export async function restoreRevision(revisionId: string): Promise<Page | undefined> {
+  const revision = await db.revisions.get(revisionId);
+  if (!revision) return undefined;
+  const page = await db.pages.get(revision.pageId);
+  if (!page) return undefined;
+  await createRevision(page.id);
+  return updatePageContent(page.id, revision.content, revision.title);
+}
+
+export async function prunePageRevisions(pageId: string, max = 30): Promise<void> {
+  const revisions = await db.revisions.where('pageId').equals(pageId).sortBy('createdAt');
+  if (revisions.length <= max) return;
+  await db.revisions.bulkDelete(revisions.slice(0, revisions.length - max).map((revision) => revision.id));
+}
+
+export const pruneRevisions = prunePageRevisions;
+
+export async function setPinned(entity: 'page' | 'notebook', id: string, pinned: boolean): Promise<Page | Notebook | undefined> {
+  return entity === 'page' ? setPagePinned(id, pinned) : setNotebookPinned(id, pinned);
+}
+
 /**
  * Update a page's content (called by autosave).
  */
 export async function updatePageContent(
   pageId: string,
-  content: string
+  content: string,
+  title?: string,
 ): Promise<Page | undefined> {
   const page = await db.pages.get(pageId);
   if (!page) return undefined;
@@ -543,6 +724,7 @@ export async function updatePageContent(
   const updated = {
     ...page,
     content,
+    ...(title === undefined ? {} : { title }),
     updatedAt: nowISO(),
   };
 
@@ -590,8 +772,10 @@ export async function deletePage(pageId: string): Promise<void> {
   // Mark as deleted in IndexedDB
   await db.pages.update(pageId, {
     deleted: true,
+    deletedAt: now,
     updatedAt: now,
   });
+  await db.attachments.where('pageId').equals(pageId).modify({ deletedAt: now, updatedAt: now }).catch(() => {});
 
   // Remove from notebook's pageIds
   const notebook = await db.notebooks.get(page.notebookId);
@@ -623,6 +807,7 @@ export async function restorePage(pageId: string): Promise<Page | null> {
     updatedAt: now,
   };
   await db.pages.put(restoredPage);
+  await db.attachments.where('pageId').equals(pageId).modify({ deletedAt: undefined, updatedAt: now }).catch(() => {});
 
   // Re-add to notebook's pageIds if not present
   const notebook = await db.notebooks.get(page.notebookId);
@@ -648,6 +833,7 @@ export async function permanentlyDeletePage(pageId: string): Promise<void> {
 
   // Remove from IndexedDB pages table
   await db.pages.delete(pageId);
+  await db.attachments.where('pageId').equals(pageId).delete().catch(() => {});
 
   // Remove from notebook if still present
   if (page) {
@@ -760,6 +946,7 @@ async function updateSearchIndexForWorkReport(report: WorkReport): Promise<void>
     content,
     date: day?.date || '',
     dayId: report.dayId,
+    projectIds: report.projectEntries.map((entry) => entry.projectId),
   };
   await db.searchIndex.put(entry);
 }
@@ -767,35 +954,77 @@ async function updateSearchIndexForWorkReport(report: WorkReport): Promise<void>
 /**
  * Search across all indexed content.
  */
-export async function searchAll(query: string, tagIds: string[] = []): Promise<SearchEntry[]> {
-  if (!query.trim() && tagIds.length === 0) return [];
+export function normalizeSearchText(value: string): string {
+  return value
+    .normalize('NFD')
+    .replace(/[\u0300-\u036f]/g, '')
+    .toLocaleLowerCase('vi-VN')
+    .trim();
+}
 
-  const lowerQuery = query.toLowerCase();
+export async function searchAll(queryOrFilters: string | SearchFilters, legacyTagIds: string[] = []): Promise<SearchEntry[]> {
+  const filters: SearchFilters = typeof queryOrFilters === 'string'
+    ? { query: queryOrFilters, tagIds: legacyTagIds }
+    : queryOrFilters;
+  const query = filters.query || '';
+  const tagIds = filters.tagIds || [];
+  if (!query.trim() && tagIds.length === 0 && !filters.types?.length && !filters.projectIds?.length && !filters.startDate && !filters.endDate && !filters.taskStatus) return [];
+
+  const lowerQuery = normalizeSearchText(query);
   const entries = await db.searchIndex.toArray();
 
   return entries
-    .filter((entry) => {
-      if (tagIds.length > 0 && (entry.type !== 'page' || !tagIds.every((id) => (entry.tagIds || []).includes(id)))) return false;
-      if (!query.trim()) return true;
-      return (
-        entry.title.toLowerCase().includes(lowerQuery) ||
-        entry.content.toLowerCase().includes(lowerQuery) ||
-        (entry.notebookTitle && entry.notebookTitle.toLowerCase().includes(lowerQuery)) ||
-        (entry.tagNames || []).some((name) => name.toLowerCase().includes(lowerQuery))
-      );
+    .map((entry) => {
+      const title = normalizeSearchText(entry.title);
+      const content = normalizeSearchText(entry.content);
+      const notebook = normalizeSearchText(entry.notebookTitle || '');
+      const tags = (entry.tagNames || []).map(normalizeSearchText);
+      let score = 0;
+      const matchedFields: string[] = [];
+      if (lowerQuery) {
+        if (title === lowerQuery) { score += 100; matchedFields.push('title'); }
+        else if (title.startsWith(lowerQuery)) { score += 60; matchedFields.push('title'); }
+        else if (title.includes(lowerQuery)) { score += 35; matchedFields.push('title'); }
+        if (tags.some((tag) => tag === lowerQuery)) { score += 30; matchedFields.push('tag'); }
+        else if (tags.some((tag) => tag.includes(lowerQuery))) { score += 15; matchedFields.push('tag'); }
+        if (notebook.includes(lowerQuery)) { score += 10; matchedFields.push('notebook'); }
+        if (content.includes(lowerQuery)) { score += 5; matchedFields.push('content'); }
+      }
+      return { entry: { ...entry, matchedFields }, score };
     })
-    .slice(0, 20); // Limit results
+    .filter((entry) => {
+      const item = entry.entry;
+      if (tagIds.length > 0 && (item.type !== 'page' || !tagIds.every((id) => (item.tagIds || []).includes(id)))) return false;
+      if (filters.types?.length && !filters.types.includes(item.type)) return false;
+      if (filters.projectIds?.length && !((item.projectId && filters.projectIds.includes(item.projectId)) || (item.projectIds || []).some((id) => filters.projectIds!.includes(id)))) return false;
+      if (filters.startDate && item.date < filters.startDate) return false;
+      if (filters.endDate && item.date > filters.endDate) return false;
+      if (filters.taskStatus && filters.taskStatus !== 'all') {
+        if (item.type !== 'task') return false;
+        if (filters.taskStatus === 'pending' && item.taskStatus !== 'todo' && item.taskStatus !== 'in_progress') return false;
+        if (filters.taskStatus !== 'pending' && item.taskStatus !== filters.taskStatus) return false;
+      }
+      if (!query.trim()) return true;
+      return entry.score > 0;
+    })
+    .sort((a, b) => b.score - a.score || b.entry.date.localeCompare(a.entry.date))
+    .slice(0, 20)
+    .map(({ entry }) => entry);
 }
 
 export async function rebuildSearchIndex(): Promise<void> {
-  const [notebooks, pages, reports, tags] = await Promise.all([
+  const [notebooks, pages, reports, tags, projects, tasks, schedules] = await Promise.all([
     db.notebooks.filter((nb) => !nb.deleted).toArray(),
     db.pages.filter((p) => !p.deleted).toArray(),
     db.workReports.filter((report) => !report.deletedAt).toArray(),
     db.tags.toArray(),
+    db.projects.filter((project) => !project.deletedAt).toArray(),
+    db.customTasks.toArray(),
+    db.scheduleBlocks.toArray(),
   ]);
   const tagNames = new Map(tags.map((tag) => [tag.id, tag.name]));
   const notebookTitles = new Map(notebooks.map((notebook) => [notebook.id, notebook.title]));
+  const notebookDayIds = new Map(notebooks.map((notebook) => [notebook.id, notebook.dateId]));
   const dayDates = new Map((await db.days.toArray()).map((day) => [day.id, day.date]));
   const entries: SearchEntry[] = [
     ...notebooks.map((notebook): SearchEntry => ({
@@ -812,7 +1041,7 @@ export async function rebuildSearchIndex(): Promise<void> {
       entityId: page.id,
       title: page.title,
       content: stripHtml(page.content),
-      date: '',
+      date: dayDates.get(notebookDayIds.get(page.notebookId) || '') || '',
       notebookId: page.notebookId,
       notebookTitle: notebookTitles.get(page.notebookId) || '',
       tagIds: page.tagIds || [],
@@ -828,8 +1057,28 @@ export async function rebuildSearchIndex(): Promise<void> {
         content: [projectNames.join(' '), ...report.projectEntries.flatMap((entry) => [entry.content, entry.result]), report.issue, report.solution, report.nextWork].filter(Boolean).join('\n'),
         date: dayDates.get(report.dayId) || '',
         dayId: report.dayId,
+        projectIds: report.projectEntries.map((entry) => entry.projectId),
       };
     }),
+    ...projects.map((project): SearchEntry => ({
+      id: `search_${project.id}`, type: 'project', entityId: project.id,
+      title: project.name, content: [project.name, project.description || ''].filter(Boolean).join('\n'), date: project.updatedAt.slice(0, 10), projectId: project.id,
+    })),
+    ...tasks.map((task): SearchEntry => ({
+      id: `search_${task.id}`, type: 'task', entityId: task.id,
+      title: task.title, content: [task.title, task.description || '', task.categoryName || ''].filter(Boolean).join('\n'), date: task.dueDate || task.updatedAt.slice(0, 10), taskStatus: task.status !== 'completed' && task.dueDate && task.dueDate < todayDate() ? 'overdue' : task.status,
+    })),
+    ...(typeof DOMParser !== 'undefined' ? parseAllTasks(pages, notebooks, true).map((task): SearchEntry => ({
+      id: `search_${task.id}`, type: 'task', entityId: task.id, title: task.text,
+      content: [task.text, task.pageTitle, task.notebookTitle].filter(Boolean).join('\n'),
+      date: task.dueDate || '', pageId: task.pageId, notebookId: task.notebookId,
+      taskStatus: task.completed ? 'completed' : task.isOverdue ? 'overdue' : 'todo',
+    })) : []),
+    ...schedules.map((block): SearchEntry => ({
+      id: `search_${block.id}`, type: 'schedule', entityId: block.id,
+      title: block.title, content: [block.title, block.description || ''].filter(Boolean).join('\n'), date: block.date,
+      pageId: block.pageId, notebookId: block.notebookId,
+    })),
   ];
   await db.transaction('rw', db.searchIndex, async () => {
     await db.searchIndex.clear();
@@ -853,8 +1102,10 @@ export async function loadFromDatabase(data: {
   tags?: Tag[];
   projects?: Project[];
   workReports?: WorkReport[];
+  attachments?: Attachment[];
 }): Promise<void> {
-  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports, db.searchIndex], async () => {
+  if (typeof performance !== 'undefined') performance.mark('mynotes:local-apply-start');
+  await db.transaction('rw', [db.days, db.notebooks, db.pages, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports, db.attachments, db.searchIndex], async () => {
     // Clear existing data
     await db.days.clear();
     await db.notebooks.clear();
@@ -885,6 +1136,10 @@ export async function loadFromDatabase(data: {
         projectEntries: Array.isArray(report.projectEntries) ? report.projectEntries : [],
       })));
     }
+    if (Array.isArray(data.attachments)) {
+      await db.attachments.clear();
+      if (data.attachments.length) await db.attachments.bulkPut(data.attachments);
+    }
 
     // Load scheduleBlocks
     await db.scheduleBlocks.clear();
@@ -909,6 +1164,7 @@ export async function loadFromDatabase(data: {
     await db.searchIndex.clear();
     const tagNames = new Map((data.tags || []).map((tag) => [tag.id, tag.name]));
     const notebookTitles = new Map((data.notebooks || []).map((notebook) => [notebook.id, notebook.title]));
+    const notebookDayIds = new Map((data.notebooks || []).map((notebook) => [notebook.id, notebook.dateId]));
     const dayDates = new Map((data.days || []).map((day) => [day.id, day.date]));
     const entries: SearchEntry[] = [];
     for (const nb of data.notebooks || []) {
@@ -921,7 +1177,7 @@ export async function loadFromDatabase(data: {
     for (const page of data.pages || []) {
       if (!page.deleted) entries.push({
         id: `search_${page.id}`, type: 'page', entityId: page.id,
-        title: page.title, content: stripHtml(page.content), date: '',
+        title: page.title, content: stripHtml(page.content), date: dayDates.get(notebookDayIds.get(page.notebookId) || '') || '',
         notebookId: page.notebookId, notebookTitle: notebookTitles.get(page.notebookId) || '',
         tagIds: page.tagIds || [],
         tagNames: (page.tagIds || []).map((id) => tagNames.get(id) || '').filter(Boolean),
@@ -934,12 +1190,31 @@ export async function loadFromDatabase(data: {
           id: `search_${report.id}`, type: 'work_report', entityId: report.id,
           title: `Báo cáo công việc ${dayDates.get(report.dayId)?.split('-').reverse().join('/') || ''}`.trim(),
           content: [projectNames.join(' '), ...report.projectEntries.flatMap((entry) => [entry.content, entry.result]), report.issue, report.solution, report.nextWork].filter(Boolean).join('\n'),
-          date: dayDates.get(report.dayId) || '', dayId: report.dayId,
+        date: dayDates.get(report.dayId) || '', dayId: report.dayId,
+        projectIds: report.projectEntries.map((entry) => entry.projectId),
         });
       }
     }
+    for (const project of data.projects || []) {
+      if (!project.deletedAt) entries.push({ id: `search_${project.id}`, type: 'project', entityId: project.id, title: project.name, content: [project.name, project.description || ''].filter(Boolean).join('\n'), date: project.updatedAt.slice(0, 10), projectId: project.id });
+    }
+    for (const task of data.customTasks || []) {
+      entries.push({ id: `search_${task.id}`, type: 'task', entityId: task.id, title: task.title, content: [task.title, task.description || '', task.categoryName || ''].filter(Boolean).join('\n'), date: task.dueDate || task.updatedAt.slice(0, 10), taskStatus: task.status !== 'completed' && task.dueDate && task.dueDate < todayDate() ? 'overdue' : task.status });
+    }
+    if (typeof DOMParser !== 'undefined') {
+      for (const task of parseAllTasks(data.pages || [], data.notebooks || [], true)) {
+        entries.push({ id: `search_${task.id}`, type: 'task', entityId: task.id, title: task.text, content: [task.text, task.pageTitle, task.notebookTitle].filter(Boolean).join('\n'), date: task.dueDate || '', pageId: task.pageId, notebookId: task.notebookId, taskStatus: task.completed ? 'completed' : task.isOverdue ? 'overdue' : 'todo' });
+      }
+    }
+    for (const block of data.scheduleBlocks || []) {
+      entries.push({ id: `search_${block.id}`, type: 'schedule', entityId: block.id, title: block.title, content: [block.title, block.description || ''].filter(Boolean).join('\n'), date: block.date, pageId: block.pageId, notebookId: block.notebookId });
+    }
     if (entries.length) await db.searchIndex.bulkPut(entries);
   });
+  if (typeof performance !== 'undefined') {
+    performance.mark('mynotes:local-apply-end');
+    try { performance.measure('mynotes:local-apply', 'mynotes:local-apply-start', 'mynotes:local-apply-end'); } catch { /* unsupported in older browsers */ }
+  }
 }
 
 /**
@@ -957,6 +1232,7 @@ export async function exportDatabase(): Promise<{
   scheduleBlocks: ScheduleBlock[];
   customTasks: CustomUserTask[];
   workCategories: WorkCategory[];
+  attachments: Attachment[];
 }> {
   const days = await db.days.toArray();
   const notebooks = await db.notebooks.toArray();
@@ -968,6 +1244,7 @@ export async function exportDatabase(): Promise<{
   const scheduleBlocks = await db.scheduleBlocks.toArray();
   const customTasks = await db.customTasks.toArray();
   const workCategories = await db.workCategories.toArray();
+  const attachments = await db.attachments.toArray();
 
   return {
     version: 3,
@@ -981,6 +1258,7 @@ export async function exportDatabase(): Promise<{
     scheduleBlocks,
     customTasks,
     workCategories,
+    attachments,
   };
 }
 
@@ -1016,6 +1294,7 @@ export async function clearAllLocalData(): Promise<void> {
       db.tags,
       db.projects,
       db.workReports,
+      db.attachments,
       db.appState,
       db.searchIndex,
       db.syncQueue,
@@ -1030,6 +1309,7 @@ export async function clearAllLocalData(): Promise<void> {
       await db.tags.clear();
       await db.projects.clear();
       await db.workReports.clear();
+      await db.attachments.clear();
       await db.appState.delete('sync.database.metadata');
       await db.searchIndex.clear();
       await db.syncQueue.clear();

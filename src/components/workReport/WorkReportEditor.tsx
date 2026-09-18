@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { BriefcaseBusiness, Check, Clipboard, Copy, FilePlus2, FolderCog, Plus, Trash2, X } from 'lucide-react';
+import { BriefcaseBusiness, Check, Clipboard, Copy, FilePlus2, FolderCog, History, Plus, Printer, Trash2, X } from 'lucide-react';
 import { useWorkReportStore } from '../../stores/workReportStore';
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
@@ -8,9 +8,15 @@ import { dateFromDayId } from '../../utils/timelineGrouping';
 import type { WorkReport, WorkReportProjectEntry } from '../../types';
 
 const editableFields = ['issue', 'solution', 'nextWork'] as const;
+type ReportTemplate = { id: string; name: string; issue: string; solution: string; nextWork: string };
+const defaultTemplates: ReportTemplate[] = [
+  { id: 'daily', name: 'Báo cáo hằng ngày', issue: '', solution: '', nextWork: 'Tiếp tục các công việc đang thực hiện và xử lý các đầu việc còn lại.' },
+  { id: 'delivery', name: 'Bàn giao / nghiệm thu', issue: 'Các điểm cần xác nhận trước khi bàn giao:', solution: 'Đã kiểm tra, phối hợp và xử lý các điểm phát sinh.', nextWork: 'Theo dõi phản hồi sau bàn giao và hoàn tất tài liệu liên quan.' },
+  { id: 'incident', name: 'Sự cố / xử lý nhanh', issue: 'Mô tả sự cố, phạm vi ảnh hưởng và nguyên nhân:', solution: 'Các bước đã thực hiện để khắc phục và phòng ngừa tái diễn:', nextWork: 'Theo dõi ổn định và bổ sung hành động phòng ngừa.' },
+];
 
 export function WorkReportEditor() {
-  const { report, projects, saving, updateReport, loadProjects, createProject, clearSelectedReport } = useWorkReportStore();
+  const { report, reports, projects, saving, updateReport, copyPreviousReport, createNextReportFromCurrent, loadProjects, loadReports, openReportById, createProject, clearSelectedReport } = useWorkReportStore();
   const { days } = useNotesStore();
   const { setProjectManagerOpen, addNotification } = useAppStore();
   const [draft, setDraft] = useState<WorkReport | null>(report);
@@ -18,12 +24,34 @@ export function WorkReportEditor() {
   const [projectSearch, setProjectSearch] = useState('');
   const [quickProjectName, setQuickProjectName] = useState('');
   const [previewOpen, setPreviewOpen] = useState(true);
+  const [historyOpen, setHistoryOpen] = useState(false);
+  const [historyProjectId, setHistoryProjectId] = useState('all');
+  const [historyFrom, setHistoryFrom] = useState('');
+  const [historyTo, setHistoryTo] = useState('');
+  const [templates, setTemplates] = useState<ReportTemplate[]>(defaultTemplates);
   const lastSaved = useRef('');
   const previewRef = useRef<HTMLTextAreaElement>(null);
 
   useEffect(() => {
     loadProjects();
-  }, [loadProjects]);
+    loadReports();
+  }, [loadProjects, loadReports]);
+
+  // Keep the local draft aligned when navigating between days/reports without
+  // unmounting the editor shell (for example, the "chuyển việc ngày mai" action).
+  useEffect(() => {
+    setDraft(report);
+    lastSaved.current = '';
+  }, [report?.id]);
+
+  useEffect(() => {
+    try {
+      const saved = JSON.parse(localStorage.getItem('mynotes_report_templates') || '[]');
+      if (Array.isArray(saved)) setTemplates([...defaultTemplates, ...saved.filter((item): item is ReportTemplate => item && typeof item.id === 'string' && typeof item.name === 'string')]);
+    } catch {
+      // Ignore malformed optional template preferences.
+    }
+  }, []);
 
   useEffect(() => {
     if (!draft) return;
@@ -53,6 +81,13 @@ export function WorkReportEditor() {
   const availableProjects = projects.filter((project) =>
     !selectedProjectIds.has(project.id) && project.name.toLocaleLowerCase().includes(projectSearch.toLocaleLowerCase()),
   );
+  const historyItems = useMemo(() => reports
+    .filter((item) => item.id !== report?.id)
+    .map((item) => ({ item, date: dateFromDayId(item.dayId) || item.dayId.replace(/^day_/, '') }))
+    .filter(({ date }) => !historyFrom || date >= historyFrom)
+    .filter(({ date }) => !historyTo || date <= historyTo)
+    .filter(({ item }) => historyProjectId === 'all' || item.projectEntries.some((entry) => entry.projectId === historyProjectId))
+    .sort((a, b) => b.date.localeCompare(a.date)), [reports, report?.id, historyFrom, historyTo, historyProjectId]);
 
   if (!draft) {
     return (
@@ -114,6 +149,50 @@ export function WorkReportEditor() {
     addNotification('success', 'Đã tạo báo cáo công việc');
   };
 
+  const copyPrevious = async () => {
+    const copied = await copyPreviousReport();
+    addNotification(copied ? 'success' : 'info', copied ? 'Đã sao chép báo cáo ngày trước.' : 'Chưa có báo cáo ngày trước để sao chép.');
+  };
+
+  const transferNextWork = async () => {
+    const created = await createNextReportFromCurrent();
+    addNotification(created ? 'success' : 'info', created ? 'Đã tạo/mở báo cáo ngày tiếp theo và chuyển công việc.' : 'Chưa có báo cáo hiện tại để chuyển tiếp.');
+  };
+
+  const applyTemplate = (templateId: string) => {
+    const template = templates.find((item) => item.id === templateId);
+    if (!template) return;
+    setDraft((current) => current ? { ...current, issue: template.issue, solution: template.solution, nextWork: template.nextWork } : current);
+  };
+
+  const saveTemplate = () => {
+    const name = window.prompt('Tên mẫu báo cáo');
+    if (!name?.trim()) return;
+    const template: ReportTemplate = {
+      id: `custom_${crypto.randomUUID()}`,
+      name: name.trim(),
+      issue: draft.issue,
+      solution: draft.solution,
+      nextWork: draft.nextWork,
+    };
+    const custom = [...templates.filter((item) => item.id.startsWith('custom_')), template];
+    setTemplates([...defaultTemplates, ...custom]);
+    localStorage.setItem('mynotes_report_templates', JSON.stringify(custom));
+    addNotification('success', `Đã lưu mẫu “${template.name}”`);
+  };
+
+  const printReport = () => {
+    const printWindow = window.open('', '_blank', 'noopener,noreferrer,width=800,height=900');
+    if (!printWindow) {
+      addNotification('warning', 'Trình duyệt đã chặn cửa sổ in.');
+      return;
+    }
+    printWindow.document.write(`<html lang="vi"><head><title>Báo cáo công việc</title><style>body{font-family:Arial,sans-serif;white-space:pre-wrap;line-height:1.5;padding:32px;color:#111} @media print{body{padding:0}}</style></head><body>${reportText.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;')}</body></html>`);
+    printWindow.document.close();
+    printWindow.focus();
+    printWindow.print();
+  };
+
   return (
     <div className="h-full overflow-y-auto" style={{ background: 'var(--color-bg-primary)' }}>
       <div className="max-w-6xl mx-auto p-4 md:p-8">
@@ -128,6 +207,19 @@ export function WorkReportEditor() {
             </div>
           </div>
           <div className="flex items-center gap-2">
+            <select aria-label="Chọn mẫu báo cáo" onChange={(event) => applyTemplate(event.target.value)} defaultValue="" className="max-w-44 px-2 py-2 rounded-lg text-xs bg-[var(--color-bg-secondary)] border border-[var(--color-border)]" style={{ color: 'var(--color-text-secondary)' }}>
+              <option value="" disabled>Mẫu báo cáo</option>
+              {templates.map((template) => <option key={template.id} value={template.id}>{template.name}</option>)}
+            </select>
+            <button type="button" onClick={saveTemplate} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+              <FilePlus2 className="w-3.5 h-3.5" /> Lưu mẫu
+            </button>
+            <button type="button" onClick={copyPrevious} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+              <Copy className="w-3.5 h-3.5" /> Sao chép ngày trước
+            </button>
+            <button type="button" onClick={() => void transferNextWork()} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+              <FilePlus2 className="w-3.5 h-3.5" /> Chuyển việc ngày mai
+            </button>
             <button type="button" onClick={() => setProjectManagerOpen(true)} className="flex items-center gap-1.5 px-3 py-2 rounded-lg text-xs font-medium cursor-pointer" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
               <FolderCog className="w-3.5 h-3.5" /> Quản lý dự án
             </button>
@@ -136,6 +228,23 @@ export function WorkReportEditor() {
             </button>
           </div>
         </div>
+
+        <details open={historyOpen} onToggle={(event) => setHistoryOpen(event.currentTarget.open)} className="mb-5 rounded-xl" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
+          <summary className="flex cursor-pointer list-none items-center gap-2 px-4 py-3 text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>
+            <History className="w-4 h-4" style={{ color: 'var(--color-accent)' }} /> Lịch sử báo cáo
+          </summary>
+          <div className="border-t px-4 py-3 space-y-3" style={{ borderColor: 'var(--color-border)' }}>
+            <div className="flex flex-wrap gap-2">
+              <select aria-label="Lọc lịch sử theo dự án" value={historyProjectId} onChange={(event) => setHistoryProjectId(event.target.value)} className="rounded-lg px-2 py-1.5 text-xs" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }}>
+                <option value="all">Tất cả dự án</option>
+                {projects.map((project) => <option key={project.id} value={project.id}>{project.name}</option>)}
+              </select>
+              <input aria-label="Từ ngày lịch sử báo cáo" type="date" value={historyFrom} onChange={(event) => setHistoryFrom(event.target.value)} className="rounded-lg px-2 py-1.5 text-xs" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }} />
+              <input aria-label="Đến ngày lịch sử báo cáo" type="date" value={historyTo} onChange={(event) => setHistoryTo(event.target.value)} className="rounded-lg px-2 py-1.5 text-xs" style={{ color: 'var(--color-text-secondary)', background: 'var(--color-bg-tertiary)', border: '1px solid var(--color-border)' }} />
+            </div>
+            {historyItems.length === 0 ? <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>Không có báo cáo phù hợp.</p> : <div className="grid gap-1.5 sm:grid-cols-2 lg:grid-cols-3">{historyItems.slice(0, 12).map(({ item, date }) => <button type="button" key={item.id} onClick={() => void openReportById(item.id)} className="touch-target rounded-lg px-3 py-2 text-left text-xs hover:bg-[var(--color-bg-hover)]" style={{ color: 'var(--color-text-secondary)', border: '1px solid var(--color-border)' }}><span className="block font-semibold">{date.split('-').reverse().join('/')}</span><span className="block truncate text-[11px]" style={{ color: 'var(--color-text-tertiary)' }}>{item.projectEntries.map((entry) => entry.projectNameSnapshot).join(', ') || 'Chưa có dự án'}</span></button>)}</div>}
+          </div>
+        </details>
 
         <div className="grid grid-cols-1 xl:grid-cols-2 gap-5 items-start">
           <section className="space-y-4">
@@ -206,7 +315,8 @@ export function WorkReportEditor() {
               <div className="flex items-center gap-2"><Clipboard className="w-4 h-4" style={{ color: 'var(--color-accent)' }} /><h2 className="text-sm font-semibold" style={{ color: 'var(--color-text-primary)' }}>Xem trước báo cáo</h2></div>
               <div className="flex items-center gap-1">
                 <button type="button" onClick={saveReport} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer" style={{ color: 'var(--color-accent)', background: 'var(--color-accent-dim)' }}><Check className="w-3.5 h-3.5" /> Tạo báo cáo</button>
-                <button type="button" onClick={copyReport} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer" style={{ color: 'var(--color-accent)', background: 'var(--color-accent-dim)' }}><Copy className="w-3.5 h-3.5" /> Copy</button>
+                <button type="button" onClick={copyReport} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer" style={{ color: 'var(--color-accent)', background: 'var(--color-accent-dim)' }}><Copy className="w-3.5 h-3.5" /> Sao chép</button>
+                <button type="button" onClick={printReport} className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs cursor-pointer" style={{ color: 'var(--color-accent)', background: 'var(--color-accent-dim)' }}><Printer className="w-3.5 h-3.5" /> In / PDF</button>
                 <button type="button" onClick={() => setPreviewOpen((open) => !open)} className="px-2 py-1.5 rounded-lg text-xs cursor-pointer md:hidden" style={{ color: 'var(--color-text-tertiary)' }}>{previewOpen ? 'Thu gọn' : 'Mở'}</button>
               </div>
             </div>

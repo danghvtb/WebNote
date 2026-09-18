@@ -198,10 +198,10 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
           <button
             onClick={() => setDailyBriefingOpen(true)}
             className="p-1.5 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-bold text-amber-300 bg-amber-500/10 hover:bg-amber-500/20 border border-amber-500/30 rounded-xl transition-all flex items-center gap-1"
-            title="Daily Briefing"
+            title="Tổng quan ngày"
           >
             <Sun className="w-4 h-4 text-amber-400" />
-            <span className="hidden md:inline">Briefing</span>
+            <span className="hidden md:inline">Tổng quan ngày</span>
           </button>
 
           <button
@@ -216,10 +216,10 @@ export function CalendarHeader({ onOpenAIPanel }: CalendarHeaderProps) {
           <button
             onClick={onOpenAIPanel}
             className="p-1.5 sm:px-3.5 sm:py-1.5 text-[11px] sm:text-xs font-bold text-purple-200 bg-gradient-to-r from-purple-900/60 to-indigo-900/60 hover:from-purple-800/80 border border-purple-500/40 rounded-xl transition-all flex items-center gap-1"
-            title="AI Optimizer"
+            title="Tối ưu lịch bằng AI"
           >
             <Sparkles className="w-4 h-4 text-purple-400" />
-            <span className="hidden md:inline">AI Optimizer</span>
+            <span className="hidden md:inline">Tối ưu bằng AI</span>
           </button>
 
           <button

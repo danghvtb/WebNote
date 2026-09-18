@@ -1,3 +1,4 @@
+/* oxlint-disable react(set-state-in-effect) -- controlled picker synchronizes its draft value. */
 import { useEffect, useRef, useState } from 'react';
 import { ChevronDown } from 'lucide-react';
 
@@ -42,6 +43,9 @@ export function Time24Picker({
   const rootRef = useRef<HTMLDivElement>(null);
 
   useEffect(() => {
+    // Keep the draft synchronized with the controlled value.
+    // oxlint-disable-next-line react(set-state-in-effect)
+    // oxlint-disable-next-line react(set-state-in-effect)
     setDraft(value);
   }, [value]);
 

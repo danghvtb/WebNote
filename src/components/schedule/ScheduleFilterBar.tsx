@@ -109,7 +109,7 @@ export function ScheduleFilterBar() {
           >
             <option value="all">⚡ Tất cả trạng thái</option>
             <option value="pending">⏳ Chưa làm (Pending)</option>
-            <option value="completed">✅ Đã xong (Completed)</option>
+            <option value="completed">✅ Đã xong</option>
             <option value="overdue">🔴 Quá hạn (Overdue)</option>
           </select>
         </div>
@@ -154,7 +154,7 @@ export function ScheduleFilterBar() {
             type="text"
             value={aiPrompt}
             onChange={(e) => setAiPrompt(e.target.value)}
-            placeholder="AI Search: VD 'Lịch họp dự án WebNote tuần này'..."
+              placeholder="Tìm bằng AI: VD 'Lịch họp dự án WebNote tuần này'..."
             className="w-full pl-9 pr-3 py-1.5 text-xs bg-purple-950/30 border border-purple-500/30 rounded-xl text-purple-200 placeholder-purple-400/60 focus:outline-none focus:border-purple-500"
           />
         </div>

@@ -4,28 +4,29 @@
 // Pull-first sync guard ensures cloud data is loaded before UI.
 // ============================================================
 
-import { useEffect } from 'react';
+import { lazy, Suspense, useEffect } from 'react';
 import { useAppStore } from './stores/appStore';
 import { LoginPage } from './components/auth/LoginPage';
 import { CreateFolderPrompt } from './components/auth/CreateFolderPrompt';
 import { SyncLoadingScreen } from './components/auth/SyncLoadingScreen';
-import { AppLayout } from './components/layout/AppLayout';
-import { SearchModal } from './components/search/SearchModal';
-import { CreateNotebookModal } from './components/modal/CreateNotebookModal';
-import { ConfirmModal } from './components/modal/ConfirmModal';
-import { SettingsModal } from './components/settings/SettingsModal';
 import { Toasts } from './components/common/Toasts';
 import { ErrorBoundary } from './components/common/ErrorBoundary';
 import { useKeyboardShortcuts } from './hooks/useKeyboardShortcuts';
 import { initNetworkListeners, onSyncStatusChange } from './services/sync/syncManager';
 
-import { GraphViewModal } from './components/modal/GraphViewModal';
-import { TaskManagerModal } from './components/modal/TaskManagerModal';
-import { ExportModal } from './components/modal/ExportModal';
-import { TrashModal } from './components/modal/TrashModal';
-import { TagManagerModal } from './components/modal/TagManagerModal';
-import { ProjectManagerModal } from './components/modal/ProjectManagerModal';
 import { useNotesStore } from './stores/notesStore';
+
+const GraphViewModal = lazy(() => import('./components/modal/GraphViewModal').then((module) => ({ default: module.GraphViewModal })));
+const AppLayout = lazy(() => import('./components/layout/AppLayout').then((module) => ({ default: module.AppLayout })));
+const SearchModal = lazy(() => import('./components/search/SearchModal').then((module) => ({ default: module.SearchModal })));
+const CreateNotebookModal = lazy(() => import('./components/modal/CreateNotebookModal').then((module) => ({ default: module.CreateNotebookModal })));
+const ConfirmModal = lazy(() => import('./components/modal/ConfirmModal').then((module) => ({ default: module.ConfirmModal })));
+const SettingsModal = lazy(() => import('./components/settings/SettingsModal').then((module) => ({ default: module.SettingsModal })));
+const TaskManagerModal = lazy(() => import('./components/modal/TaskManagerModal').then((module) => ({ default: module.TaskManagerModal })));
+const ExportModal = lazy(() => import('./components/modal/ExportModal').then((module) => ({ default: module.ExportModal })));
+const TrashModal = lazy(() => import('./components/modal/TrashModal').then((module) => ({ default: module.TrashModal })));
+const TagManagerModal = lazy(() => import('./components/modal/TagManagerModal').then((module) => ({ default: module.TagManagerModal })));
+const ProjectManagerModal = lazy(() => import('./components/modal/ProjectManagerModal').then((module) => ({ default: module.ProjectManagerModal })));
 
 // Sync timeout — background pull must never block local-first editing
 const SYNC_TIMEOUT_MS = 30_000;
@@ -72,8 +73,9 @@ function AppContent() {
 
         // Read IndexedDB before loading GIS/Drive. The cached vault is the
         // first usable UI and remains editable while cloud bootstrap runs.
-        await loadDays();
-        await loadRecentNotebooks();
+        // Hydrate independent timeline slices in parallel so cached content
+        // reaches the first render without waiting on sequential reads.
+        await Promise.all([loadDays(), loadRecentNotebooks()]);
         setLocalHydrationStatus(useNotesStore.getState().days.length > 0 ? 'ready' : 'empty');
         if (typeof performance !== 'undefined') performance.mark('mynotes:local-hydrate-end');
 
@@ -87,6 +89,10 @@ function AppContent() {
         setInitialSyncComplete(true);
         setInitialSyncMessage('');
         setInitialized(true);
+        if (typeof performance !== 'undefined') {
+          performance.mark('mynotes:first-local-content');
+          try { performance.measure('mynotes:time-to-local-content', 'mynotes:local-hydrate-start', 'mynotes:first-local-content'); } catch { /* optional performance API */ }
+        }
 
         if (!hasValidToken) {
           setCloudBootstrapStatus('auth_required');
@@ -125,11 +131,11 @@ function AppContent() {
               setRootFolderId(res.folderId);
 
               setInitialSyncMessage('Đang tải dữ liệu từ Google Drive...');
-              const { syncFromCloud } = await import('./services/sync/syncManager');
+              const { syncFromCloud } = await import('./services/sync/syncBootstrap');
               await syncFromCloud({ isConnectOrLogin: true });
             } else {
               // No folder or error — enable push, user starts fresh
-              const { markInitialPullComplete } = await import('./services/sync/syncManager');
+              const { markInitialPullComplete } = await import('./services/sync/syncBootstrap');
               markInitialPullComplete();
               setPushAllowed(true);
             }
@@ -179,6 +185,23 @@ function AppContent() {
     initNetworkListeners();
   }, []);
 
+  // Surface a safe update prompt instead of reloading while an editor is open.
+  useEffect(() => {
+    const showUpdate = () => {
+      addNotification('info', 'Đã có phiên bản WebNote mới.', {
+        label: 'Cập nhật',
+        onClick: () => {
+          navigator.serviceWorker?.getRegistration().then((registration) => {
+            registration?.waiting?.postMessage({ type: 'SKIP_WAITING' });
+            window.setTimeout(() => window.location.reload(), 250);
+          });
+        },
+      }, 120000);
+    };
+    window.addEventListener('mynotes_sw_update', showUpdate);
+    return () => window.removeEventListener('mynotes_sw_update', showUpdate);
+  }, [addNotification]);
+
   // Listen to sync status changes & Auth expiration events
   useEffect(() => {
     const unsubscribe = onSyncStatusChange((status, message) => {
@@ -207,17 +230,18 @@ function AppContent() {
   // 30-Minute Deadline Warning Monitor & Native Push + Audio Chime
   useEffect(() => {
     const alertedTaskIds = new Set<string>();
-
-    // Request Notification Permission on App init
-    import('./services/notification/notificationManager').then(({ requestNotificationPermission }) => {
-      requestNotificationPermission();
-    });
+    let monitorTimer: ReturnType<typeof setTimeout> | null = null;
+    const scheduleNextCheck = (delay = 60_000) => {
+      if (monitorTimer) clearTimeout(monitorTimer);
+      monitorTimer = setTimeout(() => { void checkUpcomingDeadlines(); }, Math.max(10_000, Math.min(delay, 60_000)));
+    };
 
     const checkUpcomingDeadlines = async () => {
+      if (document.visibilityState === 'hidden') return;
       try {
-        const { getAllVaultPages, getAllVaultNotebooks } = await import('./services/database/repository');
-        const { parseAllTasks, isValidDueDate } = await import('./utils/taskUtils');
-        const { playNotificationChime, sendNativeNotification } = await import('./services/notification/notificationManager');
+        const { getAllVaultPages, getAllVaultNotebooks } = await import('./services/database/repositoryBootstrap');
+        const { parseAllTasks, isValidDueDate } = await import('./utils/taskMonitor');
+        const { areSoundNotificationsEnabled, playNotificationChime, sendNativeNotification } = await import('./services/notification/notificationManager');
 
         const [pages, notebooks] = await Promise.all([getAllVaultPages(), getAllVaultNotebooks()]);
         const tasks = parseAllTasks(pages, notebooks, true);
@@ -235,32 +259,42 @@ function AppContent() {
           if (diffMs > 0 && diffMs <= THIRTY_MINS_MS && !alertedTaskIds.has(t.id)) {
             alertedTaskIds.add(t.id);
             const remainingMins = Math.ceil(diffMs / (60 * 1000));
-            const msg = `⏰ CẢNH BÁO DEADLINE: Task "${t.text.slice(0, 45)}" còn ${remainingMins} phút nữa là đến hạn!`;
+            const msg = `⏰ CẢNH BÁO HẠN: Công việc "${t.text.slice(0, 45)}" còn ${remainingMins} phút nữa là đến hạn!`;
 
             // 1. Toast Notification inside app
             addNotification('warning', msg);
 
             // 2. Play soft audio chime
-            playNotificationChime();
+            if (areSoundNotificationsEnabled()) playNotificationChime();
 
             // 3. Native OS Push Notification
-            sendNativeNotification('⏰ MyNotes - Cảnh Báo Deadline!', {
+            sendNativeNotification('⏰ WebNote - Cảnh báo hạn!', {
               body: msg,
               tag: `task-deadline-${t.id}`,
             });
           }
         });
+        const dueTimes = tasks.map((task) => task.dueDate ? new Date(task.dueDate.includes('T') ? task.dueDate : `${task.dueDate}T18:00`).getTime() - now : Infinity).filter((value) => value > 0);
+        scheduleNextCheck(dueTimes.length ? Math.min(...dueTimes, 60_000) : 60_000);
       } catch (err) {
         console.warn('[App] Deadline monitor error:', err);
+        scheduleNextCheck();
       }
     };
 
     // Initial check
     checkUpcomingDeadlines();
 
-    // Check every 30 seconds
-    const interval = setInterval(checkUpcomingDeadlines, 30000);
-    return () => clearInterval(interval);
+    // Re-check at most every minute, or sooner when the next deadline is near.
+    scheduleNextCheck();
+    const handleVisibility = () => {
+      if (document.visibilityState === 'visible') void checkUpcomingDeadlines();
+    };
+    document.addEventListener('visibilitychange', handleVisibility);
+    return () => {
+      if (monitorTimer) clearTimeout(monitorTimer);
+      document.removeEventListener('visibilitychange', handleVisibility);
+    };
   }, [addNotification]);
 
   // Keyboard shortcuts
@@ -284,22 +318,24 @@ function AppContent() {
 }
 
 export default function App() {
-  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen, tagManagerOpen, setTagManagerOpen, projectManagerOpen, setProjectManagerOpen } = useAppStore();
+  const { taskManagerOpen, setTaskManagerOpen, exportModalOpen, setExportModalOpen, tagManagerOpen, setTagManagerOpen, projectManagerOpen, setProjectManagerOpen, graphViewOpen, trashModalOpen, searchOpen, createNotebookOpen, confirmModal, settingsOpen } = useAppStore();
 
   return (
     <ErrorBoundary>
-      <AppContent />
-      <SearchModal />
-      <CreateNotebookModal />
-      <ConfirmModal />
-      <SettingsModal />
-      <GraphViewModal />
-      <TaskManagerModal isOpen={taskManagerOpen} onClose={() => setTaskManagerOpen(false)} />
-      <ExportModal isOpen={exportModalOpen} onClose={() => setExportModalOpen(false)} />
-      <TrashModal />
-      <TagManagerModal isOpen={tagManagerOpen} onClose={() => setTagManagerOpen(false)} />
-      <ProjectManagerModal isOpen={projectManagerOpen} onClose={() => setProjectManagerOpen(false)} />
-      <Toasts />
+      <Suspense fallback={null}>
+        <AppContent />
+        {searchOpen && <SearchModal />}
+        {createNotebookOpen && <CreateNotebookModal />}
+        {confirmModal.open && <ConfirmModal />}
+        {settingsOpen && <SettingsModal />}
+        {graphViewOpen && <GraphViewModal />}
+        {taskManagerOpen && <TaskManagerModal isOpen onClose={() => setTaskManagerOpen(false)} />}
+        {exportModalOpen && <ExportModal isOpen onClose={() => setExportModalOpen(false)} />}
+        {trashModalOpen && <TrashModal />}
+        {tagManagerOpen && <TagManagerModal isOpen onClose={() => setTagManagerOpen(false)} />}
+        {projectManagerOpen && <ProjectManagerModal isOpen onClose={() => setProjectManagerOpen(false)} />}
+        <Toasts />
+      </Suspense>
     </ErrorBoundary>
   );
 }

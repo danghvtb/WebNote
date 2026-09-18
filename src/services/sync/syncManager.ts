@@ -4,7 +4,7 @@
 // ============================================================
 
 import { db } from '../database/db';
-import { exportDatabase, loadFromDatabase } from '../database/repository';
+import { exportDatabase, loadFromDatabase, rebuildSearchIndex } from '../database/repository';
 import {
   findFileInFolder,
   createFile,
@@ -12,12 +12,12 @@ import {
   downloadFile,
   getFileMetadata,
   createFolder,
-  listFiles,
   trashFile,
+  uploadBinaryFile,
 } from '../google/drive';
 import { getRootFolderId } from '../google/rootFolderManager';
 import { useAppStore } from '../../stores/appStore';
-import type { SyncOperation, SyncStatus, Page } from '../../types';
+import type { SyncOperation, SyncStatus } from '../../types';
 import { generateId, nowISO, isOnline } from '../../utils';
 
 // Sync state — subscribers can listen for changes
@@ -74,6 +74,58 @@ function updateRuntime(partial: Record<string, unknown>): void {
 
 type VaultSnapshot = Awaited<ReturnType<typeof exportDatabase>>;
 
+async function parseSnapshotText(raw: string): Promise<VaultSnapshot> {
+  const parse = () => JSON.parse(raw) as VaultSnapshot;
+  if (raw.length < 2_000_000 || typeof Worker === 'undefined' || typeof Blob === 'undefined' || typeof URL === 'undefined') return parse();
+  const workerSource = `self.onmessage = (event) => { try { self.postMessage({ ok: true, value: JSON.parse(event.data) }); } catch (error) { self.postMessage({ ok: false, error: error instanceof Error ? error.message : 'JSON parse failed' }); } };`;
+  const workerUrl = URL.createObjectURL(new Blob([workerSource], { type: 'text/javascript' }));
+  try {
+    return await new Promise<VaultSnapshot>((resolve, reject) => {
+      const worker = new Worker(workerUrl);
+      worker.onmessage = (event: MessageEvent<{ ok: boolean; value?: VaultSnapshot; error?: string }>) => {
+        worker.terminate();
+        if (event.data.ok && event.data.value) resolve(event.data.value);
+        else reject(new Error(event.data.error || 'JSON parse failed'));
+      };
+      worker.onerror = (event) => { worker.terminate(); reject(new Error(event.message || 'Snapshot worker failed')); };
+      worker.postMessage(raw);
+    });
+  } finally {
+    URL.revokeObjectURL(workerUrl);
+  }
+}
+
+function validateRemoteSnapshot(snapshot: VaultSnapshot & { meta?: { schemaVersion?: number } }): void {
+  const collections: Array<[string, unknown]> = [
+    ['days', snapshot.days], ['notebooks', snapshot.notebooks], ['pages', snapshot.pages],
+    ['tags', snapshot.tags], ['projects', snapshot.projects], ['workReports', snapshot.workReports],
+    ['attachments', snapshot.attachments],
+  ];
+  for (const [name, value] of collections) if (!Array.isArray(value)) throw new Error(`Invalid database.json: ${name} must be an array`);
+  if ((snapshot.meta?.schemaVersion || 1) > 1) throw new Error('SNAPSHOT_VERSION_UNSUPPORTED');
+  const assertUnique = (items: Array<{ id?: string }>, name: string) => {
+    const ids = new Set<string>();
+    for (const item of items) {
+      if (!item?.id || ids.has(item.id)) throw new Error(`Invalid database.json: duplicate or empty ${name} id`);
+      ids.add(item.id);
+    }
+  };
+  assertUnique(snapshot.days, 'day');
+  assertUnique(snapshot.notebooks, 'notebook');
+  assertUnique(snapshot.pages, 'page');
+  assertUnique(snapshot.tags, 'tag');
+  assertUnique(snapshot.projects, 'project');
+  assertUnique(snapshot.workReports, 'work report');
+  assertUnique(snapshot.attachments, 'attachment');
+  const dayIds = new Set(snapshot.days.map((day) => day.id));
+  const notebookIds = new Set(snapshot.notebooks.map((notebook) => notebook.id));
+  const pageIds = new Set(snapshot.pages.map((page) => page.id));
+  for (const notebook of snapshot.notebooks) if (!dayIds.has(notebook.dateId)) throw new Error(`Invalid database.json: notebook ${notebook.id} references missing day`);
+  for (const page of snapshot.pages) if (!notebookIds.has(page.notebookId)) throw new Error(`Invalid database.json: page ${page.id} references missing notebook`);
+  for (const report of snapshot.workReports) if (!dayIds.has(report.dayId)) throw new Error(`Invalid database.json: report ${report.id} references missing day`);
+  for (const attachment of snapshot.attachments) if (!pageIds.has(attachment.pageId)) throw new Error(`Invalid database.json: attachment ${attachment.id} references missing page`);
+}
+
 function mergePendingLocal(remote: VaultSnapshot, local: VaultSnapshot, pendingOps: SyncOperation[]): VaultSnapshot {
   const merged: VaultSnapshot = {
     ...remote,
@@ -81,10 +133,11 @@ function mergePendingLocal(remote: VaultSnapshot, local: VaultSnapshot, pendingO
     tags: Array.isArray(remote.tags) ? [...remote.tags] : [],
     projects: Array.isArray(remote.projects) ? [...remote.projects] : [],
     workReports: Array.isArray(remote.workReports) ? [...remote.workReports] : [],
+    attachments: Array.isArray(remote.attachments) ? [...remote.attachments] : [],
   };
   const collections: Record<string, keyof VaultSnapshot> = {
     day: 'days', notebook: 'notebooks', page: 'pages', tag: 'tags',
-    project: 'projects', work_report: 'workReports',
+    project: 'projects', work_report: 'workReports', attachment: 'attachments',
   };
   const pending = new Map<string, SyncOperation>();
   for (const op of pendingOps) pending.set(`${op.entity}:${op.entityId}`, op);
@@ -109,6 +162,20 @@ function mergePendingLocal(remote: VaultSnapshot, local: VaultSnapshot, pendingO
     if (existingIndex >= 0) remoteItems[existingIndex] = localItem;
     else remoteItems.push(localItem);
     (merged as unknown as Record<string, Array<{ id: string }>>)[field] = remoteItems;
+  }
+
+  // Apply the same cascades as repository deletes so stale children from a
+  // remote snapshot cannot resurrect after an offline delete.
+  const deletedNotebookIds = new Set([...pending.values()].filter((op) => op.type === 'delete' && op.entity === 'notebook').map((op) => op.entityId));
+  if (deletedNotebookIds.size) {
+    merged.notebooks = merged.notebooks.filter((notebook) => !deletedNotebookIds.has(notebook.id));
+    merged.pages = merged.pages.filter((page) => !deletedNotebookIds.has(page.notebookId));
+    const removedPageIds = new Set(local.pages.filter((page) => deletedNotebookIds.has(page.notebookId)).map((page) => page.id));
+    merged.attachments = merged.attachments.filter((attachment) => !removedPageIds.has(attachment.pageId));
+  }
+  const deletedTagIds = new Set([...pending.values()].filter((op) => op.type === 'delete' && op.entity === 'tag').map((op) => op.entityId));
+  if (deletedTagIds.size) {
+    merged.pages = merged.pages.map((page) => ({ ...page, tagIds: (page.tagIds || []).filter((tagId) => !deletedTagIds.has(tagId)) }));
   }
   return merged;
 }
@@ -186,9 +253,7 @@ async function getCachedFileId(parentFolderId: string, fileName: string): Promis
  */
 export async function refreshActiveNotesStore(): Promise<void> {
   try {
-    const { useNotesStore } = await import('../../stores/notesStore');
-    const { useScheduleStore } = await import('../../stores/scheduleStore');
-    const { useWorkReportStore } = await import('../../stores/workReportStore');
+    const { useNotesStore, useScheduleStore, useWorkReportStore } = await import('../../stores/syncRefresh');
     const notesStore = useNotesStore.getState();
 
     await notesStore.loadDays();
@@ -255,6 +320,12 @@ export async function queueSync(
   };
 
   await db.syncQueue.put(op);
+
+  // Keep the unified search index fresh for domain collections whose mutations
+  // are represented by aggregate sync operations rather than page updates.
+  if (entity === 'project' || entity === 'schedule') {
+    void rebuildSearchIndex().catch(() => undefined);
+  }
 
   // ── SYNC GUARD: Do NOT push to cloud until initial pull finishes ──
   if (!initialPullComplete) {
@@ -357,6 +428,45 @@ export async function processGoogleSyncQueue(): Promise<void> {
 
     // Check pending operations to optimize sync
     const pendingOps = await db.syncQueue.where('status').equals('pending').toArray();
+    // Retry binary attachments that could not be uploaded while offline before
+    // publishing the next database snapshot. The JSON snapshot remains the
+    // source of truth and contains the resulting Drive file id.
+    const completedAttachmentOps = new Set<string>();
+    for (const op of pendingOps.filter((item) => item.entity === 'attachment' && item.type !== 'delete')) {
+      const attachment = await db.attachments.get(op.entityId);
+      if (!attachment?.dataUrl || attachment.driveFileId) {
+        completedAttachmentOps.add(op.id);
+        continue;
+      }
+      try {
+        const response = await fetch(attachment.dataUrl);
+        const driveFile = await uploadBinaryFile(attachment.name, await response.blob(), rootFolderId);
+        await db.attachments.put({ ...attachment, driveFileId: driveFile.id, updatedAt: nowISO() });
+        completedAttachmentOps.add(op.id);
+      } catch (error) {
+        console.warn('[Sync] Attachment upload deferred:', attachment.name, error);
+      }
+    }
+    for (const op of pendingOps.filter((item) => item.entity === 'attachment' && item.type === 'delete')) {
+      const attachment = await db.attachments.get(op.entityId);
+      // Permanent local deletion removes the IndexedDB row before the queue is
+      // drained. The queued payload therefore carries the last known Drive id.
+      let queuedAttachment: { driveFileId?: string; name?: string } | undefined;
+      if (op.data) {
+        try { queuedAttachment = JSON.parse(op.data) as { driveFileId?: string; name?: string }; } catch { /* ignore malformed legacy payload */ }
+      }
+      const driveFileId = attachment?.driveFileId || queuedAttachment?.driveFileId;
+      if (!driveFileId) {
+        completedAttachmentOps.add(op.id);
+        continue;
+      }
+      try {
+        await trashFile(driveFileId);
+        completedAttachmentOps.add(op.id);
+      } catch (error) {
+        console.warn('[Sync] Attachment delete deferred:', attachment?.name || queuedAttachment?.name || op.entityId, error);
+      }
+    }
     const updatedPageIds = new Set<string>();
     const deletedPageIds: string[] = [];
 
@@ -428,7 +538,9 @@ export async function processGoogleSyncQueue(): Promise<void> {
 
     // Clear only the operations included in this snapshot. Edits made while
     // the upload was in flight must remain queued for the next pass.
-    await Promise.all(pendingOps.map((op) => db.syncQueue.delete(op.id)));
+    await Promise.all(pendingOps
+      .filter((op) => op.entity !== 'attachment' || completedAttachmentOps.has(op.id))
+      .map((op) => db.syncQueue.delete(op.id)));
 
     lastSyncTime = nowISO();
     setStatus('saved');
@@ -585,19 +697,22 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
 
     updateRuntime({ cloudBootstrapStatus: 'downloading' });
     performanceMark('cloud-snapshot-download-start');
-    const remote = JSON.parse(await downloadFile(fileId)) as VaultSnapshot;
+    const remote = await parseSnapshotText(await downloadFile(fileId));
     performanceMark('cloud-snapshot-download-end');
     const remoteOwner = (remote as unknown as { meta?: { ownerEmail?: string } }).meta?.ownerEmail;
     const currentOwner = useAppStore.getState().user?.email;
     if (remoteOwner && currentOwner && remoteOwner.toLowerCase() !== currentOwner.toLowerCase()) {
       throw new Error('ACCOUNT_MISMATCH');
     }
-    if (!Array.isArray(remote.days) || !Array.isArray(remote.notebooks)) {
-      throw new Error('Invalid database.json snapshot');
-    }
-    if (!Array.isArray(remote.pages)) remote.pages = [];
-
     const local = await exportDatabase();
+    if (!Array.isArray(remote.tags)) remote.tags = [];
+    if (!Array.isArray(remote.projects)) remote.projects = [];
+    if (!Array.isArray(remote.workReports)) remote.workReports = [];
+    if (!Array.isArray(remote.pages)) remote.pages = [];
+    if (!Array.isArray(remote.attachments)) remote.attachments = local.attachments;
+    validateRemoteSnapshot(remote as VaultSnapshot & { meta?: { schemaVersion?: number } });
+
+    // Snapshots created before attachment support must not erase local files.
     const pending = await db.syncQueue.where('status').equals('pending').toArray();
     const merged = mergePendingLocal(remote, local, pending);
     updateRuntime({ cloudBootstrapStatus: 'applying', searchIndexStatus: 'building' });
@@ -631,175 +746,6 @@ export async function syncFromCloud(options?: { isConnectOrLogin?: boolean }): P
     } else {
       setStatus(isOnline() ? 'error' : 'offline', error instanceof Error ? error.message : 'Sync failed');
       updateRuntime({ cloudBootstrapStatus: isOnline() ? 'error' : 'offline', pushAllowed: false });
-    }
-  } finally {
-    syncInProgress = false;
-  }
-}
-
-export async function syncFromCloudLegacy(options?: { isConnectOrLogin?: boolean }): Promise<void> {
-  if (syncInProgress) return;
-
-  // On login or connect: wipe local cache first so no stale local data is pushed up
-  if (options?.isConnectOrLogin) {
-    try {
-      // Legacy entry point intentionally retains local data; callers use the
-      // local-first bootstrap above for all new sessions.
-    } catch (err) {
-      console.warn('[Sync] Failed to clear local cache before connect pull:', err);
-    }
-  } else {
-    // During active session: process pending local sync queue first
-    try {
-      const pendingCount = await db.syncQueue.where('status').equals('pending').count();
-      if (pendingCount > 0) {
-        await triggerSync();
-      }
-    } catch (err) {
-      console.warn('[Sync] Failed to process pending queue before pull:', err);
-    }
-  }
-
-  syncInProgress = true;
-  setStatus('syncing');
-
-  try {
-    const rootFolderId = await getRootFolderId();
-    if (!rootFolderId) {
-      setStatus('idle');
-      syncInProgress = false;
-      return;
-    }
-
-    // Download database.json
-    const dbFile = await findFileInFolder(rootFolderId, 'database.json');
-    if (!dbFile) {
-      console.log('[Sync] No database.json found on Drive. Starting fresh.');
-      setStatus('saved');
-      syncInProgress = false;
-      return;
-    }
-
-    const dbContent = await downloadFile(dbFile.id);
-    const dbData = JSON.parse(dbContent);
-
-    // 1. FAST PATH: Immediately render days, notebooks, and pages from database.json!
-    // This makes the UI populate in under 1 second instead of waiting 15-20 seconds.
-    const pagesMap = new Map<string, Page>();
-
-    if (dbData.pages && Array.isArray(dbData.pages)) {
-      dbData.pages.forEach((p: Page) => {
-        if (p && p.id) {
-          pagesMap.set(p.id, p);
-        }
-      });
-    }
-
-    // Immediately load database.json content to IndexedDB and refresh Store
-    await loadFromDatabase({
-      days: dbData.days || [],
-      notebooks: dbData.notebooks || [],
-      pages: Array.from(pagesMap.values()),
-      tags: dbData.tags || [],
-      projects: dbData.projects || [],
-      workReports: dbData.workReports || [],
-      scheduleBlocks: dbData.scheduleBlocks || [],
-      customTasks: dbData.customTasks || [],
-      workCategories: dbData.workCategories || [],
-    });
-
-    // Refresh UI immediately so user isn't stuck waiting
-    await refreshActiveNotesStore();
-
-    // 2. PARALLEL BACKGROUND PATH: Check pages/ folder for any extra/newer page files in parallel batches
-    const pagesFolder = await getCachedFileId(rootFolderId, 'pages');
-    if (pagesFolder) {
-      const pageFiles = await listFiles(pagesFolder);
-      const activePageIds = new Set(
-        dbData.pages?.filter((p: Page) => !p.deleted).map((p: Page) => p.id) || []
-      );
-
-      // Download page files in parallel batches of 5
-      const BATCH_SIZE = 5;
-      let hasUpdates = false;
-
-      for (let i = 0; i < pageFiles.length; i += BATCH_SIZE) {
-        const batch = pageFiles.slice(i, i + BATCH_SIZE);
-        await Promise.all(
-          batch.map(async (pf) => {
-            try {
-              const pageIdFromFilename = pf.name.replace('.json', '');
-              // If database.json had pages defined, but this file is NOT in activePageIds, it was deleted!
-              if (dbData.pages && !activePageIds.has(pageIdFromFilename)) {
-                // Silently trash orphaned deleted page from Drive
-                trashFile(pf.id).catch(() => {});
-                return;
-              }
-
-              const pageContent = await downloadFile(pf.id);
-              const pageData = JSON.parse(pageContent);
-              if (pageData && pageData.id) {
-                if (dbData.pages && !activePageIds.has(pageData.id)) {
-                  trashFile(pf.id).catch(() => {});
-                  return;
-                }
-                const existing = pagesMap.get(pageData.id);
-                pagesMap.set(pageData.id, {
-                  ...existing,
-                  ...pageData,
-                });
-                hasUpdates = true;
-              }
-            } catch (err) {
-              console.warn(`[Sync] Failed to load page ${pf.name}:`, err);
-            }
-          })
-        );
-      }
-
-      if (hasUpdates) {
-        const finalPages = Array.from(pagesMap.values());
-        await loadFromDatabase({
-          days: dbData.days || [],
-          notebooks: dbData.notebooks || [],
-          pages: finalPages,
-          tags: dbData.tags || [],
-          projects: dbData.projects || [],
-          workReports: dbData.workReports || [],
-          scheduleBlocks: dbData.scheduleBlocks || [],
-          customTasks: dbData.customTasks || [],
-          workCategories: dbData.workCategories || [],
-        });
-
-        // Final UI refresh
-        await refreshActiveNotesStore();
-      }
-    }
-
-    lastSyncTime = nowISO();
-    setStatus('saved');
-
-    // Refresh active notesStore state after cloud sync
-    await refreshActiveNotesStore();
-
-    // ── Mark initial pull as complete — push operations are now allowed ──
-    if (options?.isConnectOrLogin) {
-      initialPullComplete = true;
-      console.log('[Sync] Initial pull complete — push operations enabled.');
-    }
-  } catch (error) {
-    console.error('[Sync] Error syncing from cloud:', error);
-    if ((error as { status?: number })?.status === 401 || (error instanceof Error && error.message === 'AUTH_REQUIRED')) {
-      setStatus('auth_required', 'Phiên Google Drive cần được kết nối lại.');
-      if (options?.isConnectOrLogin) initialPullComplete = true;
-      return;
-    }
-    setStatus('error', error instanceof Error ? error.message : 'Sync failed');
-
-    // Even on error, allow push after login attempt so app is usable
-    if (options?.isConnectOrLogin) {
-      initialPullComplete = true;
-      console.warn('[Sync] Initial pull failed but enabling push to avoid deadlock.');
     }
   } finally {
     syncInProgress = false;

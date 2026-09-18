@@ -3,6 +3,7 @@ import { Archive, Check, FolderKanban, Pencil, Plus, RotateCcw, Trash2, X } from
 import { useWorkReportStore } from '../../stores/workReportStore';
 import { useAppStore } from '../../stores/appStore';
 import { getAllWorkReports } from '../../services/database/repository';
+import { DialogShell } from '../common/DialogShell';
 
 export function ProjectManagerModal({ isOpen, onClose }: { isOpen: boolean; onClose: () => void }) {
   const {
@@ -101,15 +102,13 @@ export function ProjectManagerModal({ isOpen, onClose }: { isOpen: boolean; onCl
   );
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-sm" onClick={onClose}>
-      <div className="w-full max-w-xl max-h-[85vh] overflow-hidden rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-2xl" onClick={(event) => event.stopPropagation()}>
+    <DialogShell open={isOpen} onClose={onClose} ariaLabel="Quản lý dự án" className="w-full max-w-xl max-h-[85vh] overflow-hidden rounded-2xl bg-[var(--color-bg-secondary)] border border-[var(--color-border)] shadow-2xl">
         <div className="flex items-center justify-between px-5 py-4 border-b border-[var(--color-border)]"><div className="flex items-center gap-2"><FolderKanban className="w-5 h-5 text-cyan-400" /><h2 className="text-base font-semibold">Quản lý dự án</h2></div><button type="button" onClick={onClose} className="p-1 cursor-pointer"><X className="w-5 h-5" /></button></div>
         <div className="p-5 space-y-4 overflow-y-auto max-h-[calc(85vh-65px)]">
           <div className="space-y-2"><div className="flex gap-2"><input value={newName} onChange={(event) => setNewName(event.target.value)} onKeyDown={(event) => { if (event.key === 'Enter') handleCreate(); }} placeholder="Tên dự án mới" className="flex-1 rounded-lg px-3 py-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] outline-none text-sm" /><button type="button" onClick={handleCreate} className="px-3 rounded-lg bg-cyan-600 text-white flex items-center gap-1 cursor-pointer"><Plus className="w-4 h-4" /> Thêm</button></div><input value={newDescription} onChange={(event) => setNewDescription(event.target.value)} placeholder="Mô tả (không bắt buộc)" className="w-full rounded-lg px-3 py-2 bg-[var(--color-bg-tertiary)] border border-[var(--color-border)] outline-none text-xs" /></div>
           <div className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-tertiary)' }}>Đang hoạt động ({sortedProjects.length})</h3>{sortedProjects.map((project) => renderProject(project))}{sortedProjects.length === 0 && <p className="text-xs py-4 text-center" style={{ color: 'var(--color-text-tertiary)' }}>Chưa có dự án.</p>}</div>
           {sortedArchived.length > 0 && <div className="space-y-2"><h3 className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-tertiary)' }}>Đã xóa ({sortedArchived.length})</h3>{sortedArchived.map((project) => renderProject(project, true))}</div>}
         </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

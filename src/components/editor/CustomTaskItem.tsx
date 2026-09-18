@@ -103,12 +103,12 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
           className={`p-1 rounded-lg transition-all cursor-pointer flex items-center gap-1 text-[11px] font-semibold border ${
             dueDate
               ? 'bg-purple-950/80 border-purple-500/50 text-purple-300 hover:bg-purple-900/80 shadow-sm'
-              : 'bg-slate-900/80 border-slate-800 text-slate-400 opacity-60 group-hover:opacity-100 hover:text-purple-300 hover:border-purple-500/40'
+              : 'bg-slate-900/80 border-slate-800 text-slate-400 opacity-90 hover:text-purple-300 hover:border-purple-500/40'
           }`}
           title="Cài đặt deadline cho task này"
         >
           <Calendar className="w-3.5 h-3.5 text-purple-400" />
-          {!dueDate && <span className="text-[10px] hidden group-hover:inline">Set Due</span>}
+          {!dueDate && <span className="text-[10px]">Đặt hạn</span>}
         </button>
 
         {/* Popover Menu */}
@@ -121,7 +121,7 @@ export function CustomTaskItemComponent({ node, updateAttributes }: NodeViewProp
             <div className="flex items-center justify-between text-[11px] font-bold text-purple-300 border-b border-purple-500/20 pb-1.5">
               <span className="flex items-center gap-1">
                 <Calendar className="w-3.5 h-3.5 text-purple-400" />
-                Chọn thời hạn (Deadline)
+                Chọn thời hạn
               </span>
               <button
                 type="button"

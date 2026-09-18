@@ -62,7 +62,7 @@ export function loadGISScript(): Promise<void> {
  * Initialize Google Auth — loads scripts and creates token client.
  */
 export async function initGoogleAuth(): Promise<void> {
-  // Drive requests use authenticated fetch; do not load the unused GAPI
+  // Drive requests use authenticated fetch; only the token client is needed.
   // client on the startup critical path.
   await loadGISScript();
 

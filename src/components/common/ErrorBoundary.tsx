@@ -41,10 +41,10 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-8 h-8" style={{ color: 'var(--color-error)' }} />
             </div>
             <h1 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>
-              Something went wrong
+              Đã xảy ra lỗi
             </h1>
             <p className="text-sm mb-6" style={{ color: 'var(--color-text-secondary)' }}>
-              {this.state.error?.message || 'An unexpected error occurred.'}
+              {this.state.error?.message || 'Ứng dụng gặp lỗi không mong muốn.'}
             </p>
             <button
               onClick={this.handleReload}
@@ -52,7 +52,7 @@ export class ErrorBoundary extends Component<Props, State> {
               style={{ background: 'var(--color-accent)', color: '#fff' }}
             >
               <RefreshCw className="w-4 h-4" />
-              Reload App
+              Tải lại ứng dụng
             </button>
           </div>
         </div>

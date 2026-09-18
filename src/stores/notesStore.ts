@@ -47,12 +47,14 @@ interface NotesState {
   // Actions — CRUD
   createNotebook: (title: string, dayId?: string) => Promise<Notebook>;
   updateNotebook: (id: string, updates: Partial<Pick<Notebook, 'title' | 'icon'>>) => Promise<void>;
+  setNotebookPinned: (id: string, isPinned: boolean) => Promise<void>;
   deleteNotebook: (id: string) => Promise<void>;
   duplicateNotebook: (id: string) => Promise<void>;
 
   createPage: (notebookId: string, title?: string) => Promise<Page>;
   updatePageContent: (pageId: string, content: string) => Promise<void>;
   updatePageTitle: (pageId: string, title: string) => Promise<void>;
+  setPagePinned: (pageId: string, isPinned: boolean) => Promise<void>;
   deletePage: (pageId: string) => Promise<void>;
   restorePage: (pageId: string) => Promise<void>;
   permanentlyDeletePage: (pageId: string) => Promise<void>;
@@ -257,6 +259,14 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     await get().loadRecentNotebooks();
   },
 
+  setNotebookPinned: async (id, isPinned) => {
+    const updated = await repo.setNotebookPinned(id, isPinned);
+    if (!updated) return;
+    set((s) => ({ notebooks: s.notebooks.map((nb) => nb.id === id ? updated : nb) }));
+    if (get().selectedDayId) await get().loadNotebooksByDay(get().selectedDayId!);
+    await get().loadRecentNotebooks();
+  },
+
   deleteNotebook: async (id) => {
     const { selectedNotebookId, selectedDayId } = get();
     await repo.deleteNotebook(id);
@@ -283,7 +293,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   // ── CRUD — Pages ──
 
-  createPage: async (notebookId, title = 'Untitled') => {
+  createPage: async (notebookId, title = 'Chưa có tiêu đề') => {
     const page = await repo.createPage(notebookId, title);
     await get().loadPagesByNotebook(notebookId);
     set({ selectedPageId: page.id });
@@ -365,6 +375,13 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   reorderPages: async (notebookId, pageIds) => {
     await repo.reorderPages(notebookId, pageIds);
     await get().loadPagesByNotebook(notebookId);
+  },
+
+  setPagePinned: async (pageId, isPinned) => {
+    const updated = await repo.setPagePinned(pageId, isPinned);
+    if (!updated) return;
+    set((s) => ({ pages: s.pages.map((p) => p.id === pageId ? updated : p) }));
+    if (get().selectedNotebookId) await get().loadPagesByNotebook(get().selectedNotebookId!);
   },
 
   clearPageSelection: () => set({ selectedNotebookId: null, selectedPageId: null, pages: [] }),

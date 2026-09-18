@@ -107,7 +107,7 @@ export function FilterResultListView() {
 
                     {customTask && (
                       <span className="px-2 py-0.5 rounded-md bg-purple-950/40 text-purple-300 border border-purple-500/30 flex items-center gap-1 text-[10px]">
-                        <CheckCircle2 className="w-3 h-3 text-purple-400" /> Task: {customTask.title}
+                        <CheckCircle2 className="w-3 h-3 text-purple-400" /> Công việc: {customTask.title}
                       </span>
                     )}
 

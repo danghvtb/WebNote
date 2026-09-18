@@ -6,9 +6,6 @@
 import { useState } from 'react';
 import { Brain, Cloud, Shield, Zap } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
-import { initGoogleAuth, signIn, fetchUserProfile } from '../../services/google/auth';
-import { ensureRootFolder } from '../../services/google/rootFolderManager';
-import { syncFromCloud } from '../../services/sync/syncManager';
 import { useNotesStore } from '../../stores/notesStore';
 
 export function LoginPage() {
@@ -25,25 +22,30 @@ export function LoginPage() {
 
     try {
       // Reset sync guard for fresh login
-      const { resetInitialPullState } = await import('../../services/sync/syncManager');
+      const { resetInitialPullState } = await import('../../services/sync/syncBootstrap');
       resetInitialPullState();
 
       // Step 1: Initialize Google Auth
-      setStep('Initializing...');
-      await initGoogleAuth();
+      setStep('Đang khởi tạo...');
+      const auth = await import('../../services/google/auth');
+      await auth.initGoogleAuth();
 
       // Step 2: Sign in
-      setStep('Signing in with Google...');
-      const accessToken = await signIn();
+      setStep('Đang đăng nhập Google...');
+      const accessToken = await auth.signIn();
 
       // Step 3: Get user profile
-      setStep('Getting your profile...');
-      const user = await fetchUserProfile(accessToken);
-      const { getVaultOwnerEmail, clearAllLocalData } = await import('../../services/database/repository');
+      setStep('Đang tải hồ sơ...');
+      const user = await auth.fetchUserProfile(accessToken);
+      const { getVaultOwnerEmail, clearAllLocalData } = await import('../../services/database/repositoryBootstrap');
       const previousOwner = await getVaultOwnerEmail();
       if (previousOwner && previousOwner.toLowerCase() !== user.email.toLowerCase()) {
         // The user explicitly chose a different Google account. Never expose
         // or upload the previous account's cache to this account.
+        const confirmed = typeof window === 'undefined' || window.confirm(
+          `Tài khoản hiện tại khác tài khoản đang giữ dữ liệu cục bộ (${previousOwner}). Dữ liệu cục bộ sẽ được xóa trước khi tải vault của ${user.email}. Bạn có muốn tiếp tục không?`
+        );
+        if (!confirmed) throw new Error('Đã hủy đổi tài khoản để bảo toàn dữ liệu cục bộ.');
         await clearAllLocalData();
       }
       localStorage.setItem('mynotes_cloud_bootstrap_pending', '1');
@@ -56,12 +58,14 @@ export function LoginPage() {
       setNeedsFolderCreation(false);
 
       // Step 4: Find or detect root folder
-      setStep('Looking for MyNotes folder...');
+      setStep('Đang tìm thư mục MyNotes...');
+      const { ensureRootFolder } = await import('../../services/google/rootFolderManager');
       const result = await ensureRootFolder();
 
       if (result.status === 'found') {
         setRootFolderId(result.folderId);
-        setStep('Downloading your notes from Google Drive...');
+        setStep('Đang tải ghi chú từ Google Drive...');
+        const { syncFromCloud } = await import('../../services/sync/syncBootstrap');
         await syncFromCloud({ isConnectOrLogin: true });
 
         // Sync complete — mark as ready
@@ -70,7 +74,7 @@ export function LoginPage() {
         setInitialized(true);
       } else if (result.status === 'not_found') {
         // Need to ask user to create folder — no cloud data to pull
-        const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+        const { markInitialPullComplete } = await import('../../services/sync/syncBootstrap');
         markInitialPullComplete();
         setInitialSyncComplete(true);
         setNeedsFolderCreation(true);
@@ -80,7 +84,8 @@ export function LoginPage() {
         const best = result.folders.find((f) => f.hasDatabase) || result.folders[0];
         setRootFolderId(best.id);
 
-        setStep('Downloading your notes from Google Drive...');
+        setStep('Đang tải ghi chú từ Google Drive...');
+        const { syncFromCloud } = await import('../../services/sync/syncBootstrap');
         await syncFromCloud({ isConnectOrLogin: true });
 
         setInitialSyncComplete(true);
@@ -89,12 +94,12 @@ export function LoginPage() {
       } else if (result.status === 'error') {
         setError(result.error);
         // Allow push on error so app isn't stuck
-        const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+        const { markInitialPullComplete } = await import('../../services/sync/syncBootstrap');
         markInitialPullComplete();
         setInitialSyncComplete(true);
       }
     } catch (err) {
-      const msg = err instanceof Error ? err.message : 'Login failed';
+      const msg = err instanceof Error ? err.message : 'Đăng nhập thất bại';
       setError(msg);
       console.error('[Login]', err);
       // Ensure app isn't stuck if login fails
@@ -113,16 +118,16 @@ export function LoginPage() {
           <div className="inline-flex items-center justify-center w-16 h-16 rounded-2xl mb-6" style={{ background: 'var(--color-accent-dim)' }}>
             <Brain className="w-8 h-8" style={{ color: 'var(--color-accent)' }} />
           </div>
-          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>MyNotes</h1>
-          <p className="text-base" style={{ color: 'var(--color-text-secondary)' }}>Personal Knowledge Base</p>
+          <h1 className="text-3xl font-bold mb-2" style={{ color: 'var(--color-text-primary)' }}>WebNote</h1>
+          <p className="text-base" style={{ color: 'var(--color-text-secondary)' }}>Kho tri thức cá nhân</p>
         </div>
 
         {/* Features */}
         <div className="grid grid-cols-3 gap-4 mb-10">
           {[
-            { icon: Cloud, label: 'Google Drive', desc: 'Cloud sync' },
-            { icon: Shield, label: 'Your data', desc: 'Private & secure' },
-            { icon: Zap, label: 'Offline-first', desc: 'Always available' },
+            { icon: Cloud, label: 'Google Drive', desc: 'Đồng bộ đám mây' },
+            { icon: Shield, label: 'Dữ liệu của bạn', desc: 'Riêng tư & an toàn' },
+            { icon: Zap, label: 'Offline-first', desc: 'Luôn sẵn sàng' },
           ].map((feature) => (
             <div
               key={feature.label}
@@ -151,7 +156,7 @@ export function LoginPage() {
           {loading ? (
             <>
               <div className="w-5 h-5 border-2 rounded-full animate-spin" style={{ borderColor: 'var(--color-text-tertiary)', borderTopColor: 'var(--color-text-primary)' }} />
-              <span>{step || 'Please wait...'}</span>
+              <span>{step || 'Vui lòng chờ…'}</span>
             </>
           ) : (
             <>
@@ -161,7 +166,7 @@ export function LoginPage() {
                 <path fill="#FBBC05" d="M5.84 14.09c-.22-.66-.35-1.36-.35-2.09s.13-1.43.35-2.09V7.07H2.18C1.43 8.55 1 10.22 1 12s.43 3.45 1.18 4.93l2.85-2.22.81-.62z" />
                 <path fill="#EA4335" d="M12 5.38c1.62 0 3.06.56 4.21 1.64l3.15-3.15C17.45 2.09 14.97 1 12 1 7.7 1 3.99 3.47 2.18 7.07l3.66 2.84c.87-2.6 3.3-4.53 6.16-4.53z" />
               </svg>
-              <span>Continue with Google</span>
+              <span>Tiếp tục với Google</span>
             </>
           )}
         </button>
@@ -171,7 +176,7 @@ export function LoginPage() {
           onClick={async () => {
             // Offline mode — bypass sync guard entirely
             localStorage.removeItem('mynotes_cloud_bootstrap_pending');
-            const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+            const { markInitialPullComplete } = await import('../../services/sync/syncBootstrap');
             markInitialPullComplete();
             setInitialSyncComplete(true);
             setAuth(
@@ -191,7 +196,7 @@ export function LoginPage() {
             background: 'var(--color-bg-tertiary)',
           }}
         >
-          <span>🚀 Explore in Offline Demo Mode</span>
+          <span>🚀 Khám phá Chế độ Ngoại tuyến</span>
         </button>
 
         {/* Error Message & Friendly Offline Guidance */}
@@ -206,7 +211,7 @@ export function LoginPage() {
               onClick={async () => {
                 // Offline mode — bypass sync guard entirely
                 localStorage.removeItem('mynotes_cloud_bootstrap_pending');
-                const { markInitialPullComplete } = await import('../../services/sync/syncManager');
+                const { markInitialPullComplete } = await import('../../services/sync/syncBootstrap');
                 markInitialPullComplete();
                 setInitialSyncComplete(true);
                 setAuth(
@@ -228,9 +233,9 @@ export function LoginPage() {
 
         {/* Footer */}
         <p className="text-center text-xs mt-8" style={{ color: 'var(--color-text-tertiary)' }}>
-          Your notes are stored securely in your own Google Drive.
+          Ghi chú được lưu an toàn trong Google Drive của bạn.
           <br />
-          No data is stored on our servers.
+          Dữ liệu không được lưu trên máy chủ của chúng tôi.
         </p>
       </div>
     </div>

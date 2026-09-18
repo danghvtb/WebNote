@@ -1,0 +1,29 @@
+name: Browser E2E
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  browser-e2e:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npm install --no-save playwright @axe-core/playwright
+      - run: npx playwright install --with-deps chromium
+      - run: npm run build
+      - run: node scripts/browser-e2e.mjs
+      - run: node scripts/browser-performance.mjs | tee browser-performance.json
+      - name: Upload browser performance metrics
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-performance
+          path: browser-performance.json

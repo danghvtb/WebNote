@@ -18,6 +18,7 @@ import type {
   Tag,
   Project,
   WorkReport,
+  Attachment,
 } from '../../types';
 
 export class MyNotesDB extends Dexie {
@@ -34,6 +35,7 @@ export class MyNotesDB extends Dexie {
   tags!: Table<Tag, string>;
   projects!: Table<Project, string>;
   workReports!: Table<WorkReport, string>;
+  attachments!: Table<Attachment, string>;
 
   constructor() {
     super('MyNotesDB');
@@ -91,6 +93,30 @@ export class MyNotesDB extends Dexie {
         if (typeof report.nextWork !== 'string') report.nextWork = '';
       });
     });
+
+    this.version(6).stores({
+      notebooks: 'id, dateId, title, updatedAt, deleted, isPinned, deletedAt',
+      pages: 'id, notebookId, title, order, updatedAt, deleted, isPinned, deletedAt, *tagIds',
+      revisions: 'id, pageId, createdAt',
+    }).upgrade(async (tx) => {
+      await tx.table('notebooks').toCollection().modify((notebook: Notebook) => {
+        if (typeof notebook.isPinned !== 'boolean') notebook.isPinned = false;
+        if (notebook.deleted && !notebook.deletedAt) notebook.deletedAt = notebook.updatedAt || new Date().toISOString();
+      });
+      await tx.table('pages').toCollection().modify((page: Page) => {
+        if (typeof page.isPinned !== 'boolean') page.isPinned = false;
+        if (page.deleted && !page.deletedAt) page.deletedAt = page.updatedAt || new Date().toISOString();
+      });
+    });
+
+    this.version(7).stores({
+      attachments: 'id, pageId, createdAt, updatedAt, deletedAt',
+    }).upgrade(async (tx) => {
+      await tx.table('attachments').toCollection().modify((attachment: Partial<Attachment>) => {
+        if (!attachment.createdAt) attachment.createdAt = new Date().toISOString();
+        if (!attachment.updatedAt) attachment.updatedAt = attachment.createdAt;
+      });
+    });
   }
 }
 
@@ -103,7 +129,7 @@ export const db = new MyNotesDB();
 export async function clearDatabase(): Promise<void> {
   await db.transaction(
     'rw',
-    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.appState, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports],
+    [db.days, db.notebooks, db.pages, db.revisions, db.syncQueue, db.appState, db.searchIndex, db.scheduleBlocks, db.customTasks, db.workCategories, db.tags, db.projects, db.workReports, db.attachments],
     async () => {
       await db.days.clear();
       await db.notebooks.clear();
@@ -118,8 +144,21 @@ export async function clearDatabase(): Promise<void> {
       await db.tags.clear();
       await db.projects.clear();
       await db.workReports.clear();
+      await db.attachments.clear();
     }
   );
+  // IndexedDB is the vault; remove user-scoped browser preferences as part of
+  // an explicit "xóa dữ liệu local" action as well. Authentication/session
+  // keys are owned by the auth layer and are intentionally left untouched.
+  if (typeof localStorage !== 'undefined') {
+    [
+      'mynotes_theme',
+      'mynotes_report_templates',
+      'mynotes_recent_searches',
+      'mynotes_notifications_enabled',
+      'mynotes_notification_sound_enabled',
+    ].forEach((key) => localStorage.removeItem(key));
+  }
 }
 
 /**

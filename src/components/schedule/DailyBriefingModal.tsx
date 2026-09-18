@@ -3,6 +3,7 @@
 // Displays morning inspiration & AI-synthesized schedule plan
 // ============================================================
 
+/* oxlint-disable react(set-state-in-effect) -- modal open starts an async briefing request. */
 import { useEffect, useState } from 'react';
 import { Sun, Sparkles, X, ShieldCheck } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
@@ -10,6 +11,8 @@ import { generateDailyBriefing } from '../../services/ai/geminiService';
 import { getAllVaultPages, getAllVaultNotebooks } from '../../services/database/repository';
 import { parseAllTasks } from '../../utils/taskUtils';
 import { todayDate } from '../../utils';
+import { sanitizeAIHtml } from '../../services/ai/sanitize';
+import { DialogShell } from '../common/DialogShell';
 
 export function DailyBriefingModal() {
   const { dailyBriefingOpen, setDailyBriefingOpen, blocks, selectedDate } = useScheduleStore();
@@ -18,12 +21,15 @@ export function DailyBriefingModal() {
 
   useEffect(() => {
     if (dailyBriefingOpen) {
+      // Start the async briefing request when the modal opens.
+      // oxlint-disable-next-line react(set-state-in-effect)
       setLoading(true);
       Promise.all([getAllVaultPages(), getAllVaultNotebooks()]).then(([pages, notebooks]) => {
         const tasks = parseAllTasks(pages, notebooks, true);
         const todayBlocks = blocks.filter((b) => b.date === (selectedDate || todayDate()));
 
         generateDailyBriefing(selectedDate || todayDate(), todayBlocks, tasks.length).then((html) => {
+          // oxlint-disable-next-line react(set-state-in-effect)
           setBriefingHtml(html);
           setLoading(false);
         });
@@ -34,8 +40,7 @@ export function DailyBriefingModal() {
   if (!dailyBriefingOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-md animate-in fade-in duration-200">
-      <div className="relative w-full max-w-lg bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden">
+    <DialogShell open={dailyBriefingOpen} onClose={() => setDailyBriefingOpen(false)} ariaLabel="Tổng quan ngày" className="w-full max-w-lg bg-gradient-to-b from-slate-900 via-slate-900 to-slate-950 border border-purple-500/30 rounded-2xl shadow-2xl overflow-hidden">
         {/* Decorative Top Glow */}
         <div className="absolute top-0 inset-x-0 h-1 bg-gradient-to-r from-amber-400 via-purple-500 to-cyan-400" />
 
@@ -47,14 +52,15 @@ export function DailyBriefingModal() {
             </div>
             <div>
               <h3 className="text-base font-bold text-slate-100 flex items-center gap-1.5">
-                Daily Briefing <Sparkles className="w-4 h-4 text-purple-400" />
+                Tổng quan ngày <Sparkles className="w-4 h-4 text-purple-400" />
               </h3>
               <p className="text-[11px] text-slate-400">Tổng quan kế hoạch & năng lượng chào ngày mới</p>
             </div>
           </div>
           <button
             onClick={() => setDailyBriefingOpen(false)}
-            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="touch-target p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            aria-label="Đóng tổng quan ngày"
           >
             <X className="w-5 h-5" />
           </button>
@@ -70,24 +76,23 @@ export function DailyBriefingModal() {
           ) : (
             <div
               className="prose prose-invert prose-xs max-w-none space-y-3"
-              dangerouslySetInnerHTML={{ __html: briefingHtml }}
+              dangerouslySetInnerHTML={{ __html: sanitizeAIHtml(briefingHtml) }}
             />
           )}
         </div>
 
         {/* Footer */}
         <div className="flex items-center justify-between px-6 py-3.5 border-t border-slate-800/80 bg-slate-900/60">
-          <span className="text-[11px] text-slate-500 flex items-center gap-1">
-            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> WebNote AI Powered
+            <span className="text-[11px] text-slate-500 flex items-center gap-1">
+            <ShieldCheck className="w-3.5 h-3.5 text-emerald-400" /> WebNote hỗ trợ AI
           </span>
           <button
             onClick={() => setDailyBriefingOpen(false)}
-            className="px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-purple-600/20 transition-all"
+            className="touch-target px-5 py-2 text-xs font-bold text-white bg-gradient-to-r from-purple-600 to-indigo-600 hover:from-purple-500 hover:to-indigo-500 rounded-xl shadow-lg shadow-purple-600/20 transition-all"
           >
             Bắt Đầu Ngày Làm Việc 🚀
           </button>
         </div>
-      </div>
-    </div>
+    </DialogShell>
   );
 }

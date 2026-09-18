@@ -1,3 +1,4 @@
+/* oxlint-disable react(set-state-in-effect, react-hooks(exhaustive-deps)) -- keyboard menu listener follows open state. */
 import React, { useEffect, useState, useRef } from 'react';
 import { Editor } from '@tiptap/react';
 import {
@@ -37,38 +38,38 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI, onToggleTranslate
   const menuItems: MenuItem[] = [
     {
       icon: <Heading1 className="w-4 h-4 text-purple-400" />,
-      label: 'Heading 1',
-      description: 'Large section heading',
+      label: 'Tiêu đề 1',
+      description: 'Tiêu đề phần lớn',
       command: (ed) => ed.chain().focus().toggleHeading({ level: 1 }).run(),
     },
     {
       icon: <Heading2 className="w-4 h-4 text-purple-400" />,
-      label: 'Heading 2',
-      description: 'Medium section heading',
+      label: 'Tiêu đề 2',
+      description: 'Tiêu đề phần vừa',
       command: (ed) => ed.chain().focus().toggleHeading({ level: 2 }).run(),
     },
     {
       icon: <Heading3 className="w-4 h-4 text-purple-400" />,
-      label: 'Heading 3',
-      description: 'Small section heading',
+      label: 'Tiêu đề 3',
+      description: 'Tiêu đề phần nhỏ',
       command: (ed) => ed.chain().focus().toggleHeading({ level: 3 }).run(),
     },
     {
       icon: <List className="w-4 h-4 text-purple-400" />,
-      label: 'Bullet List',
-      description: 'Create a simple bulleted list',
+      label: 'Danh sách dấu đầu dòng',
+      description: 'Tạo danh sách đơn giản',
       command: (ed) => ed.chain().focus().toggleBulletList().run(),
     },
     {
       icon: <CheckSquare className="w-4 h-4 text-purple-400" />,
-      label: 'Task List',
-      description: 'Track tasks with checkboxes',
+      label: 'Danh sách công việc',
+      description: 'Theo dõi việc bằng ô chọn',
       command: (ed) => ed.chain().focus().toggleTaskList().run(),
     },
     {
       icon: <Calendar className="w-4 h-4 text-rose-400" />,
-      label: 'Task with Deadline',
-      description: 'Insert task with @today deadline tag',
+      label: 'Công việc có hạn',
+      description: 'Chèn việc với thời hạn @today',
       command: (ed) => {
         const d = new Date();
         d.setHours(18, 0, 0, 0);
@@ -81,32 +82,32 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI, onToggleTranslate
     },
     {
       icon: <Code className="w-4 h-4 text-purple-400" />,
-      label: 'Code Block',
-      description: 'Code snippet with syntax highlighting',
+      label: 'Khối mã',
+      description: 'Đoạn mã có tô màu cú pháp',
       command: (ed) => ed.chain().focus().toggleCodeBlock().run(),
     },
     {
       icon: <Quote className="w-4 h-4 text-purple-400" />,
-      label: 'Quote',
-      description: 'Capture a blockquote',
+      label: 'Trích dẫn',
+      description: 'Chèn một khối trích dẫn',
       command: (ed) => ed.chain().focus().toggleBlockquote().run(),
     },
     {
       icon: <TableIcon className="w-4 h-4 text-purple-400" />,
-      label: 'Table',
-      description: 'Insert a 3x3 table',
+      label: 'Bảng',
+      description: 'Chèn bảng 3x3',
       command: (ed) => ed.chain().focus().insertTable({ rows: 3, cols: 3, withHeaderRow: true }).run(),
     },
     {
       icon: <Minus className="w-4 h-4 text-purple-400" />,
-      label: 'Divider',
-      description: 'Visually separate content',
+      label: 'Đường phân cách',
+      description: 'Phân tách nội dung trực quan',
       command: (ed) => ed.chain().focus().setHorizontalRule().run(),
     },
     {
       icon: <Sparkles className="w-4 h-4 text-yellow-400" />,
-      label: 'AI Copilot',
-      description: 'Generate, summarize, or polish text',
+      label: 'Trợ lý AI',
+      description: 'Tạo, tóm tắt hoặc trau chuốt văn bản',
       command: () => onOpenAI(),
     },
     {
@@ -118,6 +119,9 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI, onToggleTranslate
   ];
 
   useEffect(() => {
+    // Reset selection when the command menu opens or its query changes.
+    // oxlint-disable-next-line react(set-state-in-effect)
+    // oxlint-disable-next-line react(set-state-in-effect)
     setSelectedIndex(0);
   }, [isOpen]);
 
@@ -155,6 +159,10 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI, onToggleTranslate
 
     window.addEventListener('keydown', handleKeyDown);
     return () => window.removeEventListener('keydown', handleKeyDown);
+  // The menu is intentionally recreated from editor callbacks; handlers are
+  // event-scoped and do not need to restart the listener on every render.
+  // oxlint-disable-next-line react-hooks(exhaustive-deps)
+  // oxlint-disable-next-line react-hooks(exhaustive-deps)
   }, [isOpen, selectedIndex, menuItems]);
 
   if (!isOpen) return null;
@@ -168,8 +176,8 @@ export function SlashMenu({ editor, isOpen, onClose, onOpenAI, onToggleTranslate
       }}
     >
       <div className="px-2 py-1.5 text-[10px] uppercase tracking-wider font-semibold text-purple-400/80 border-b border-purple-500/10 mb-1 flex items-center justify-between">
-        <span>Slash Commands Menu</span>
-        <span className="text-slate-500">Esc to exit</span>
+        <span>Menu lệnh nhanh</span>
+        <span className="text-slate-500">Esc để đóng</span>
       </div>
       {menuItems.map((item, idx) => (
         <button

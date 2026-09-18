@@ -1,0 +1,19 @@
+{
+  "name": "WebNote — Sổ ghi chú cá nhân",
+  "short_name": "WebNote",
+  "description": "Ghi chú, báo cáo công việc và lịch biểu cá nhân.",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "background_color": "#090D16",
+  "theme_color": "#090D16",
+  "lang": "vi",
+  "icons": [
+    {
+      "src": "./favicon.svg",
+      "sizes": "any",
+      "type": "image/svg+xml",
+      "purpose": "any maskable"
+    }
+  ]
+}

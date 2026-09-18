@@ -16,6 +16,8 @@ export function useKeyboardShortcuts() {
     if (!isLoggedIn) return;
 
     const handleKeyDown = (e: KeyboardEvent) => {
+      const target = e.target as HTMLElement | null;
+      if (target?.matches('input, textarea, select, [contenteditable="true"]')) return;
       const isCtrl = e.ctrlKey || e.metaKey;
 
       // Ctrl+K — Search
@@ -36,7 +38,7 @@ export function useKeyboardShortcuts() {
       if (isCtrl && e.shiftKey && e.key === 'N') {
         e.preventDefault();
         if (selectedNotebookId) {
-          createPage(selectedNotebookId, 'Untitled');
+      createPage(selectedNotebookId, 'Chưa có tiêu đề');
         }
         return;
       }

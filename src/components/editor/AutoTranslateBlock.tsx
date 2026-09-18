@@ -3,6 +3,7 @@
 // Real-time translation as you type ("Viết đến đâu dịch đến đấy")
 // ============================================================
 
+/* oxlint-disable react(set-state-in-effect) -- source changes reset async translation state. */
 import { useState, useEffect, useRef } from 'react';
 import { Languages, ArrowRightLeft, Copy, Check, ArrowDown, RefreshCw, Pause, Play, X, Sparkles } from 'lucide-react';
 import { translateLiveText } from '../../services/ai/geminiService';
@@ -69,7 +70,10 @@ export function AutoTranslateBlock({
 
     const plainText = getCleanText(noteContent).trim();
     if (!plainText) {
+      // Reset derived translation state when the source changes.
+      // oxlint-disable-next-line react(set-state-in-effect)
       setTranslatedText('');
+      // oxlint-disable-next-line react(set-state-in-effect)
       setIsLoading(false);
       return;
     }

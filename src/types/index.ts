@@ -18,6 +18,8 @@ export interface Notebook {
   updatedAt: string; // ISO 8601
   pageIds: string[]; // Ordered list of Page IDs
   deleted?: boolean; // Soft delete flag
+  deletedAt?: string;
+  isPinned?: boolean;
 }
 
 export interface Page {
@@ -30,6 +32,8 @@ export interface Page {
   updatedAt: string;   // ISO 8601
   tagIds: string[];    // References to Tag.id
   deleted?: boolean;   // Soft delete flag
+  deletedAt?: string;
+  isPinned?: boolean;
 }
 
 export interface Tag {
@@ -78,6 +82,19 @@ export interface Revision {
   deviceId: string;
 }
 
+export interface Attachment {
+  id: string;
+  pageId: string;
+  name: string;
+  mimeType: string;
+  size: number;
+  dataUrl?: string;
+  driveFileId?: string;
+  createdAt: string;
+  updatedAt: string;
+  deletedAt?: string;
+}
+
 // --- Database Types ---
 
 export interface Database {
@@ -89,6 +106,7 @@ export interface Database {
   tags?: Tag[];
   projects?: Project[];
   workReports?: WorkReport[];
+  attachments?: Attachment[];
   settings: AppSettings;
 }
 
@@ -98,6 +116,15 @@ export interface AppSettings {
   editorLineHeight: number;
   codeTheme: string;
   lastSyncedAt?: string;
+  notificationsEnabled?: boolean;
+  notificationSoundEnabled?: boolean;
+  reportTemplates?: Array<{
+    id: string;
+    name: string;
+    issue: string;
+    solution: string;
+    nextWork: string;
+  }>;
 }
 
 export const DEFAULT_SETTINGS: AppSettings = {
@@ -106,6 +133,20 @@ export const DEFAULT_SETTINGS: AppSettings = {
   editorLineHeight: 1.6,
   codeTheme: 'github-dark',
 };
+
+export type AiScopeType = 'current_page' | 'notebook' | 'selected_pages' | 'vault';
+
+export interface AiScope {
+  type: AiScopeType;
+  ids?: string[];
+}
+
+export interface AiRequestPreview {
+  scope: AiScope;
+  pageCount: number;
+  payloadBytes: number;
+  context: string;
+}
 
 // --- Auth Types ---
 
@@ -153,7 +194,7 @@ export type AppTheme = 'dark' | 'light' | 'system';
 export type TimelineGroupingMode = 'week' | 'month';
 
 export interface SearchResult {
-  type: 'notebook' | 'page' | 'work_report';
+  type: 'notebook' | 'page' | 'work_report' | 'project' | 'task' | 'schedule';
   id: string;
   title: string;
   excerpt: string;
@@ -164,16 +205,31 @@ export interface SearchResult {
 
 export interface SearchEntry {
   id: string;
-  type: 'notebook' | 'page' | 'work_report';
+  type: 'notebook' | 'page' | 'work_report' | 'project' | 'task' | 'schedule';
   entityId: string;
   title: string;
   content: string;
   date: string;
   dayId?: string;
+  pageId?: string;
   notebookId?: string;
   notebookTitle?: string;
   tagIds?: string[];
   tagNames?: string[];
+  projectId?: string;
+  projectIds?: string[];
+  taskStatus?: 'todo' | 'in_progress' | 'completed' | 'overdue';
+  matchedFields?: string[];
+}
+
+export interface SearchFilters {
+  query?: string;
+  types?: Array<'page' | 'notebook' | 'work_report' | 'project' | 'task' | 'schedule'>;
+  tagIds?: string[];
+  projectIds?: string[];
+  startDate?: string;
+  endDate?: string;
+  taskStatus?: 'all' | 'pending' | 'completed' | 'overdue';
 }
 
 // --- App State Types ---
