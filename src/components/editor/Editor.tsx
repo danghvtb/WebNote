@@ -154,8 +154,11 @@ export function Editor() {
   // Autosave timers must be isolated per page. A single shared timer lets a
   // second page cancel the first page's pending save during quick navigation.
   const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
-  const currentPageRef = useRef<string | null>(null);
+  const pendingSavesRef = useRef<Map<string, string>>(new Map());
+  const savingPagesRef = useRef<Map<string, Promise<void>>>(new Map());
+  const hydratingPageRef = useRef<string | null>(null);
   const lastRevisionAtRef = useRef(0);
+  const previousSelectedPageIdRef = useRef<string | null>(selectedPageId);
   const selectedPage = pages.find((p) => p.id === selectedPageId);
 
   useEffect(() => {
@@ -234,6 +237,7 @@ export function Editor() {
   const handleRestoreRevision = async (revisionId: string) => {
     setRestoringRevisionId(revisionId);
     try {
+      if (selectedPageId) await flushPageSave(selectedPageId);
       const restored = await restoreRevision(revisionId);
       if (restored) {
         await updatePageContent(restored.id, restored.content);
@@ -253,6 +257,7 @@ export function Editor() {
     if (!selectedPageId) return;
     setRecoveringFromDrive(true);
     try {
+      await flushPageSave(selectedPageId);
       const recovered = await recoverPageSnapshot(selectedPageId);
       if (!recovered) {
         addNotification('warning', 'Không tìm thấy bản sao page có nội dung trên Google Drive.');
@@ -291,6 +296,9 @@ export function Editor() {
           clearTimeout(pendingSave);
           saveTimersRef.current.delete(pageIdToDelete);
         }
+        pendingSavesRef.current.delete(pageIdToDelete);
+        const inFlightSave = savingPagesRef.current.get(pageIdToDelete);
+        if (inFlightSave) await inFlightSave.catch(() => undefined);
 
         // 2. Preserve attachment metadata in the queue while the page is moved
         // to Trash so Drive binaries are removed/reconciled as well.
@@ -318,36 +326,98 @@ export function Editor() {
     });
   };
 
-  // Debounced save handler
+  const persistPageContent = useCallback(async (pageId: string, html: string) => {
+    // Keep a lightweight recovery point at most once per 15 minutes.
+    if (Date.now() - lastRevisionAtRef.current > 15 * 60 * 1000) {
+      await createRevision(pageId);
+      await prunePageRevisions(pageId);
+      lastRevisionAtRef.current = Date.now();
+    }
+    await updatePageContent(pageId, html);
+    await queueSync('update', 'page', pageId, { content: html });
+  }, [updatePageContent]);
+
+  /**
+   * Persist the latest pending value for a page immediately. This is used
+   * before navigation, tab hiding and unmounting so the debounce window can
+   * never lose the last keystrokes.
+   */
+  const flushPageSave = useCallback((pageId: string): Promise<void> => {
+    const html = pendingSavesRef.current.get(pageId);
+    if (html === undefined) return Promise.resolve();
+
+    const timer = saveTimersRef.current.get(pageId);
+    if (timer) clearTimeout(timer);
+    saveTimersRef.current.delete(pageId);
+    pendingSavesRef.current.delete(pageId);
+
+    const previousSave = savingPagesRef.current.get(pageId) || Promise.resolve();
+    const currentSave = previousSave
+      .catch(() => undefined)
+      .then(() => persistPageContent(pageId, html))
+      .catch((error) => {
+        console.error('[Editor] Save failed:', error);
+        setSyncStatus('error', 'Không thể lưu thay đổi');
+      });
+    savingPagesRef.current.set(pageId, currentSave);
+    void currentSave.finally(() => {
+      if (savingPagesRef.current.get(pageId) === currentSave) savingPagesRef.current.delete(pageId);
+    });
+    return currentSave;
+  }, [persistPageContent, setSyncStatus]);
+
+  // The callbacks in this section intentionally read mutable save refs so they
+  // can flush the latest draft without waiting for another render.
+  // oxlint-disable react/preserve-manual-memoization
+  // The callback intentionally reads mutable save refs so it can flush the
+  // latest draft without waiting for another render.
+  // oxlint-disable-next-line react/preserve-manual-memoization
+  const flushAllPendingSaves = useCallback(() => {
+    return Promise.all(Array.from(pendingSavesRef.current.keys()).map((pageId) => flushPageSave(pageId))).then(() => undefined);
+  }, [flushPageSave]);
+
+  // Debounced save handler. The page id and latest HTML are captured together
+  // so navigating to another page cannot redirect an old save to the new one.
+  // oxlint-disable-next-line react/preserve-manual-memoization
   const handleSave = useCallback(
     (html: string) => {
-      if (!selectedPageId) return;
+      const pageId = selectedPageId;
+      if (!pageId || hydratingPageRef.current === pageId) return;
 
       setSyncStatus('saving');
-
-      const previousTimer = saveTimersRef.current.get(selectedPageId);
+      const previousTimer = saveTimersRef.current.get(pageId);
       if (previousTimer) clearTimeout(previousTimer);
+      pendingSavesRef.current.set(pageId, html);
 
-      const timer = setTimeout(async () => {
-        saveTimersRef.current.delete(selectedPageId);
-        try {
-          // Keep a lightweight recovery point at most once per 15 minutes.
-          if (Date.now() - lastRevisionAtRef.current > 15 * 60 * 1000) {
-            await createRevision(selectedPageId);
-            await prunePageRevisions(selectedPageId);
-            lastRevisionAtRef.current = Date.now();
-          }
-          await updatePageContent(selectedPageId, html);
-          await queueSync('update', 'page', selectedPageId, { content: html });
-        } catch (err) {
-          console.error('[Editor] Save failed:', err);
-          setSyncStatus('error', 'Không thể lưu thay đổi');
-        }
-      }, 1500); // 1.5 second debounce
-      saveTimersRef.current.set(selectedPageId, timer);
+      const timer = setTimeout(() => {
+        void flushPageSave(pageId);
+      }, 1500);
+      saveTimersRef.current.set(pageId, timer);
     },
-    [selectedPageId, updatePageContent, setSyncStatus]
+    [flushPageSave, selectedPageId, setSyncStatus]
   );
+
+  // Flush before changing page and when the editor leaves the document. The
+  // browser may terminate a hidden page before a 1.5s debounce callback runs.
+  useEffect(() => {
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === 'hidden') void flushAllPendingSaves();
+    };
+    const handlePageHide = () => { void flushAllPendingSaves(); };
+    document.addEventListener('visibilitychange', handleVisibilityChange);
+    window.addEventListener('pagehide', handlePageHide);
+    return () => {
+      document.removeEventListener('visibilitychange', handleVisibilityChange);
+      window.removeEventListener('pagehide', handlePageHide);
+      void flushAllPendingSaves();
+    };
+  }, [flushAllPendingSaves]);
+
+  useEffect(() => {
+    const previousPageId = previousSelectedPageIdRef.current;
+    if (previousPageId && previousPageId !== selectedPageId) void flushPageSave(previousPageId);
+    previousSelectedPageIdRef.current = selectedPageId;
+  }, [flushPageSave, selectedPageId]);
 
   const refreshHeadings = useCallback((instance: TiptapEditor | null) => {
     if (!instance) return;
@@ -477,6 +547,7 @@ export function Editor() {
     editor?.setEditable(!readingMode);
   }, [editor, readingMode]);
 
+  // oxlint-disable-next-line react/preserve-manual-memoization
   const handleInsertTranslation = useCallback(
     (text: string) => {
       if (!editor) return;
@@ -489,6 +560,7 @@ export function Editor() {
     [editor]
   );
 
+  // oxlint-disable-next-line react/preserve-manual-memoization
   const handleReplaceNote = useCallback(
     (text: string) => {
       if (!editor) return;
@@ -500,20 +572,28 @@ export function Editor() {
     },
     [editor]
   );
+  // oxlint-enable react/preserve-manual-memoization
 
-  // Update editor content when page changes
+  // Update editor content whenever the selected page or its persisted content
+  // changes. Do not rely only on the page id: during a notebook switch the
+  // selected page can briefly disappear from `pages`, and the same page id may
+  // be selected again afterwards while the editor is empty.
   useEffect(() => {
-    if (!editor || !selectedPage) return;
+    if (!editor) return;
+    if (!selectedPage) {
+      return;
+    }
 
-    // Only update if switching to a different page
-    if (currentPageRef.current !== selectedPageId) {
-      currentPageRef.current = selectedPageId || null;
-      const currentContent = editor.getHTML();
-      if (currentContent !== selectedPage.content) {
-        editor.commands.setContent(selectedPage.content || '', { emitUpdate: false });
+    const persistedContent = selectedPage.content || '';
+    if (editor.getHTML() !== persistedContent) {
+      hydratingPageRef.current = selectedPageId;
+      try {
+        editor.commands.setContent(persistedContent, { emitUpdate: false });
+      } finally {
+        hydratingPageRef.current = null;
       }
     }
-  }, [editor, selectedPage, selectedPageId]);
+  }, [editor, selectedPageId, selectedPage?.content]);
 
 
 

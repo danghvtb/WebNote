@@ -174,7 +174,7 @@ export function AppLayout() {
           {/* Main Content Area */}
           <div className="flex-1 overflow-hidden flex flex-col pb-14 md:pb-0">
             <Suspense fallback={<div className="flex-1 flex items-center justify-center text-sm text-slate-400">Đang mở nội dung…</div>}>
-              {selectedReportId ? <WorkReportEditor key={selectedReportId} /> : selectedPageId ? <Editor /> : <HomePage />}
+              {selectedReportId ? <WorkReportEditor key={selectedReportId} /> : selectedPageId ? <Editor key={selectedPageId} /> : <HomePage />}
             </Suspense>
           </div>
         </div>
