@@ -54,7 +54,7 @@ export function formatDateISO(date: Date): string {
 export function formatDateDisplay(dateStr: string): string {
   const date = new Date(dateStr + 'T00:00:00');
   const now = new Date();
-  const months = ['Th01', 'Th02', 'Th03', 'Th04', 'Th05', 'Th06', 'Th07', 'Th08', 'Th09', 'Th10', 'Th11', 'Th12'];
+  const months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
   const day = String(date.getDate()).padStart(2, '0');
   const month = months[date.getMonth()];
   const year = date.getFullYear();
@@ -188,25 +188,10 @@ export function extractWikiLinks(html: string): string[] {
  */
 export function getGreeting(): string {
   const hour = new Date().getHours();
-  if (hour < 12) return 'Chào buổi sáng';
-  if (hour < 17) return 'Chào buổi chiều';
-  if (hour < 21) return 'Chào buổi tối';
-  return 'Chúc ngủ ngon';
-}
-
-/**
- * Normalize user-facing text for case/diacritic-insensitive comparisons.
- * Keeping this helper in one place prevents each feature (search, graph,
- * backlinks) from implementing subtly different matching rules.
- */
-export function normalizeComparableText(value: string): string {
-  return value
-    .normalize('NFD')
-    .replace(/[\u0300-\u036f]/g, '')
-    .toLocaleLowerCase('vi-VN')
-    .replace(/đ/g, 'd')
-    .trim()
-    .replace(/\s+/g, ' ');
+  if (hour < 12) return 'Good morning';
+  if (hour < 17) return 'Good afternoon';
+  if (hour < 21) return 'Good evening';
+  return 'Good night';
 }
 
 /**

@@ -11,7 +11,6 @@ import { getAllVaultPages, getAllVaultNotebooks } from '../../services/database/
 import type { Page, Notebook } from '../../types';
 import { todayDate } from '../../utils';
 import { Time24Picker } from '../common/Time24Picker';
-import { DialogShell } from '../common/DialogShell';
 import {
   parseAllTasks,
   updateTaskDueDateInHtml,
@@ -173,8 +172,10 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
   if (!isOpen) return null;
 
   return (
-    <DialogShell open={isOpen} onClose={onClose} ariaLabel="Trung tâm công việc" className="w-full max-w-5xl max-h-[90vh] bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden" style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(168, 85, 247, 0.25)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/80 backdrop-blur-md animate-fade-in">
       <div
+        className="w-full max-w-5xl max-h-[90vh] bg-slate-900 border border-purple-500/30 rounded-2xl shadow-2xl flex flex-col overflow-hidden"
+        style={{ boxShadow: '0 25px 50px -12px rgba(0, 0, 0, 0.8), 0 0 35px rgba(168, 85, 247, 0.25)' }}
       >
         {/* Header */}
         <div className="p-5 border-b border-purple-500/20 flex items-center justify-between bg-slate-950/80">
@@ -184,16 +185,16 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
             </div>
             <div>
               <h3 className="text-lg font-bold text-slate-100 flex items-center gap-2">
-                Trung tâm công việc & quản lý hạn
+                Task Center & Smart Deadline Manager
                 {overdueCount > 0 && (
                   <span className="px-2 py-0.5 rounded-full bg-rose-950 border border-rose-500 text-rose-300 text-xs font-extrabold flex items-center gap-1 animate-pulse">
                     <AlertTriangle className="w-3.5 h-3.5 text-rose-400" />
-                    {overdueCount} quá hạn
+                    {overdueCount} Overdue
                   </span>
                 )}
               </h3>
               <p className="text-xs text-slate-400">
-                {allTasks.length} công việc ({completedCount} hoàn thành - {progressPercent}%, {overdueCount} quá hạn)
+                {allTasks.length} total tasks ({completedCount} completed - {progressPercent}%, {overdueCount} overdue)
               </p>
             </div>
           </div>
@@ -223,7 +224,7 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Tìm công việc..."
+                placeholder="Search tasks..."
                 className="w-full pl-9 pr-3 py-1.5 text-xs bg-slate-950 border border-slate-800 rounded-lg text-slate-200 focus:outline-none focus:border-purple-500/50"
               />
             </div>
@@ -324,15 +325,15 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
               <div className="bg-emerald-950/20 border border-emerald-500/30 rounded-xl p-3 flex flex-col">
                 <h4 className="text-xs font-bold text-emerald-300 mb-3 flex items-center gap-2 uppercase tracking-wider">
                   <CheckCircle2 className="w-4 h-4 text-emerald-400" />
-                  Đã hoàn thành ({sortedTasks.filter((t) => t.completed).length})
+                  Completed ({sortedTasks.filter((t) => t.completed).length})
                 </h4>
                 <div className="flex-1 space-y-2 overflow-y-auto max-h-[420px] pr-1">
                   {sortedTasks.filter((t) => t.completed).map((task) => (
                     <div key={task.id} className="p-3 bg-slate-900 border border-emerald-500/30 rounded-xl opacity-75">
                       <p className="text-xs font-medium line-through text-slate-400 mb-2">{task.text}</p>
                       <div className="flex items-center justify-between text-[10px] text-emerald-400">
-                        <span>Hoàn thành hôm nay</span>
-                        <button onClick={() => toggleTask(task)} className="text-slate-400 hover:underline">Hoàn tác</button>
+                        <span>Completed Today</span>
+                        <button onClick={() => toggleTask(task)} className="text-slate-400 hover:underline">Undo</button>
                       </div>
                     </div>
                   ))}
@@ -342,8 +343,8 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
           ) : sortedTasks.length === 0 ? (
             <div className="py-12 text-center text-slate-500">
               <CheckCircle2 className="w-10 h-10 mx-auto mb-2 text-slate-600" />
-                  <p className="text-sm font-medium">Không tìm thấy công việc</p>
-              <p className="text-xs text-slate-600 mt-1">Tạo công việc bằng checklist hoặc `/deadline` trong ghi chú</p>
+              <p className="text-sm font-medium">No tasks found</p>
+              <p className="text-xs text-slate-600 mt-1">Create tasks using checklist or `/deadline` in any note</p>
             </div>
           ) : (
             sortedTasks.map((task) => {
@@ -527,6 +528,6 @@ export function TaskManagerModal({ isOpen, onClose }: TaskManagerModalProps) {
           )}
         </div>
       </div>
-    </DialogShell>
+    </div>
   );
 }

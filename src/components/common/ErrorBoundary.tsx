@@ -32,21 +32,6 @@ export class ErrorBoundary extends Component<Props, State> {
     window.location.reload();
   };
 
-  handleResetAppCache = async () => {
-    try {
-      if ('serviceWorker' in navigator) {
-        const registrations = await navigator.serviceWorker.getRegistrations();
-        await Promise.all(registrations.map((registration) => registration.unregister()));
-      }
-      if ('caches' in window) {
-        const cacheNames = await caches.keys();
-        await Promise.all(cacheNames.map((cacheName) => caches.delete(cacheName)));
-      }
-    } finally {
-      window.location.reload();
-    }
-  };
-
   render() {
     if (this.state.hasError) {
       return (
@@ -56,28 +41,19 @@ export class ErrorBoundary extends Component<Props, State> {
               <AlertTriangle className="w-8 h-8" style={{ color: 'var(--color-error)' }} />
             </div>
             <h1 className="text-xl font-semibold mb-2" style={{ color: 'var(--color-text-primary)' }}>
-              Đã xảy ra lỗi
+              Something went wrong
             </h1>
             <p className="text-sm mb-6" style={{ color: 'var(--color-text-secondary)' }}>
-              {this.state.error?.message || 'Ứng dụng gặp lỗi không mong muốn.'}
+              {this.state.error?.message || 'An unexpected error occurred.'}
             </p>
-            <div className="flex flex-wrap justify-center gap-2">
-              <button
-                onClick={this.handleReload}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-pointer touch-target"
-                style={{ background: 'var(--color-accent)', color: '#fff' }}
-              >
-                <RefreshCw className="w-4 h-4" />
-                Tải lại ứng dụng
-              </button>
-              <button
-                onClick={() => void this.handleResetAppCache()}
-                className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-pointer touch-target"
-                style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-primary)', border: '1px solid var(--color-border)' }}
-              >
-                Xóa cache ứng dụng
-              </button>
-            </div>
+            <button
+              onClick={this.handleReload}
+              className="inline-flex items-center gap-2 px-4 py-2.5 rounded-lg text-sm font-medium cursor-pointer"
+              style={{ background: 'var(--color-accent)', color: '#fff' }}
+            >
+              <RefreshCw className="w-4 h-4" />
+              Reload App
+            </button>
           </div>
         </div>
       );

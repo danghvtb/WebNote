@@ -4,16 +4,14 @@
 // ============================================================
 
 import { useState } from 'react';
-import { X, Cloud, Monitor, Moon, Sun, RefreshCw, Trash2, Bell, BellOff } from 'lucide-react';
+import { X, Cloud, Monitor, Moon, Sun, RefreshCw, Trash2 } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { forceSync } from '../../services/sync/syncManager';
 import { clearDatabase } from '../../services/database/db';
 import { signOut } from '../../services/google/auth';
 import { formatTime } from '../../utils';
-import { getGeminiApiKey, setGeminiApiKey, testGeminiApiKey } from '../../services/ai/geminiService';
-import { areNotificationsEnabled, areSoundNotificationsEnabled, disableNotifications, enableNotificationsFromUserAction, getNotificationPermission, setSoundNotificationsEnabled } from '../../services/notification/notificationManager';
+import { getGeminiApiKey, setGeminiApiKey } from '../../services/ai/geminiService';
 import type { AppTheme } from '../../types';
-import { DialogShell } from '../common/DialogShell';
 
 export function SettingsModal() {
   const {
@@ -23,10 +21,6 @@ export function SettingsModal() {
   } = useAppStore();
 
   const [geminiKey, setGeminiKey] = useState(() => getGeminiApiKey());
-  const [notificationPermission, setNotificationPermission] = useState(() => getNotificationPermission());
-  const [notificationsEnabled, setNotificationsEnabled] = useState(() => areNotificationsEnabled());
-  const [soundEnabled, setSoundEnabled] = useState(() => areSoundNotificationsEnabled());
-  const [testingGeminiKey, setTestingGeminiKey] = useState(false);
 
   if (!settingsOpen) return null;
 
@@ -37,20 +31,20 @@ export function SettingsModal() {
   const handleSync = async () => {
     try {
       await forceSync();
-      addNotification('success', 'Đồng bộ hoàn tất');
+      addNotification('success', 'Sync complete');
     } catch {
-      addNotification('error', 'Đồng bộ thất bại');
+      addNotification('error', 'Sync failed');
     }
   };
 
   const handleClearCache = () => {
     setConfirmModal({
       open: true,
-      title: 'Xóa dữ liệu local?',
-      message: 'Toàn bộ dữ liệu lưu trên thiết bị sẽ bị xóa. Dữ liệu trên Google Drive không bị ảnh hưởng.',
+      title: 'Clear Local Cache',
+      message: 'This will clear all locally cached data. Your data on Google Drive will not be affected.',
       onConfirm: async () => {
         await clearDatabase();
-      addNotification('info', 'Đã xóa dữ liệu local');
+        addNotification('info', 'Local cache cleared');
       },
     });
   };
@@ -58,8 +52,8 @@ export function SettingsModal() {
   const handleDisconnect = () => {
     setConfirmModal({
       open: true,
-      title: 'Đăng xuất tài khoản Google?',
-      message: 'Ứng dụng sẽ đăng xuất và xóa dữ liệu local. Ghi chú trên Google Drive vẫn được giữ an toàn.',
+      title: 'Disconnect Google Account',
+      message: 'This will sign you out and clear local data. Your notes on Google Drive will remain safe.',
       onConfirm: () => {
         signOut();
         logout();
@@ -68,54 +62,31 @@ export function SettingsModal() {
     });
   };
 
-  const handleEnableNotifications = async () => {
-    const granted = await enableNotificationsFromUserAction();
-    setNotificationPermission(getNotificationPermission());
-    setNotificationsEnabled(granted);
-    addNotification(granted ? 'success' : 'warning', granted ? 'Đã bật nhắc deadline trên trình duyệt.' : 'Trình duyệt chưa cấp quyền thông báo.');
-  };
-
-  const handleDisableNotifications = () => {
-    disableNotifications();
-    setNotificationsEnabled(false);
-    addNotification('info', 'Đã tắt nhắc deadline trên trình duyệt.');
-  };
-
-  const handleToggleSound = () => {
-    const next = !soundEnabled;
-    setSoundNotificationsEnabled(next);
-    setSoundEnabled(next);
-  };
-
-  const handleTestGeminiKey = async () => {
-    setTestingGeminiKey(true);
-    try {
-      const result = await testGeminiApiKey(geminiKey);
-      addNotification(result.ok ? 'success' : 'error', result.message);
-    } finally {
-      setTestingGeminiKey(false);
-    }
-  };
-
   const themes: { value: AppTheme; label: string; icon: React.ReactNode }[] = [
-    { value: 'dark', label: 'Tối', icon: <Moon className="w-4 h-4" /> },
-    { value: 'light', label: 'Sáng', icon: <Sun className="w-4 h-4" /> },
-    { value: 'system', label: 'Theo hệ thống', icon: <Monitor className="w-4 h-4" /> },
+    { value: 'dark', label: 'Dark', icon: <Moon className="w-4 h-4" /> },
+    { value: 'light', label: 'Light', icon: <Sun className="w-4 h-4" /> },
+    { value: 'system', label: 'System', icon: <Monitor className="w-4 h-4" /> },
   ];
-  const syncStatusLabel: Record<string, string> = { saved: 'Đã lưu', syncing: 'Đang đồng bộ', offline: 'Ngoại tuyến', error: 'Lỗi', auth_required: 'Cần kết nối', idle: 'Chưa đồng bộ' };
 
   return (
-    <DialogShell open={settingsOpen} onClose={() => setSettingsOpen(false)} ariaLabel="Cài đặt" className="w-full max-w-lg max-h-[80vh] rounded-xl overflow-hidden animate-scale-in flex flex-col" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={() => setSettingsOpen(false)}
+    >
       <div
+        className="w-full max-w-lg max-h-[80vh] rounded-xl overflow-hidden animate-scale-in flex flex-col"
+        style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between px-6 py-4" style={{ borderBottom: '1px solid var(--color-border)' }}>
-          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Cài đặt</h2>
+          <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>Settings</h2>
           <button
             onClick={() => setSettingsOpen(false)}
             className="p-1 rounded-lg cursor-pointer"
             style={{ color: 'var(--color-text-tertiary)' }}
-            aria-label="Đóng cài đặt"
+            aria-label="Close settings"
           >
             <X className="w-5 h-5" />
           </button>
@@ -124,7 +95,7 @@ export function SettingsModal() {
         {/* Content */}
         <div className="flex-1 overflow-y-auto px-6 py-4">
           {/* Account Section */}
-          <Section title="Tài khoản">
+          <Section title="Account">
             <div className="flex items-center gap-3">
               {user?.picture && (
                 <img src={user.picture} alt={user.name} className="w-10 h-10 rounded-full" />
@@ -134,19 +105,19 @@ export function SettingsModal() {
                 <p className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>{user?.email}</p>
               </div>
               <span className="ml-auto text-xs px-2 py-1 rounded-full" style={{ background: 'rgba(63,185,80,0.1)', color: 'var(--color-success)' }}>
-                Đã kết nối
+                Connected
               </span>
             </div>
           </Section>
 
           {/* Storage Section */}
-          <Section title="Lưu trữ">
+          <Section title="Storage">
             <div className="flex items-center gap-2 mb-2">
               <Cloud className="w-4 h-4" style={{ color: 'var(--color-text-secondary)' }} />
               <span className="text-sm" style={{ color: 'var(--color-text-primary)' }}>Google Drive</span>
             </div>
             <p className="text-xs ml-6" style={{ color: 'var(--color-text-tertiary)' }}>
-              Thư mục: MyNotes
+              Folder: MyNotes
             </p>
             {rootFolderId && (
               <p className="text-xs ml-6 mt-0.5 font-mono" style={{ color: 'var(--color-text-tertiary)' }}>
@@ -156,15 +127,15 @@ export function SettingsModal() {
           </Section>
 
           {/* Sync Section */}
-          <Section title="Đồng bộ">
+          <Section title="Sync">
             <div className="flex items-center justify-between">
               <div>
                 <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>
-                  Trạng thái: <span style={{ color: syncStatus === 'saved' ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>{syncStatusLabel[syncStatus] || syncStatus}</span>
+                  Status: <span style={{ color: syncStatus === 'saved' ? 'var(--color-success)' : 'var(--color-text-secondary)' }}>{syncStatus}</span>
                 </p>
                 {lastSyncTime && (
                   <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
-                    Đồng bộ gần nhất: {formatTime(lastSyncTime)}
+                    Last sync: {formatTime(lastSyncTime)}
                   </p>
                 )}
               </div>
@@ -174,37 +145,13 @@ export function SettingsModal() {
                 style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}
               >
                 <RefreshCw className="w-3 h-3" />
-                Đồng bộ ngay
-              </button>
-            </div>
-          </Section>
-
-          {/* Notification preferences: permission is requested only from this user action. */}
-          <Section title="Thông báo deadline">
-            <div className="flex items-start gap-3">
-              {notificationsEnabled ? <Bell className="w-4 h-4 mt-0.5 text-emerald-400" /> : <BellOff className="w-4 h-4 mt-0.5 text-slate-500" />}
-              <div className="min-w-0 flex-1">
-                <p className="text-sm" style={{ color: 'var(--color-text-primary)' }}>Nhắc công việc sắp đến hạn</p>
-                <p className="text-xs mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
-                  Quyền hiện tại: {notificationPermission === 'unsupported' ? 'Không hỗ trợ' : notificationPermission === 'granted' ? 'Đã cấp' : notificationPermission === 'denied' ? 'Đã từ chối' : 'Chưa hỏi'}
-                </p>
-              </div>
-              {notificationsEnabled ? (
-                <button onClick={handleDisableNotifications} className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer" style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}>Tắt</button>
-              ) : (
-                <button onClick={handleEnableNotifications} disabled={notificationPermission === 'denied' || notificationPermission === 'unsupported'} className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50" style={{ background: 'var(--color-accent-dim)', color: 'var(--color-accent)' }}>Bật</button>
-              )}
-            </div>
-            <div className="mt-3 flex items-center justify-between border-t border-slate-800/70 pt-3">
-              <span className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>Âm thanh cảnh báo</span>
-              <button onClick={handleToggleSound} className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer" style={{ background: soundEnabled ? 'var(--color-accent-dim)' : 'var(--color-bg-tertiary)', color: soundEnabled ? 'var(--color-accent)' : 'var(--color-text-tertiary)' }}>
-                {soundEnabled ? 'Đang bật' : 'Đang tắt'}
+                Sync Now
               </button>
             </div>
           </Section>
 
           {/* Appearance Section */}
-          <Section title="Giao diện">
+          <Section title="Appearance">
             <div className="flex gap-2">
               {themes.map((t) => (
                 <button
@@ -225,7 +172,7 @@ export function SettingsModal() {
           </Section>
 
           {/* Gemini AI Config Section */}
-          <Section title="Trợ lý Google Gemini AI">
+          <Section title="Google Gemini AI Assistant">
             <div className="space-y-2">
               <label className="block text-xs font-medium text-purple-300 flex items-center justify-between">
                 <span>Gemini API Key (Miễn phí từ Google AI Studio)</span>
@@ -248,23 +195,14 @@ export function SettingsModal() {
                 placeholder="AIzaSy..."
                 className="w-full px-3 py-2 text-xs rounded-lg bg-slate-900 border border-purple-500/40 text-slate-200 outline-none focus:border-purple-400"
               />
-              <button
-                type="button"
-                onClick={handleTestGeminiKey}
-                disabled={!geminiKey.trim() || testingGeminiKey}
-                className="px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer disabled:opacity-50"
-                style={{ background: 'var(--color-accent-dim)', color: 'var(--color-accent)' }}
-              >
-                {testingGeminiKey ? 'Đang kiểm tra…' : 'Kiểm tra API key'}
-              </button>
               <p className="text-[10px] text-slate-400">
-                Key chỉ được lưu trong trình duyệt (LocalStorage). AI chỉ gửi phạm vi bạn chọn trong cửa sổ AI; khi không có key, ứng dụng dùng bộ phân tích cục bộ.
+                Key được bảo mật lưu ở trình duyệt của bạn (LocalStorage). AI sẽ dùng Gemini 1.5 Flash đọc 100% Vault để trả lời thông minh.
               </p>
             </div>
           </Section>
 
           {/* Danger Zone */}
-          <Section title="Khu vực nguy hiểm" danger>
+          <Section title="Danger Zone" danger>
             <div className="space-y-2">
               <button
                 onClick={handleClearCache}
@@ -274,7 +212,7 @@ export function SettingsModal() {
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 <Trash2 className="w-4 h-4" />
-                Xóa dữ liệu local
+                Clear Local Cache
               </button>
               <button
                 onClick={handleDisconnect}
@@ -284,13 +222,13 @@ export function SettingsModal() {
                 onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
               >
                 <Trash2 className="w-4 h-4" />
-                Đăng xuất tài khoản Google
+                Disconnect Google Account
               </button>
             </div>
           </Section>
         </div>
       </div>
-    </DialogShell>
+    </div>
   );
 }
 

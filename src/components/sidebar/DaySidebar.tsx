@@ -55,7 +55,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
       try {
         // Build the timeline from the notebooks as well as the Day records.
         // Older/synced data can contain notebooks whose Day record is missing
-        // on this device, and those dates must still be visible in the timeline.
+        // on this device, and those dates must still be visible in Timeline.
         const [notebooks, reports] = await Promise.all([getAllVaultNotebooks(), getAllWorkReports()]);
         const withCounts = buildTimelineDays(days, notebooks, {
           id: todayId(),
@@ -156,20 +156,19 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
   return (
     <aside
       className={`${mobile ? 'w-full h-full' : 'w-56 h-full'} flex flex-col flex-shrink-0 glass-sidebar`}
-      aria-label="Dòng thời gian các ngày"
     >
       {/* Header */}
       <div className="flex items-center justify-between px-4 py-3" style={{ borderBottom: '1px solid var(--color-border)' }}>
         <span className="text-xs font-semibold uppercase tracking-wider" style={{ color: 'var(--color-text-tertiary)' }}>
-          Dòng thời gian
+          Timeline
         </span>
         <div className="flex items-center gap-1">
-          <div className="flex items-center p-0.5 rounded-lg" style={{ background: 'var(--color-bg-primary)' }} role="group" aria-label="Nhóm dòng thời gian">
+          <div className="flex items-center p-0.5 rounded-lg" style={{ background: 'var(--color-bg-primary)' }} role="group" aria-label="Timeline grouping">
             {(['week', 'month'] as const).map((mode) => (
               <button
                 key={mode}
                 onClick={() => setTimelineGroupingMode(mode)}
-                className="touch-target px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
+                className="px-2 py-1 rounded-md text-[11px] font-semibold transition-colors cursor-pointer"
                 style={{
                   background: timelineGroupingMode === mode ? 'var(--color-bg-active)' : 'transparent',
                   color: timelineGroupingMode === mode ? 'var(--color-text-primary)' : 'var(--color-text-tertiary)',
@@ -182,15 +181,15 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
           </div>
           <button
             onClick={handleToday}
-            className="touch-target flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer"
+            className="flex items-center gap-1 px-2 py-1 rounded-md text-xs font-medium transition-colors cursor-pointer"
             style={{ color: 'var(--color-accent)' }}
             onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-accent-dim)')}
             onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
-            title="Về hôm nay"
-            aria-label="Về hôm nay"
+            title="Go to today"
+            aria-label="Go to today"
           >
             <Calendar className="w-3 h-3" />
-            Hôm nay
+            Today
           </button>
         </div>
       </div>
@@ -201,15 +200,15 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
           <div className="flex flex-col items-center justify-center py-12 px-4">
             <Calendar className="w-8 h-8 mb-3" style={{ color: 'var(--color-text-tertiary)' }} />
             <p className="text-sm text-center" style={{ color: 'var(--color-text-tertiary)' }}>
-              Chưa có nội dung.
+              No notes yet.
             </p>
             <button
               onClick={handleToday}
-              className="touch-target mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
+              className="mt-3 flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium cursor-pointer"
               style={{ background: 'var(--color-accent-dim)', color: 'var(--color-accent)' }}
             >
               <Plus className="w-3 h-3" />
-              Bắt đầu hôm nay
+              Start today
             </button>
           </div>
         ) : (
@@ -221,7 +220,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                 <button
                   type="button"
                   onClick={() => toggleTimelineGroup(timelineGroupingMode, group.key)}
-                  className="touch-target w-full flex items-center justify-between gap-2 px-2 py-2 rounded-lg transition-colors cursor-pointer"
+                  className="w-full flex items-center justify-between gap-2 px-2 py-2 rounded-lg transition-colors cursor-pointer"
                   style={{ color: 'var(--color-text-tertiary)' }}
                   onMouseEnter={(e) => (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                   onMouseLeave={(e) => (e.currentTarget.style.background = 'transparent')}
@@ -230,7 +229,7 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                   <span className="min-w-0 text-left">
                     <span className="block text-xs font-semibold truncate">{group.label}</span>
                     <span className="block text-[10px] mt-0.5" style={{ color: 'var(--color-text-tertiary)' }}>
-                      {group.notebookCount} {group.notebookCount === 1 ? 'sổ' : 'sổ'} · {group.notebookDayCount} {group.notebookDayCount === 1 ? 'ngày' : 'ngày'}{group.workReportCount ? ` · ${group.workReportCount} báo cáo` : ''}
+                      {group.notebookCount} {group.notebookCount === 1 ? 'notebook' : 'notebooks'} · {group.notebookDayCount} {group.notebookDayCount === 1 ? 'day' : 'days'}{group.workReportCount ? ` · ${group.workReportCount} báo cáo` : ''}
                     </span>
                   </span>
                   <ChevronDown className={`w-3.5 h-3.5 flex-shrink-0 transition-transform ${expanded ? 'rotate-180' : ''}`} />
@@ -242,11 +241,11 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                     <div key={day.id} className="relative group">
                     <button
                       onClick={() => handleDaySelect(day)}
-                      className="touch-target w-full text-left flex items-center gap-3 px-3 py-2 pr-8 rounded-lg mb-0.5 transition-colors cursor-pointer"
+                      className="w-full text-left flex items-center gap-3 px-3 py-2 pr-8 rounded-lg mb-0.5 transition-colors cursor-pointer"
                       style={{ background: selected ? 'var(--color-bg-active)' : 'transparent' }}
                       onMouseEnter={(e) => !selected && (e.currentTarget.style.background = 'var(--color-bg-hover)')}
                       onMouseLeave={(e) => !selected && (e.currentTarget.style.background = 'transparent')}
-                      aria-label={`${formatDateDisplay(day.date)} - ${day.notebookCount} sổ ghi chú${day.workReportCount ? ', có báo cáo công việc' : ''}`}
+                      aria-label={`${formatDateDisplay(day.date)} - ${day.notebookCount} notebooks${day.workReportCount ? ', có báo cáo công việc' : ''}`}
                     >
                       <div
                         className="w-2 h-2 rounded-full flex-shrink-0"
@@ -273,11 +272,11 @@ export function DaySidebar({ mobile = false }: DaySidebarProps) {
                           )}
                         </div>
                         <span className="text-xs" style={{ color: 'var(--color-text-tertiary)' }}>
-                          {day.notebookCount} sổ ghi chú{day.workReportCount ? ` · ${day.workReportCount} báo cáo` : ''}
+                          {day.notebookCount} {day.notebookCount === 1 ? 'notebook' : 'notebooks'}{day.workReportCount ? ` · ${day.workReportCount} báo cáo` : ''}
                         </span>
                       </div>
                     </button>
-                    <button type="button" onClick={(event) => { event.stopPropagation(); setAddMenuDayId((current) => current === day.id ? null : day.id); }} className="touch-target absolute right-1 top-1 p-2 rounded-md opacity-100 md:opacity-0 md:group-hover:opacity-100 cursor-pointer" style={{ color: 'var(--color-accent)' }} aria-label={`Thêm nội dung cho ${formatDateDisplay(day.date)}`}><Plus className="w-3.5 h-3.5" /></button>
+                    <button type="button" onClick={(event) => { event.stopPropagation(); setAddMenuDayId((current) => current === day.id ? null : day.id); }} className="absolute right-1 top-1.5 p-1 rounded-md opacity-0 group-hover:opacity-100 cursor-pointer" style={{ color: 'var(--color-accent)' }} aria-label={`Thêm nội dung cho ${formatDateDisplay(day.date)}`}><Plus className="w-3.5 h-3.5" /></button>
                     {addMenuDayId === day.id && <div className="absolute right-0 top-9 z-30 w-48 rounded-lg p-1 shadow-xl" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)' }}>
                       <button type="button" onClick={() => handleAddNotebook(day.id)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-left cursor-pointer hover:bg-[var(--color-bg-hover)]" style={{ color: 'var(--color-text-secondary)' }}><Notebook className="w-3.5 h-3.5" /> Sổ ghi chú</button>
                       <button type="button" onClick={() => handleAddReport(day.id)} className="w-full flex items-center gap-2 px-2.5 py-2 rounded-md text-xs text-left cursor-pointer hover:bg-[var(--color-bg-hover)]" style={{ color: 'var(--color-text-secondary)' }}><ClipboardList className="w-3.5 h-3.5" /> Báo cáo công việc</button>

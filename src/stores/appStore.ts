@@ -179,7 +179,7 @@ export const useAppStore = create<AppState>((set) => ({
     localStorage.removeItem('mynotes_rootFolderId');
     if (accountRootKey) localStorage.removeItem(accountRootKey);
     // Reset sync guard so next login does a fresh pull
-    import('../services/sync/syncReset').then(({ resetInitialPullState }) => {
+    import('../services/sync/syncManager').then(({ resetInitialPullState }) => {
       resetInitialPullState();
     });
     import('../services/google/rootFolderManager').then(({ clearRootFolderCache }) => {

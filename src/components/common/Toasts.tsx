@@ -25,7 +25,7 @@ export function Toasts() {
   if (notifications.length === 0) return null;
 
   return (
-    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm" role="region" aria-label="Thông báo" aria-live="polite">
+    <div className="fixed bottom-4 right-4 z-50 flex flex-col gap-2 max-w-sm">
       {notifications.map((notif) => {
         const Icon = iconMap[notif.type];
         const color = colorMap[notif.type];
@@ -61,9 +61,9 @@ export function Toasts() {
             )}
             <button
               onClick={() => removeNotification(notif.id)}
-                className="touch-target p-1 rounded cursor-pointer hover:opacity-80 transition-opacity"
+              className="p-0.5 rounded cursor-pointer hover:opacity-80 transition-opacity"
               style={{ color: 'var(--color-text-tertiary)' }}
-              aria-label="Đóng thông báo"
+              aria-label="Dismiss notification"
             >
               <X className="w-3.5 h-3.5" />
             </button>

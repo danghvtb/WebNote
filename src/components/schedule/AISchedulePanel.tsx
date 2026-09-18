@@ -9,7 +9,6 @@ import { useScheduleStore } from '../../stores/scheduleStore';
 import { generateSmartSchedule, type AIScheduleRecommendation } from '../../services/ai/geminiService';
 import { getAllVaultPages, getAllVaultNotebooks } from '../../services/database/repository';
 import { parseAllTasks } from '../../utils/taskUtils';
-import { sanitizeAIHtml } from '../../services/ai/sanitize';
 
 interface AISchedulePanelProps {
   isOpen: boolean;
@@ -98,7 +97,7 @@ export function AISchedulePanel({ isOpen, onClose }: AISchedulePanelProps) {
           </div>
           <div>
             <h3 className="text-sm font-bold text-slate-100 flex items-center gap-1.5">
-              Tối ưu lịch bằng AI
+              AI Schedule Optimizer
             </h3>
             <p className="text-[11px] text-slate-400">Tự động đề xuất xếp lịch tối ưu ngày {selectedDate}</p>
           </div>
@@ -129,7 +128,7 @@ export function AISchedulePanel({ isOpen, onClose }: AISchedulePanelProps) {
               onClick={handleRunOptimizer}
               className="w-full py-2.5 px-4 text-xs font-bold text-white bg-purple-600 hover:bg-purple-500 rounded-xl shadow-lg shadow-purple-600/20 transition-all flex items-center justify-center gap-2"
             >
-              <Sparkles className="w-4 h-4" /> Chạy tối ưu lịch
+              <Sparkles className="w-4 h-4" /> Chạy AI Schedule Optimizer
             </button>
           </div>
         )}
@@ -148,7 +147,7 @@ export function AISchedulePanel({ isOpen, onClose }: AISchedulePanelProps) {
             {/* Summary */}
             <div
               className="p-3.5 bg-purple-950/30 border border-purple-500/20 rounded-xl text-xs text-slate-200"
-              dangerouslySetInnerHTML={{ __html: sanitizeAIHtml(summaryHtml) }}
+              dangerouslySetInnerHTML={{ __html: summaryHtml }}
             />
 
             <div className="flex items-center justify-between">

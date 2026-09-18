@@ -7,12 +7,6 @@ import { create } from 'zustand';
 import type { Day, Notebook, Page, Tag } from '../types';
 import * as repo from '../services/database/repository';
 
-// Incremented whenever navigation starts a new data load. IndexedDB queries
-// can resolve out of order; these epochs prevent an older response from
-// replacing the list belonging to the page/notebook currently being viewed.
-let notebooksLoadEpoch = 0;
-let pagesLoadEpoch = 0;
-
 interface NotesState {
   // Data
   days: Day[];
@@ -53,14 +47,12 @@ interface NotesState {
   // Actions — CRUD
   createNotebook: (title: string, dayId?: string) => Promise<Notebook>;
   updateNotebook: (id: string, updates: Partial<Pick<Notebook, 'title' | 'icon'>>) => Promise<void>;
-  setNotebookPinned: (id: string, isPinned: boolean) => Promise<void>;
   deleteNotebook: (id: string) => Promise<void>;
   duplicateNotebook: (id: string) => Promise<void>;
 
   createPage: (notebookId: string, title?: string) => Promise<Page>;
   updatePageContent: (pageId: string, content: string) => Promise<void>;
   updatePageTitle: (pageId: string, title: string) => Promise<void>;
-  setPagePinned: (pageId: string, isPinned: boolean) => Promise<void>;
   deletePage: (pageId: string) => Promise<void>;
   restorePage: (pageId: string) => Promise<void>;
   permanentlyDeletePage: (pageId: string) => Promise<void>;
@@ -127,33 +119,24 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   loadNotebooksByDay: async (dayId: string) => {
-    const requestEpoch = ++notebooksLoadEpoch;
     set({ notebooksLoading: true });
     try {
       const notebooks = await repo.getNotebooksByDay(dayId);
-      // A user can switch days before the previous IndexedDB query resolves.
-      // Never let an older response replace the currently selected day's list.
-      if (requestEpoch !== notebooksLoadEpoch || get().selectedDayId !== dayId) return;
       set({ notebooks, notebooksLoading: false });
     } catch (error) {
       console.error('[NotesStore] Failed to load notebooks:', error);
-      if (requestEpoch === notebooksLoadEpoch && get().selectedDayId === dayId) set({ notebooksLoading: false });
+      set({ notebooksLoading: false });
     }
   },
 
   loadPagesByNotebook: async (notebookId: string) => {
-    const requestEpoch = ++pagesLoadEpoch;
     set({ pagesLoading: true });
     try {
       const pages = await repo.getPagesByNotebook(notebookId);
-      // Ignore stale responses when navigation moved to another notebook while
-      // this request was in flight. Otherwise selectedPageId can point to a
-      // page missing from the rendered list and the editor appears blank.
-      if (requestEpoch !== pagesLoadEpoch || get().selectedNotebookId !== notebookId) return;
       set({ pages, pagesLoading: false });
     } catch (error) {
       console.error('[NotesStore] Failed to load pages:', error);
-      if (requestEpoch === pagesLoadEpoch && get().selectedNotebookId === notebookId) set({ pagesLoading: false });
+      set({ pagesLoading: false });
     }
   },
 
@@ -182,9 +165,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   // ── Selection ──
 
   selectDay: async (dayId) => {
-    // Invalidate any page query started for the previous day immediately.
-    pagesLoadEpoch += 1;
-    notebooksLoadEpoch += 1;
     set({
       selectedDayId: dayId,
       selectedNotebookId: null,
@@ -193,7 +173,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
       pages: [],
     });
     await get().loadNotebooksByDay(dayId);
-    if (get().selectedDayId !== dayId) return;
     const { notebooks, selectedNotebookId } = get();
     if (notebooks.length > 0 && !selectedNotebookId) {
       await get().selectNotebook(notebooks[0].id);
@@ -201,7 +180,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   selectNotebook: async (notebookId) => {
-    pagesLoadEpoch += 1;
     const notebook = await repo.getNotebook(notebookId);
     if (notebook) {
       if (get().selectedDayId !== notebook.dateId) {
@@ -214,8 +192,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     });
     await get().loadPagesByNotebook(notebookId);
 
-    if (get().selectedNotebookId !== notebookId) return;
-
     // Auto-select first page if no page selected or selected page not in this notebook
     const { pages, selectedPageId } = get();
     if (pages.length > 0 && (!selectedPageId || !pages.some((p) => p.id === selectedPageId))) {
@@ -224,22 +200,16 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   },
 
   selectPage: async (pageId) => {
-    // Invalidate a previous notebook load before resolving this page's parent.
-    pagesLoadEpoch += 1;
     set({ selectedPageId: pageId });
     try {
       const page = await repo.getPage(pageId);
       if (page) {
         const notebook = await repo.getNotebook(page.notebookId);
         if (notebook) {
-          // The user may have selected another page while the parent lookup was
-          // pending. Do not let this stale result change the active notebook.
-          if (get().selectedPageId !== pageId) return;
           if (get().selectedDayId !== notebook.dateId) {
             set({ selectedDayId: notebook.dateId });
             await get().loadNotebooksByDay(notebook.dateId);
           }
-          if (get().selectedPageId !== pageId) return;
           if (get().selectedNotebookId !== notebook.id) {
             set({ selectedNotebookId: notebook.id });
             await get().loadPagesByNotebook(notebook.id);
@@ -287,14 +257,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
     await get().loadRecentNotebooks();
   },
 
-  setNotebookPinned: async (id, isPinned) => {
-    const updated = await repo.setNotebookPinned(id, isPinned);
-    if (!updated) return;
-    set((s) => ({ notebooks: s.notebooks.map((nb) => nb.id === id ? updated : nb) }));
-    if (get().selectedDayId) await get().loadNotebooksByDay(get().selectedDayId!);
-    await get().loadRecentNotebooks();
-  },
-
   deleteNotebook: async (id) => {
     const { selectedNotebookId, selectedDayId } = get();
     await repo.deleteNotebook(id);
@@ -321,7 +283,7 @@ export const useNotesStore = create<NotesState>((set, get) => ({
 
   // ── CRUD — Pages ──
 
-  createPage: async (notebookId, title = 'Chưa có tiêu đề') => {
+  createPage: async (notebookId, title = 'Untitled') => {
     const page = await repo.createPage(notebookId, title);
     await get().loadPagesByNotebook(notebookId);
     set({ selectedPageId: page.id });
@@ -403,13 +365,6 @@ export const useNotesStore = create<NotesState>((set, get) => ({
   reorderPages: async (notebookId, pageIds) => {
     await repo.reorderPages(notebookId, pageIds);
     await get().loadPagesByNotebook(notebookId);
-  },
-
-  setPagePinned: async (pageId, isPinned) => {
-    const updated = await repo.setPagePinned(pageId, isPinned);
-    if (!updated) return;
-    set((s) => ({ pages: s.pages.map((p) => p.id === pageId ? updated : p) }));
-    if (get().selectedNotebookId) await get().loadPagesByNotebook(get().selectedNotebookId!);
   },
 
   clearPageSelection: () => set({ selectedNotebookId: null, selectedPageId: null, pages: [] }),

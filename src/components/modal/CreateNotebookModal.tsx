@@ -7,7 +7,6 @@ import { X } from 'lucide-react';
 import { useAppStore } from '../../stores/appStore';
 import { useNotesStore } from '../../stores/notesStore';
 import { queueSync } from '../../services/sync/syncManager';
-import { DialogShell } from '../common/DialogShell';
 
 export function CreateNotebookModal() {
   const { createNotebookOpen, setCreateNotebookOpen, addNotification } = useAppStore();
@@ -25,9 +24,9 @@ export function CreateNotebookModal() {
       await queueSync('create', 'notebook', nb.id);
       setTitle('');
       setCreateNotebookOpen(false);
-      addNotification('success', `Đã tạo "${nb.title}"`);
-    } catch {
-      addNotification('error', 'Không thể tạo sổ ghi chú');
+      addNotification('success', `Created "${nb.title}"`);
+    } catch (err) {
+      addNotification('error', 'Failed to create notebook');
     } finally {
       setLoading(false);
     }
@@ -44,21 +43,27 @@ export function CreateNotebookModal() {
     }
   };
 
-  const close = () => { setTitle(''); setCreateNotebookOpen(false); };
   return (
-    <DialogShell open={createNotebookOpen} onClose={close} ariaLabel="Tạo sổ ghi chú" className="w-full max-w-md rounded-xl p-6 animate-scale-in" style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }}>
+    <div
+      className="fixed inset-0 z-50 flex items-center justify-center"
+      style={{ background: 'rgba(0,0,0,0.5)', backdropFilter: 'blur(4px)' }}
+      onClick={() => { setTitle(''); setCreateNotebookOpen(false); }}
+    >
       <div
+        className="w-full max-w-md rounded-xl p-6 animate-scale-in"
+        style={{ background: 'var(--color-bg-secondary)', border: '1px solid var(--color-border)', boxShadow: '0 16px 48px rgba(0,0,0,0.4)' }}
+        onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-center justify-between mb-5">
           <h2 className="text-lg font-semibold" style={{ color: 'var(--color-text-primary)' }}>
-            Tạo sổ ghi chú
+            Create Notebook
           </h2>
           <button
-            onClick={close}
+            onClick={() => { setTitle(''); setCreateNotebookOpen(false); }}
             className="p-1 rounded-lg cursor-pointer"
             style={{ color: 'var(--color-text-tertiary)' }}
-            aria-label="Đóng"
+            aria-label="Close"
           >
             <X className="w-5 h-5" />
           </button>
@@ -67,14 +72,14 @@ export function CreateNotebookModal() {
         {/* Title Input */}
         <div className="mb-5">
           <label className="block text-xs font-medium mb-1.5" style={{ color: 'var(--color-text-secondary)' }}>
-            Tên sổ
+            Title
           </label>
           <input
             type="text"
             value={title}
             onChange={(e) => setTitle(e.target.value)}
             onKeyDown={handleKeyDown}
-            placeholder="Tên sổ ghi chú..."
+            placeholder="Notebook title..."
             autoFocus
             className="w-full px-3 py-2.5 rounded-lg text-sm bg-transparent outline-none"
             style={{ border: '1px solid var(--color-border)', color: 'var(--color-text-primary)' }}
@@ -84,11 +89,11 @@ export function CreateNotebookModal() {
         {/* Actions */}
         <div className="flex justify-end gap-3">
           <button
-            onClick={close}
+            onClick={() => { setTitle(''); setCreateNotebookOpen(false); }}
             className="px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer"
             style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}
           >
-            Hủy
+            Cancel
           </button>
           <button
             onClick={handleCreate}
@@ -96,10 +101,10 @@ export function CreateNotebookModal() {
             className="px-4 py-2 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-50"
             style={{ background: 'var(--color-accent)', color: '#fff' }}
           >
-            {loading ? 'Đang tạo...' : 'Tạo'}
+            {loading ? 'Creating...' : 'Create'}
           </button>
         </div>
       </div>
-    </DialogShell>
+    </div>
   );
 }

@@ -107,10 +107,10 @@ export function ScheduleBlockCard({
         </div>
 
         {!isCompact && (
-          <div className="opacity-100 md:opacity-0 md:group-hover:opacity-100 transition-opacity flex items-center gap-1 shrink-0">
+          <div className="opacity-0 group-hover:opacity-100 transition-opacity flex items-center gap-1 shrink-0">
             <button
               onClick={handleDelete}
-              className="touch-target p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
+              className="p-1 rounded text-slate-400 hover:text-rose-400 hover:bg-slate-800 transition-colors"
             >
               <Trash2 className="w-3.5 h-3.5" />
             </button>

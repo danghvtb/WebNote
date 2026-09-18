@@ -6,7 +6,6 @@
 import React, { useState } from 'react';
 import { X, FolderKanban, Trash2, Tag } from 'lucide-react';
 import { useScheduleStore } from '../../stores/scheduleStore';
-import { DialogShell } from '../common/DialogShell';
 
 export function CustomTaskManagerModal() {
   const {
@@ -37,7 +36,8 @@ export function CustomTaskManagerModal() {
   const COLOR_PRESETS = ['#3b82f6', '#a855f7', '#10b981', '#f59e0b', '#f43f5e', '#06b6d4'];
 
   return (
-    <DialogShell open={taskManagerModalOpen} onClose={() => setTaskManagerModalOpen(false)} ariaLabel="Quản lý nhóm công việc và dự án" className="w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
+    <div className="fixed inset-0 z-[100] flex items-center justify-center p-4 bg-slate-950/70 backdrop-blur-sm animate-in fade-in duration-150">
+      <div className="relative w-full max-w-xl bg-slate-900 border border-slate-800 rounded-2xl shadow-2xl overflow-hidden flex flex-col max-h-[85vh]">
         {/* Modal Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-slate-800 bg-slate-900/90">
           <div className="flex items-center gap-2.5">
@@ -45,13 +45,13 @@ export function CustomTaskManagerModal() {
               <FolderKanban className="w-5 h-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-100">Quản lý nhóm công việc / dự án</h3>
+              <h3 className="text-base font-bold text-slate-100">Quản Lý Nhóm Work / Project</h3>
               <p className="text-[11px] text-slate-400">Tạo và phân loại nhóm công việc cá nhân</p>
             </div>
           </div>
           <button
             onClick={() => setTaskManagerModalOpen(false)}
-            className="touch-target p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
+            className="p-1.5 rounded-lg text-slate-400 hover:text-slate-200 hover:bg-slate-800 transition-colors"
             aria-label="Đóng quản lý nhóm Work"
           >
             <X className="w-5 h-5" />
@@ -62,7 +62,7 @@ export function CustomTaskManagerModal() {
         <div className="flex-1 p-5 overflow-y-auto space-y-4">
           <form onSubmit={handleCreateCategory} className="p-3.5 bg-slate-950 border border-slate-800 rounded-xl space-y-3">
             <h4 className="text-xs font-bold text-slate-200 flex items-center gap-1.5">
-              <Tag className="w-3.5 h-3.5 text-purple-400" /> Tạo nhóm công việc / dự án
+              <Tag className="w-3.5 h-3.5 text-purple-400" /> Tạo Nhóm Work / Project
             </h4>
             <div className="flex flex-wrap items-center gap-2">
               <input
@@ -112,7 +112,7 @@ export function CustomTaskManagerModal() {
 
                   <button
                     onClick={() => removeCategory(category.id)}
-                    className="touch-target opacity-100 md:opacity-0 md:group-hover:opacity-100 p-1.5 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-1.5 rounded text-slate-500 hover:text-rose-400 hover:bg-slate-900 transition-all"
                     aria-label={`Xóa nhóm ${category.name}`}
                   >
                     <Trash2 className="w-4 h-4" />
@@ -122,6 +122,7 @@ export function CustomTaskManagerModal() {
             )}
           </div>
         </div>
-    </DialogShell>
+      </div>
+    </div>
   );
 }

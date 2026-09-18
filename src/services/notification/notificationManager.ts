@@ -3,32 +3,6 @@
 // Plays soft notification chimes and pushes native OS notifications.
 // ============================================================
 
-const NOTIFICATION_PREFERENCE_KEY = 'mynotes_notifications_enabled';
-const SOUND_PREFERENCE_KEY = 'mynotes_notification_sound_enabled';
-
-function hasNotificationApi(): boolean {
-  return typeof window !== 'undefined' && 'Notification' in window;
-}
-
-/** Current browser permission without prompting the user. */
-export function getNotificationPermission(): NotificationPermission | 'unsupported' {
-  return hasNotificationApi() ? Notification.permission : 'unsupported';
-}
-
-/** Whether the user explicitly enabled deadline notifications in WebNote. */
-export function areNotificationsEnabled(): boolean {
-  return typeof localStorage !== 'undefined' && localStorage.getItem(NOTIFICATION_PREFERENCE_KEY) === '1';
-}
-
-/** Sound remains enabled by default for existing users; it is independently configurable. */
-export function areSoundNotificationsEnabled(): boolean {
-  return typeof localStorage === 'undefined' || localStorage.getItem(SOUND_PREFERENCE_KEY) !== '0';
-}
-
-export function setSoundNotificationsEnabled(enabled: boolean): void {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(SOUND_PREFERENCE_KEY, enabled ? '1' : '0');
-}
-
 /**
  * Play a soft synth chime using Web Audio API (no external file dependencies)
  */
@@ -65,39 +39,26 @@ export function playNotificationChime(): void {
  * Request Browser Push Notification permission
  */
 export async function requestNotificationPermission(): Promise<boolean> {
-  if (!hasNotificationApi()) return false;
+  if (!('Notification' in window)) return false;
   if (Notification.permission === 'granted') return true;
   if (Notification.permission !== 'denied') {
     const permission = await Notification.requestPermission();
-    const granted = permission === 'granted';
-    if (typeof localStorage !== 'undefined') {
-      localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, granted ? '1' : '0');
-    }
-    return granted;
+    return permission === 'granted';
   }
   return false;
-}
-
-/** Must be called from a user gesture (for example the Settings button). */
-export async function enableNotificationsFromUserAction(): Promise<boolean> {
-  return requestNotificationPermission();
-}
-
-export function disableNotifications(): void {
-  if (typeof localStorage !== 'undefined') localStorage.setItem(NOTIFICATION_PREFERENCE_KEY, '0');
 }
 
 /**
  * Send Native OS Push Notification
  */
 export function sendNativeNotification(title: string, options?: NotificationOptions): void {
-  if (!hasNotificationApi() || !areNotificationsEnabled()) return;
+  if (!('Notification' in window)) return;
   
   if (Notification.permission === 'granted') {
     try {
       new Notification(title, {
-        icon: './favicon.svg',
-        badge: './favicon.svg',
+        icon: '/favicon.ico',
+        badge: '/favicon.ico',
         ...options,
       });
     } catch (err) {

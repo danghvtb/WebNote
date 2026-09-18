@@ -27,7 +27,7 @@ export function CreateFolderPrompt() {
       await notesStore.selectToday();
       await notesStore.loadDays();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Không thể tạo thư mục');
+      setError(err instanceof Error ? err.message : 'Failed to create folder');
     } finally {
       setCreating(false);
     }
@@ -44,17 +44,17 @@ export function CreateFolderPrompt() {
           </div>
 
           <h2 className="text-xl font-semibold text-center mb-2" style={{ color: 'var(--color-text-primary)' }}>
-            Thiết lập MyNotes
+            Set up MyNotes
           </h2>
           <p className="text-center mb-6 text-sm" style={{ color: 'var(--color-text-secondary)' }}>
-            Tạo thư mục <strong>"MyNotes"</strong> trong Google Drive để lưu ghi chú an toàn.
+            Create a <strong>"MyNotes"</strong> folder in your Google Drive to store your notes securely.
           </p>
 
           <div className="flex items-center gap-3 p-3 rounded-lg mb-6" style={{ background: 'var(--color-bg-tertiary)' }}>
             <Cloud className="w-5 h-5 flex-shrink-0" style={{ color: 'var(--color-text-secondary)' }} />
             <div>
               <p className="text-xs" style={{ color: 'var(--color-text-secondary)' }}>
-                Ghi chú của bạn sẽ được lưu tại:
+                All your notes will be stored in:
               </p>
               <p className="text-sm font-medium mt-0.5" style={{ color: 'var(--color-text-primary)' }}>
                 Google Drive / MyNotes /
@@ -71,7 +71,7 @@ export function CreateFolderPrompt() {
               className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer"
               style={{ background: 'var(--color-bg-tertiary)', color: 'var(--color-text-secondary)' }}
             >
-              Hủy
+              Cancel
             </button>
             <button
               onClick={handleCreate}
@@ -79,7 +79,7 @@ export function CreateFolderPrompt() {
               className="flex-1 px-4 py-2.5 rounded-lg text-sm font-medium transition-colors cursor-pointer disabled:opacity-60"
               style={{ background: 'var(--color-accent)', color: '#FFFFFF' }}
             >
-              {creating ? 'Đang tạo...' : 'Tạo thư mục'}
+              {creating ? 'Creating...' : 'Create Folder'}
             </button>
           </div>
 

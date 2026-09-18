@@ -302,7 +302,7 @@ export function parseTasksFromPage(page: Page, notebookTitle: string): ParsedTas
       tasks.push({
         id: `${page.id}-task-${index}`,
         pageId: page.id,
-        pageTitle: page.title || 'Chưa có tiêu đề',
+        pageTitle: page.title || 'Untitled',
         notebookId: page.notebookId,
         notebookTitle,
         text: cleanedText || rawText,

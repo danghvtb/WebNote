@@ -3,16 +3,13 @@
 // Smart AI Assistant that answers questions across ALL notes in your vault!
 // ============================================================
 
-/* oxlint-disable react(set-state-in-effect) -- modal open synchronizes external vault data. */
 import { useState, useEffect, useRef } from 'react';
 import { X, Sparkles, FileText, CheckSquare, RefreshCw, Wand2, Send, MessageSquare, Database, Bot, User } from 'lucide-react';
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { getAllVaultPages } from '../../services/database/repository';
 import { queryGeminiVault } from '../../services/ai/geminiService';
-import { sanitizeAIHtml } from '../../services/ai/sanitize';
 import { queueSync } from '../../services/sync/syncManager';
-import { DialogShell } from '../common/DialogShell';
 import type { Page } from '../../types';
 
 interface AIModalProps {
@@ -29,7 +26,7 @@ interface ChatMessage {
 }
 
 export function AIModal({ isOpen, onClose }: AIModalProps) {
-  const { selectedPageId, selectedNotebookId, pages, updatePageContent } = useNotesStore();
+  const { selectedPageId, pages, updatePageContent } = useNotesStore();
   const { addNotification } = useAppStore();
   const [loading, setLoading] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'summarize' | 'polish' | 'tasks' | 'digest'>('chat');
@@ -39,9 +36,6 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
   const [inputQuery, setInputQuery] = useState('');
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [allVaultPages, setAllVaultPages] = useState<Page[]>([]);
-  const [scope, setScope] = useState<'page' | 'notebook' | 'selected' | 'vault'>('page');
-  const [selectedPageIds, setSelectedPageIds] = useState<string[]>([]);
-  const [scopeConfirmed, setScopeConfirmed] = useState(false);
   const chatEndRef = useRef<HTMLDivElement>(null);
 
   const selectedPage = pages.find((p) => p.id === selectedPageId);
@@ -49,12 +43,6 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
   // Fetch 100% of all vault pages for full-vault knowledge scanning
   useEffect(() => {
     if (isOpen) {
-      // Reset transient modal state when the dialog opens.
-      // oxlint-disable-next-line react(set-state-in-effect)
-      setScope('page');
-      setSelectedPageIds(selectedPageId ? [selectedPageId] : []);
-      // oxlint-disable-next-line react(set-state-in-effect)
-      setScopeConfirmed(false);
       getAllVaultPages().then((p) => setAllVaultPages(p));
     }
   }, [isOpen]);
@@ -65,21 +53,12 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
 
   if (!isOpen) return null;
 
-  const vaultPages = allVaultPages.length > 0 ? allVaultPages : pages;
-  const targetPages = scope === 'page'
-    ? (selectedPage ? [selectedPage] : [])
-    : scope === 'notebook'
-      ? vaultPages.filter((page) => page.notebookId === selectedNotebookId)
-      : scope === 'selected'
-        ? vaultPages.filter((page) => selectedPageIds.includes(page.id))
-        : vaultPages;
-  const requiresScopeConfirmation = scope !== 'page';
-  const payloadBytes = targetPages.reduce((total, page) => total + (page.content || '').length, 0);
+  const targetPages = allVaultPages.length > 0 ? allVaultPages : pages;
 
   // Handle Full-Vault Chat Query using Gemini 1.5 Pro/Flash LLM across ALL Notes!
   const handleSendQuery = async (queryText?: string) => {
     const q = queryText || inputQuery;
-    if (!q.trim() || loading || targetPages.length === 0 || (requiresScopeConfirmation && !scopeConfirmed)) return;
+    if (!q.trim() || loading) return;
 
     const userMsg: ChatMessage = {
       id: `msg-${Date.now()}`,
@@ -122,11 +101,6 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
   };
 
   const handleGenerateAction = async (action: 'summarize' | 'polish' | 'tasks' | 'digest') => {
-    if (requiresScopeConfirmation && !scopeConfirmed) return;
-    if (targetPages.length === 0) {
-      addNotification('warning', 'Hãy mở một trang hoặc chọn phạm vi Notebook/Vault trước khi dùng AI.');
-      return;
-    }
     setActiveTab(action);
     setLoading(true);
     setAiResult(null);
@@ -163,7 +137,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
 
   const handleApply = async () => {
     if (!aiResult || !selectedPageId) return;
-    const newContent = (selectedPage?.content || '') + '<br/><hr/>' + sanitizeAIHtml(aiResult);
+    const newContent = (selectedPage?.content || '') + '<br/><hr/>' + aiResult;
     await updatePageContent(selectedPageId, newContent);
     await queueSync('update', 'page', selectedPageId, { content: newContent });
     addNotification('success', 'Đã chèn nội dung AI vào ghi chú!');
@@ -171,8 +145,10 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
   };
 
   return (
-    <DialogShell open={isOpen} onClose={onClose} ariaLabel="Trợ lý AI Vault" className="w-full max-w-2xl max-h-[85vh] rounded-2xl glass-card border border-purple-500/40 p-6 shadow-2xl glow-accent flex flex-col overflow-hidden" style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}>
+    <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/70 backdrop-blur-md animate-fade-in">
       <div
+        className="w-full max-w-2xl max-h-[85vh] rounded-2xl glass-card border border-purple-500/40 p-6 shadow-2xl glow-accent flex flex-col overflow-hidden"
+        style={{ background: 'var(--color-bg-secondary)', color: 'var(--color-text-primary)' }}
       >
         {/* Modal Header */}
         <div className="flex items-center justify-between pb-4 mb-3 border-b border-slate-700/50">
@@ -185,50 +161,15 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
                 Trợ Lý Thông Minh AI Vault Copilot
                 <span className="px-2 py-0.5 rounded-full bg-purple-950/80 border border-purple-500/40 text-[10px] text-purple-300 font-medium flex items-center gap-1">
                   <Database className="w-3 h-3 text-cyan-400" />
-                  {targetPages.length} trang được chọn
+                  {targetPages.length} Notes Scanned
                 </span>
               </h3>
-              <p className="text-xs text-slate-400">Hỏi đáp và phân tích trong phạm vi bạn đã chọn</p>
+              <p className="text-xs text-slate-400">Hỏi đáp & Phân tích thông minh trên TOÀN BỘ kho ghi chú Vault của bạn</p>
             </div>
           </div>
           <button onClick={onClose} className="p-1.5 rounded-lg text-slate-400 hover:text-white hover:bg-slate-800 transition-colors">
             <X className="w-5 h-5" />
           </button>
-        </div>
-
-        {/* Privacy scope: page is the safe default; broader scopes require an explicit confirmation. */}
-        <div className="mb-4 rounded-xl border border-slate-800 bg-slate-950/60 p-3 space-y-2">
-          <div className="flex flex-wrap items-center gap-2">
-            <label htmlFor="ai-scope" className="text-xs font-semibold text-slate-300">Phạm vi gửi cho AI</label>
-            <select
-              id="ai-scope"
-              value={scope}
-              onChange={(event) => {
-                const nextScope = event.target.value as 'page' | 'notebook' | 'selected' | 'vault';
-                setScope(nextScope);
-                setScopeConfirmed(nextScope === 'page');
-              }}
-              className="rounded-lg border border-slate-700 bg-slate-900 px-2.5 py-1.5 text-xs text-slate-200 outline-none focus:border-purple-400"
-            >
-              <option value="page">Trang hiện tại (khuyến nghị)</option>
-              <option value="notebook">Notebook hiện tại</option>
-              <option value="selected">Các trang đã chọn</option>
-              <option value="vault">Toàn bộ Vault</option>
-            </select>
-            <span className="text-[10px] text-slate-500">{targetPages.length} trang · {(payloadBytes / 1024).toFixed(1)} KB</span>
-          </div>
-          {scope === 'selected' && <div className="mt-2 max-h-32 overflow-y-auto rounded-lg border border-slate-800 p-2 space-y-1">{vaultPages.map((page) => <label key={page.id} className="flex items-center gap-2 text-[11px] text-slate-300"><input type="checkbox" checked={selectedPageIds.includes(page.id)} onChange={(event) => setSelectedPageIds((current) => event.target.checked ? [...new Set([...current, page.id])] : current.filter((id) => id !== page.id))} className="accent-purple-500" /><span className="truncate">{page.title || 'Chưa có tiêu đề'}</span></label>)}</div>}
-          {requiresScopeConfirmation && (
-            <label className="flex items-start gap-2 text-[11px] text-amber-200/90 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={scopeConfirmed}
-                onChange={(event) => setScopeConfirmed(event.target.checked)}
-                className="mt-0.5 accent-purple-500"
-              />
-              <span>Tôi xác nhận nội dung trong phạm vi đã chọn sẽ được gửi tới Google Gemini để xử lý.</span>
-            </label>
-          )}
         </div>
 
         {/* Action Tabs */}
@@ -335,7 +276,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
                           : 'bg-slate-900 border border-slate-800 text-slate-200 rounded-tl-none'
                       }`}
                     >
-                      <div dangerouslySetInnerHTML={{ __html: sanitizeAIHtml(msg.text) }} />
+                      <div dangerouslySetInnerHTML={{ __html: msg.text }} />
                       {msg.sourceNotes && msg.sourceNotes.length > 0 && (
                         <div className="mt-2 pt-2 border-t border-slate-800 text-[10px] text-slate-400 flex flex-wrap items-center gap-1">
                           <span className="font-semibold text-cyan-400">Nguồn trích xuất:</span>
@@ -373,7 +314,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
                   <span className="text-xs font-medium">AI đang phân tích và xử lý nội dung toàn bộ Vault...</span>
                 </div>
               ) : aiResult ? (
-                <div className="prose prose-invert prose-sm" dangerouslySetInnerHTML={{ __html: sanitizeAIHtml(aiResult) }} />
+                <div className="prose prose-invert prose-sm" dangerouslySetInnerHTML={{ __html: aiResult }} />
               ) : (
                 <p className="text-xs text-slate-500 text-center py-12">Chọn một chức năng AI ở trên để phân tích toàn bộ ghi chú.</p>
               )}
@@ -394,7 +335,7 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
             />
             <button
               onClick={() => handleSendQuery()}
-              disabled={!inputQuery.trim() || loading || targetPages.length === 0 || (requiresScopeConfirmation && !scopeConfirmed)}
+              disabled={!inputQuery.trim() || loading}
               className="px-4 py-2.5 rounded-xl bg-purple-600 hover:bg-purple-500 text-white text-xs font-semibold transition-all disabled:opacity-50 cursor-pointer flex items-center gap-1.5"
             >
               <Send className="w-3.5 h-3.5" />
@@ -421,6 +362,6 @@ export function AIModal({ isOpen, onClose }: AIModalProps) {
           </div>
         )}
       </div>
-    </DialogShell>
+    </div>
   );
 }

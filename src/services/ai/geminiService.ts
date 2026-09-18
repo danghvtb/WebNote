@@ -3,9 +3,7 @@
 // Connects WebNote to Google Gemini API for Full-Vault AI Intelligence
 // ============================================================
 
-/* oxlint-disable no-useless-escape -- markdown bullet parsing accepts literal asterisks. */
 import type { Page } from '../../types';
-import { sanitizeAIHtml } from './sanitize';
 
 const GEMINI_KEY_STORAGE_KEY = 'mynotes_gemini_api_key';
 
@@ -213,7 +211,7 @@ export function formatMarkdownToHTML(markdownText: string): string {
   if (inUl) resultLines.push('</ul>');
   if (inOl) resultLines.push('</ol>');
 
-  return sanitizeAIHtml(resultLines.join('\n'));
+  return resultLines.join('\n');
 }
 
 /**
@@ -227,10 +225,6 @@ export async function queryGeminiVault(
 ): Promise<{ text: string; sourcePages: { title: string; id: string }[] }> {
   const apiKey = getGeminiApiKey();
 
-  // Never make a network request with an empty key. The local analyzer keeps
-  // the feature useful offline and avoids leaking context to a failed request.
-  if (!apiKey) return simulateGeminiResponse(query, vaultPages, customSystemPrompt);
-
   const currentDate = new Date().toLocaleDateString('vi-VN', {
     weekday: 'long',
     year: 'numeric',
@@ -241,13 +235,9 @@ export async function queryGeminiVault(
   });
 
   // Extract text from ALL pages in full detail without truncation cutoffs
-  const fullVaultContextStr = vaultPages
+  const vaultContextStr = vaultPages
     .map((p) => parsePageToCleanText(p))
     .join('\n');
-  const MAX_CONTEXT_CHARS = 180_000;
-  const vaultContextStr = fullVaultContextStr.length > MAX_CONTEXT_CHARS
-    ? `${fullVaultContextStr.slice(0, MAX_CONTEXT_CHARS)}\n[Đã rút gọn vì vượt giới hạn dữ liệu gửi cho AI.]`
-    : fullVaultContextStr;
 
   const systemInstructionText = customSystemPrompt || `Bạn là Trợ lý AI Vault thông minh và tinh nhuệ của ứng dụng WebNote.
 Thời gian hệ thống hiện tại: ${currentDate}.
@@ -549,7 +539,7 @@ function simulateGeminiResponse(query: string, vaultPages: Page[], customPrompt?
   }
 
   return {
-    text: sanitizeAIHtml(resultHtml),
+    text: resultHtml,
     sourcePages: activePages.map((p) => ({ title: p.title, id: p.id })),
   };
 }
@@ -734,7 +724,7 @@ Trả về kết quả chuẩn định dạng JSON duy nhất (không bọc tron
           const parsed = JSON.parse(jsonMatch[0]);
           return {
             recommendations: parsed.recommendations || [],
-            summaryHtml: sanitizeAIHtml(parsed.summary || '<p class="text-xs text-slate-300">Đã tối ưu hóa lịch biểu thành công.</p>'),
+            summaryHtml: parsed.summary || '<p class="text-xs text-slate-300">Đã tối ưu hóa lịch biểu thành công.</p>',
           };
         }
       }
@@ -763,7 +753,7 @@ Trả về kết quả chuẩn định dạng JSON duy nhất (không bọc tron
 
   return {
     recommendations: fallbackRecs,
-    summaryHtml: sanitizeAIHtml(`<p class="text-xs text-amber-300">Đã tạo lịch đề xuất tự động (Fallback mode). Bạn có thể chỉnh sửa khung giờ tùy thích.</p>`),
+    summaryHtml: `<p class="text-xs text-amber-300">Đã tạo lịch đề xuất tự động (Fallback mode). Bạn có thể chỉnh sửa khung giờ tùy thích.</p>`,
   };
 }
 
@@ -808,7 +798,7 @@ YÊU CẦU ĐỊNH DẠNG:
       if (response.ok) {
         const data = await response.json();
         const html = data.candidates?.[0]?.content?.parts?.[0]?.text;
-        if (html && html.trim()) return sanitizeAIHtml(html.trim().replace(/^```html|```$/g, ''));
+        if (html && html.trim()) return html.trim().replace(/^```html|```$/g, '');
       }
     } catch (err) {
       console.warn('[Gemini] Daily Briefing error:', err);
@@ -816,7 +806,7 @@ YÊU CẦU ĐỊNH DẠNG:
   }
 
   // Fallback Daily Briefing HTML
-  return sanitizeAIHtml(`
+  return `
     <div class="space-y-3 text-xs leading-relaxed text-slate-200">
       <p class="text-sm font-bold text-amber-300 flex items-center gap-1.5">
         ☀️ Chào ngày mới! Chúc bạn một ngày làm việc tràn đầy năng lượng và hiệu quả.
@@ -827,21 +817,7 @@ YÊU CẦU ĐỊNH DẠNG:
       </div>
       <p class="text-slate-300">💡 <em>Mẹo nhỏ:</em> Hãy giải quyết công việc quan trọng nhất ngay đầu buổi sáng khi tinh thần minh mẫn nhất (Eat the Frog)!</p>
     </div>
-  `);
-}
-
-/** Validate the configured key with a lightweight models request. */
-export async function testGeminiApiKey(apiKey = getGeminiApiKey()): Promise<{ ok: boolean; message: string }> {
-  const key = apiKey.trim();
-  if (!key) return { ok: false, message: 'Chưa có Gemini API key.' };
-  try {
-    const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models?key=${encodeURIComponent(key)}`);
-    if (response.ok) return { ok: true, message: 'Gemini API key hoạt động.' };
-    const data = await response.json().catch(() => ({}));
-    return { ok: false, message: data.error?.message || `Gemini trả về HTTP ${response.status}.` };
-  } catch {
-    return { ok: false, message: 'Không thể kết nối Gemini. Hãy kiểm tra mạng.' };
-  }
+  `;
 }
 
 /**
