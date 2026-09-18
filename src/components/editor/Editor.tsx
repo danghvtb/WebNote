@@ -27,6 +27,7 @@ import { Clock, FileText, Link2, Sparkles, AlertTriangle, Paperclip, Trash2, Boo
 import { useNotesStore } from '../../stores/notesStore';
 import { useAppStore } from '../../stores/appStore';
 import { processGoogleSyncQueue, queueSync } from '../../services/sync/syncManager';
+import { recoverPageSnapshot } from '../../services/sync/pageRecovery';
 import { addPageAttachment, createRevision, deletePageAttachment, getPageAttachments, getPageRevisions, prunePageRevisions, restoreRevision } from '../../services/database/repository';
 import { downloadFileAsBlob, uploadBinaryFile } from '../../services/google/drive';
 import type { Attachment, Page, Revision } from '../../types';
@@ -146,10 +147,13 @@ export function Editor() {
   const [headings, setHeadings] = useState<Array<{ level: number; text: string; pos: number }>>([]);
   const [revisions, setRevisions] = useState<Revision[]>([]);
   const [restoringRevisionId, setRestoringRevisionId] = useState<string | null>(null);
+  const [recoveringFromDrive, setRecoveringFromDrive] = useState(false);
   const [attachments, setAttachments] = useState<Attachment[]>([]);
   const [uploadingAttachment, setUploadingAttachment] = useState(false);
   const [readingMode, setReadingMode] = useState(false);
-  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  // Autosave timers must be isolated per page. A single shared timer lets a
+  // second page cancel the first page's pending save during quick navigation.
+  const saveTimersRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   const currentPageRef = useRef<string | null>(null);
   const lastRevisionAtRef = useRef(0);
   const selectedPage = pages.find((p) => p.id === selectedPageId);
@@ -245,6 +249,31 @@ export function Editor() {
     }
   };
 
+  const handleRecoverFromDrive = async () => {
+    if (!selectedPageId) return;
+    setRecoveringFromDrive(true);
+    try {
+      const recovered = await recoverPageSnapshot(selectedPageId);
+      if (!recovered) {
+        addNotification('warning', 'Không tìm thấy bản sao page có nội dung trên Google Drive.');
+        return;
+      }
+
+      // Preserve the current state before replacing it with the recovered copy.
+      await createRevision(selectedPageId);
+      await updatePageContent(selectedPageId, recovered.content);
+      await updatePageTitle(selectedPageId, recovered.title);
+      await queueSync('update', 'page', selectedPageId, { content: recovered.content, title: recovered.title });
+      editor?.commands.setContent(recovered.content, { emitUpdate: false });
+      if (editor) refreshHeadings(editor);
+      addNotification('success', 'Đã khôi phục bản sao gần nhất từ Google Drive.');
+    } catch (error) {
+      addNotification('error', error instanceof Error ? error.message : 'Không thể khôi phục từ Google Drive.');
+    } finally {
+      setRecoveringFromDrive(false);
+    }
+  };
+
   const handleDeleteCurrentPage = () => {
     if (!selectedPageId) return;
     const pageIdToDelete = selectedPageId;
@@ -257,9 +286,10 @@ export function Editor() {
       message: `Bạn có chắc chắn muốn chuyển ghi chú "${pageTitle}" vào Thùng rác không?`,
       onConfirm: async () => {
         // 1. Immediately cancel any pending autosave to prevent "Zombie Page"
-        if (saveTimerRef.current) {
-          clearTimeout(saveTimerRef.current);
-          saveTimerRef.current = null;
+        const pendingSave = saveTimersRef.current.get(pageIdToDelete);
+        if (pendingSave) {
+          clearTimeout(pendingSave);
+          saveTimersRef.current.delete(pageIdToDelete);
         }
 
         // 2. Preserve attachment metadata in the queue while the page is moved
@@ -295,9 +325,11 @@ export function Editor() {
 
       setSyncStatus('saving');
 
-      if (saveTimerRef.current) clearTimeout(saveTimerRef.current);
+      const previousTimer = saveTimersRef.current.get(selectedPageId);
+      if (previousTimer) clearTimeout(previousTimer);
 
-      saveTimerRef.current = setTimeout(async () => {
+      const timer = setTimeout(async () => {
+        saveTimersRef.current.delete(selectedPageId);
         try {
           // Keep a lightweight recovery point at most once per 15 minutes.
           if (Date.now() - lastRevisionAtRef.current > 15 * 60 * 1000) {
@@ -312,6 +344,7 @@ export function Editor() {
           setSyncStatus('error', 'Không thể lưu thay đổi');
         }
       }, 1500); // 1.5 second debounce
+      saveTimersRef.current.set(selectedPageId, timer);
     },
     [selectedPageId, updatePageContent, setSyncStatus]
   );
@@ -712,7 +745,17 @@ export function Editor() {
             <div className="p-3 rounded-xl bg-slate-900/60 border border-slate-800" role="region" aria-label="Lịch sử phiên bản">
               <div className="flex items-center justify-between mb-2">
                 <h4 className="font-semibold text-slate-300 text-xs">Các phiên bản gần đây</h4>
-                <button onClick={() => setHistoryOpen(false)} className="text-slate-500 hover:text-white text-xs cursor-pointer">Đóng</button>
+                <div className="flex items-center gap-2">
+                  <button
+                    type="button"
+                    onClick={() => void handleRecoverFromDrive()}
+                    disabled={recoveringFromDrive}
+                    className="touch-target px-2 py-1 rounded border border-cyan-500/30 text-cyan-300 hover:bg-cyan-900/30 disabled:opacity-50 cursor-pointer"
+                  >
+                    {recoveringFromDrive ? 'Đang khôi phục...' : 'Khôi phục từ Drive'}
+                  </button>
+                  <button type="button" onClick={() => setHistoryOpen(false)} className="touch-target px-2 py-1 text-slate-500 hover:text-white text-xs cursor-pointer">Đóng</button>
+                </div>
               </div>
               {revisions.length === 0 ? (
                 <p className="text-xs text-slate-500">Chưa có phiên bản lưu tự động.</p>
