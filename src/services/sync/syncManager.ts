@@ -214,7 +214,7 @@ export function mergeNewerLocalRecords(remote: VaultSnapshot, local: VaultSnapsh
   for (const localDay of (local.days || []) as Array<{ id: string; updatedAt?: string; createdAt?: string }>) {
     if (!remoteDayIds.has(localDay.id)) remoteDays.push(localDay);
   }
-  merged.days = remoteDays;
+  merged.days = remoteDays as VaultSnapshot['days'];
   const collections: Array<{ entity: SyncOperation['entity']; key: keyof VaultSnapshot }> = [
     { entity: 'notebook', key: 'notebooks' },
     { entity: 'page', key: 'pages' }, { entity: 'tag', key: 'tags' },
