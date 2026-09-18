@@ -1,4 +1,6 @@
-const CACHE_NAME = 'webnote-shell-v2';
+// Bump this whenever the app shell changes so clients cannot keep an
+// incompatible runtime from a previous deployment.
+const CACHE_NAME = 'webnote-shell-v3';
 const APP_SHELL = ['./', './index.html', './favicon.svg', './manifest.webmanifest'];
 
 self.addEventListener('install', (event) => {
@@ -24,17 +26,34 @@ self.addEventListener('fetch', (event) => {
   if (request.method !== 'GET' || new URL(request.url).origin !== self.location.origin) return;
 
   if (request.mode === 'navigate') {
-    event.respondWith(fetch(request).catch(() => caches.match('./index.html')));
+    event.respondWith((async () => {
+      try {
+        return await fetch(request);
+      } catch {
+        try {
+          return await caches.match('./index.html') || Response.error();
+        } catch {
+          return Response.error();
+        }
+      }
+    })());
     return;
   }
 
-  event.respondWith(
-    caches.match(request).then((cached) => cached || fetch(request).then((response) => {
-      if (response.ok) {
+  event.respondWith((async () => {
+    let cached;
+    try { cached = await caches.match(request); } catch { cached = undefined; }
+    if (cached) return cached;
+    const response = await fetch(request);
+    if (response.ok) {
+      try {
         const copy = response.clone();
-        caches.open(CACHE_NAME).then((cache) => cache.put(request, copy));
+        const cache = await caches.open(CACHE_NAME);
+        await cache.put(request, copy);
+      } catch {
+        // Cache storage is optional; a successful network response is enough.
       }
-      return response;
-    }))
-  );
+    }
+    return response;
+  })());
 });
